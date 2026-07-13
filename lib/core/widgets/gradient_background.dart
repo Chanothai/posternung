@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../theme/app_colors.dart';
 
-/// The diagonal gradient wash used as the background on onboarding screens
-/// that don't have a hero image (shared by the authenticate and
-/// limited-stock screens).
-class OnboardingGradientBackground extends StatelessWidget {
-  const OnboardingGradientBackground({super.key});
+/// The diagonal gradient wash used as the background on screens that don't
+/// have a hero image. Shared across features (onboarding + auth) — lives in
+/// `core/` per CLAUDE.md's cross-feature rule.
+class AppGradientBackground extends StatelessWidget {
+  const AppGradientBackground({super.key});
 
   @override
   Widget build(BuildContext context) {

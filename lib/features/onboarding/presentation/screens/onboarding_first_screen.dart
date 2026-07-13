@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../auth/auth_gate.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../home/home_page.dart';
+import '../../../auth/presentation/auth_gate.dart';
 import '../providers/onboarding_providers.dart';
 import '../widgets/onboarding_footer.dart';
 import '../widgets/onboarding_header.dart';
