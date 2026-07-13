@@ -14,13 +14,13 @@ void main() {
       ),
     );
 
-    expect(find.text('Cinevault 2'), findsOneWidget);
-    expect(find.text('SKIP'), findsOneWidget);
-    expect(find.text('VERIFIED'), findsOneWidget);
+    expect(find.text('PosterNung'), findsOneWidget);
+    expect(find.text('ข้าม'), findsOneWidget);
+    expect(find.text('ยืนยันแล้ว'), findsOneWidget);
     expect(
-      find.text('100% Authenticated\nOriginals', findRichText: true),
+      find.text('รับรองความแท้ 100%\nต้นฉบับ', findRichText: true),
       findsOneWidget,
     );
-    expect(find.text('Next'), findsOneWidget);
+    expect(find.text('ถัดไป'), findsOneWidget);
   });
 }

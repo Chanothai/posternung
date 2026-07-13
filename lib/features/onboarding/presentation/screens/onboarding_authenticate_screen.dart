@@ -26,7 +26,7 @@ class OnboardingAuthenticateScreen extends ConsumerWidget {
   }
 
   static Widget _buildHome(BuildContext context) =>
-      const MyHomePage(title: 'Cinevault');
+      const MyHomePage(title: 'PosterNung');
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -185,7 +185,7 @@ class _CenterpieceBadge extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 11),
-                        Text('VERIFIED', style: AppTextStyles.badgeLabel),
+                        Text('ยืนยันแล้ว', style: AppTextStyles.badgeLabel),
                       ],
                     ),
                   ),
@@ -211,11 +211,11 @@ class _CopyBlock extends StatelessWidget {
           TextSpan(
             children: [
               TextSpan(
-                text: '100% Authenticated\n',
+                text: 'รับรองความแท้ 100%\n',
                 style: AppTextStyles.heroTitleSmall,
               ),
               TextSpan(
-                text: 'Originals',
+                text: 'ต้นฉบับ',
                 style: AppTextStyles.heroTitleSmallEmphasis,
               ),
             ],
@@ -226,8 +226,8 @@ class _CopyBlock extends StatelessWidget {
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 384),
           child: Text(
-            'Every poster is strictly vetted by experts. Complete with a '
-            'digital certificate of authenticity and provenance tracing.',
+            'โปสเตอร์ทุกชิ้นผ่านการตรวจสอบอย่างเข้มงวดโดยผู้เชี่ยวชาญ '
+            'พร้อมใบรับรองความแท้แบบดิจิทัลและการตรวจสอบที่มาโดยละเอียด',
             style: AppTextStyles.bodyDescription,
             textAlign: TextAlign.center,
           ),

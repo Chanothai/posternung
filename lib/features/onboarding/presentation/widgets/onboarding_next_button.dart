@@ -4,7 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 
-/// The accent pill "Next" CTA shared across onboarding screens.
+/// The accent pill "next" CTA shared across onboarding screens.
 class OnboardingNextButton extends StatelessWidget {
   const OnboardingNextButton({super.key, required this.onPressed});
 
@@ -30,7 +30,7 @@ class OnboardingNextButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Next', style: AppTextStyles.primaryButton),
+              Text('ถัดไป', style: AppTextStyles.primaryButton),
               const SizedBox(width: 12),
               SvgPicture.asset(
                 'assets/images/arrow_right.svg',

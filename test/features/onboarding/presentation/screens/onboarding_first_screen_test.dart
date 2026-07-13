@@ -13,13 +13,16 @@ void main() {
       const ProviderScope(child: MaterialApp(home: OnboardingFirstScreen())),
     );
 
-    expect(find.text('Cinevault 2'), findsOneWidget);
+    expect(find.text('PosterNung'), findsOneWidget);
     expect(
-      find.text('Own a Piece of\nCinema History', findRichText: true),
+      find.text(
+        'เป็นเจ้าของชิ้นส่วนหนึ่งของ\nประวัติศาสตร์ภาพยนตร์',
+        findRichText: true,
+      ),
       findsOneWidget,
     );
-    expect(find.text('Next'), findsOneWidget);
-    expect(find.text('SKIP'), findsOneWidget);
+    expect(find.text('ถัดไป'), findsOneWidget);
+    expect(find.text('ข้าม'), findsOneWidget);
   });
 
   testWidgets('tapping Next navigates to the authenticate screen', (
@@ -29,7 +32,7 @@ void main() {
       const ProviderScope(child: MaterialApp(home: OnboardingFirstScreen())),
     );
 
-    await tester.tap(find.text('Next'));
+    await tester.tap(find.text('ถัดไป'));
     await tester.pumpAndSettle();
 
     expect(find.byType(OnboardingAuthenticateScreen), findsOneWidget);
