@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import 'onboarding_next_button.dart';
+import 'onboarding_primary_button.dart';
 import 'onboarding_progress_indicator.dart';
 
 /// Shared footer chrome across onboarding screens: gradient wash, progress
-/// dots, and the Next CTA.
+/// dots, and the primary CTA.
 class OnboardingFooter extends StatelessWidget {
   const OnboardingFooter({
     super.key,
     required this.currentPage,
     required this.onNext,
+    this.buttonLabel = 'ถัดไป',
+    this.showArrowIcon = true,
   });
 
   final int currentPage;
   final VoidCallback onNext;
+  final String buttonLabel;
+  final bool showArrowIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +40,11 @@ class OnboardingFooter extends StatelessWidget {
           children: [
             OnboardingProgressIndicator(currentPage: currentPage),
             const SizedBox(height: 32),
-            OnboardingNextButton(onPressed: onNext),
+            OnboardingPrimaryButton(
+              onPressed: onNext,
+              label: buttonLabel,
+              showArrow: showArrowIcon,
+            ),
           ],
         ),
       ),
