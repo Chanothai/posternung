@@ -23,7 +23,7 @@ class OnboardingFirstScreen extends ConsumerWidget {
   }
 
   static Widget _buildHome(BuildContext context) =>
-      const MyHomePage(title: 'Cinevault');
+      const MyHomePage(title: 'PosterNung');
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -45,12 +45,28 @@ class OnboardingFirstScreen extends ConsumerWidget {
                     _enterApp(context);
                   },
                 ),
-                const Spacer(flex: 3),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 32),
-                  child: _HeroContent(),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight,
+                          ),
+                          child: Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                                vertical: 24,
+                              ),
+                              child: const _HeroContent(),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-                const Spacer(flex: 2),
                 OnboardingFooter(
                   currentPage: currentPage,
                   onNext: () {
@@ -127,11 +143,11 @@ class _HeroContent extends StatelessWidget {
             TextSpan(
               children: [
                 TextSpan(
-                  text: 'Own a Piece of\n',
+                  text: 'เป็นเจ้าของชิ้นส่วนหนึ่งของ\n',
                   style: AppTextStyles.heroTitle,
                 ),
                 TextSpan(
-                  text: 'Cinema History',
+                  text: 'ประวัติศาสตร์ภาพยนตร์',
                   style: AppTextStyles.heroTitleEmphasis,
                 ),
               ],
@@ -142,8 +158,8 @@ class _HeroContent extends StatelessWidget {
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 384),
             child: Text(
-              'Discover and collect rare, authenticated original movie '
-              'posters from your favorite eras.',
+              'ค้นพบและสะสมโปสเตอร์ภาพยนตร์ต้นฉบับหายากที่ผ่านการรับรอง '
+              'จากยุคที่คุณชื่นชอบ',
               style: AppTextStyles.bodyDescription,
               textAlign: TextAlign.center,
             ),

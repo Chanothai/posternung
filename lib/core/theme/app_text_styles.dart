@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
 
-/// Typography tokens extracted from Figma (Cinevault 2 — Onboarding).
+/// Typography tokens extracted from Figma (PosterNung — Onboarding).
 abstract final class AppTextStyles {
   static TextStyle get appBarTitle => GoogleFonts.libreBaskerville(
     fontSize: 20,
@@ -13,7 +13,11 @@ abstract final class AppTextStyles {
     color: AppColors.textPrimary,
   );
 
-  static TextStyle get skipButton => GoogleFonts.libreBaskerville(
+  // Thai text has no glyphs in Lora/Libre Baskerville/IBM Plex Mono — Flutter
+  // silently falls back to a generic system font for it, breaking the
+  // vintage-editorial look. These getters use Thai-covering families chosen
+  // to stay close to the original serif/mono character instead.
+  static TextStyle get skipButton => GoogleFonts.sarabun(
     fontSize: 14,
     height: 20 / 14,
     fontWeight: FontWeight.normal,
@@ -21,14 +25,14 @@ abstract final class AppTextStyles {
     color: AppColors.textSecondary,
   );
 
-  static TextStyle get heroTitle => GoogleFonts.lora(
+  static TextStyle get heroTitle => GoogleFonts.notoSerifThai(
     fontSize: 36,
     height: 45 / 36,
     fontWeight: FontWeight.bold,
     color: AppColors.textPrimary,
   );
 
-  static TextStyle get heroTitleEmphasis => GoogleFonts.lora(
+  static TextStyle get heroTitleEmphasis => GoogleFonts.notoSerifThai(
     fontSize: 36,
     height: 45 / 36,
     fontWeight: FontWeight.normal,
@@ -36,14 +40,14 @@ abstract final class AppTextStyles {
     color: AppColors.accent,
   );
 
-  static TextStyle get heroTitleSmall => GoogleFonts.lora(
+  static TextStyle get heroTitleSmall => GoogleFonts.notoSerifThai(
     fontSize: 30,
     height: 37.5 / 30,
     fontWeight: FontWeight.bold,
     color: AppColors.textPrimary,
   );
 
-  static TextStyle get heroTitleSmallEmphasis => GoogleFonts.lora(
+  static TextStyle get heroTitleSmallEmphasis => GoogleFonts.notoSerifThai(
     fontSize: 30,
     height: 37.5 / 30,
     fontWeight: FontWeight.normal,
@@ -51,21 +55,29 @@ abstract final class AppTextStyles {
     color: AppColors.accent,
   );
 
-  static TextStyle get badgeLabel => GoogleFonts.ibmPlexMono(
+  static TextStyle get badgeLabel => GoogleFonts.sarabun(
     fontSize: 10.4,
     fontWeight: FontWeight.w600,
     letterSpacing: 1.04,
     color: AppColors.textSecondary,
   );
 
-  static TextStyle get bodyDescription => GoogleFonts.libreBaskerville(
+  static TextStyle get stockBadgeLabel => GoogleFonts.sarabun(
+    fontSize: 8,
+    height: 12 / 8,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.8,
+    color: AppColors.accent,
+  );
+
+  static TextStyle get bodyDescription => GoogleFonts.sarabun(
     fontSize: 16,
     height: 26 / 16,
     fontWeight: FontWeight.normal,
     color: AppColors.textSecondary,
   );
 
-  static TextStyle get primaryButton => GoogleFonts.libreBaskerville(
+  static TextStyle get primaryButton => GoogleFonts.sarabun(
     fontSize: 18,
     height: 28 / 18,
     fontWeight: FontWeight.bold,

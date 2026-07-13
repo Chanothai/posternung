@@ -4,11 +4,20 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 
-/// The accent pill "Next" CTA shared across onboarding screens.
-class OnboardingNextButton extends StatelessWidget {
-  const OnboardingNextButton({super.key, required this.onPressed});
+/// The accent pill primary CTA shared across onboarding screens. Defaults to
+/// "next" with a trailing arrow; the last screen passes a different [label]
+/// and sets [showArrow] to false (e.g. "Get Started").
+class OnboardingPrimaryButton extends StatelessWidget {
+  const OnboardingPrimaryButton({
+    super.key,
+    required this.onPressed,
+    this.label = 'ถัดไป',
+    this.showArrow = true,
+  });
 
   final VoidCallback onPressed;
+  final String label;
+  final bool showArrow;
 
   @override
   Widget build(BuildContext context) {
@@ -30,13 +39,15 @@ class OnboardingNextButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Next', style: AppTextStyles.primaryButton),
-              const SizedBox(width: 12),
-              SvgPicture.asset(
-                'assets/images/arrow_right.svg',
-                width: 12.25,
-                height: 14,
-              ),
+              Text(label, style: AppTextStyles.primaryButton),
+              if (showArrow) ...[
+                const SizedBox(width: 12),
+                SvgPicture.asset(
+                  'assets/images/arrow_right.svg',
+                  width: 12.25,
+                  height: 14,
+                ),
+              ],
             ],
           ),
         ),
