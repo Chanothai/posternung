@@ -1,0 +1,23 @@
+{
+  "name": "posternung",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A Flutter app for discovering and collecting rare, authenticated original movie posters. This package.json exists only to host commit-lint/husky/commitizen tooling.",
+  "scripts": {
+    "commit": "git-cz",
+    "prepare": "husky"
+  },
+  "config": {
+    "commitizen": {
+      "path": "cz-conventional-changelog"
+    }
+  },
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.1",
+    "@commitlint/config-conventional": "^21.2.0",
+    "commitizen": "^4.3.2",
+    "cz-conventional-changelog": "^3.3.0",
+    "husky": "^9.1.7"
+  }
+}
