@@ -55,11 +55,19 @@ abstract final class AppTextStyles {
     color: AppColors.accent,
   );
 
-  static TextStyle get badgeLabel => GoogleFonts.chakraPetch(
+  static TextStyle get badgeLabel => GoogleFonts.sarabun(
     fontSize: 10.4,
     fontWeight: FontWeight.w600,
     letterSpacing: 1.04,
     color: AppColors.textSecondary,
+  );
+
+  static TextStyle get stockBadgeLabel => GoogleFonts.sarabun(
+    fontSize: 8,
+    height: 12 / 8,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.8,
+    color: AppColors.accent,
   );
 
   static TextStyle get bodyDescription => GoogleFonts.sarabun(

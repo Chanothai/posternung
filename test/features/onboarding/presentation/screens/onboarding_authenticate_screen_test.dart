@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:posternung/features/onboarding/presentation/screens/onboarding_authenticate_screen.dart';
+import 'package:posternung/features/onboarding/presentation/screens/onboarding_limit_stock_screen.dart';
 
 void main() {
   testWidgets('OnboardingAuthenticateScreen renders badge copy and CTA', (
@@ -22,5 +23,20 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('ถัดไป'), findsOneWidget);
+  });
+
+  testWidgets('tapping Next navigates to the limit-stock screen', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(home: OnboardingAuthenticateScreen()),
+      ),
+    );
+
+    await tester.tap(find.text('ถัดไป'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(OnboardingLimitStockScreen), findsOneWidget);
   });
 }

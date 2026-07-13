@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -9,17 +10,16 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../home/home_page.dart';
 import '../providers/onboarding_providers.dart';
-import '../widgets/dashed_circle_border.dart';
 import '../widgets/onboarding_footer.dart';
 import '../widgets/onboarding_gradient_background.dart';
 import '../widgets/onboarding_header.dart';
-import 'onboarding_limit_stock_screen.dart';
 
-/// Second screen of the onboarding flow ("100% Authenticated Originals").
+/// Third and final screen of the onboarding flow ("Limited Stock — One of a
+/// Kind"). Its skip action is hidden — there's nothing left to skip to.
 ///
-/// Figma: node 7:2, frame "Onboarding - Authenticate".
-class OnboardingAuthenticateScreen extends ConsumerWidget {
-  const OnboardingAuthenticateScreen({super.key});
+/// Figma: node 7:90, frame "Onboarding - limit stock".
+class OnboardingLimitStockScreen extends ConsumerWidget {
+  const OnboardingLimitStockScreen({super.key});
 
   void _enterApp(BuildContext context) {
     Navigator.of(context).pushReplacement(
@@ -44,12 +44,7 @@ class OnboardingAuthenticateScreen extends ConsumerWidget {
           SafeArea(
             child: Column(
               children: [
-                OnboardingHeader(
-                  onSkip: () {
-                    controller.skip();
-                    _enterApp(context);
-                  },
-                ),
+                const OnboardingHeader(),
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
@@ -67,7 +62,7 @@ class OnboardingAuthenticateScreen extends ConsumerWidget {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const _CenterpieceBadge(),
+                                  const _CenterpieceIllustration(),
                                   const SizedBox(height: 40),
                                   const _CopyBlock(),
                                 ],
@@ -81,13 +76,11 @@ class OnboardingAuthenticateScreen extends ConsumerWidget {
                 ),
                 OnboardingFooter(
                   currentPage: currentPage,
+                  buttonLabel: 'เริ่มต้นใช้งาน',
+                  showArrowIcon: false,
                   onNext: () {
                     controller.next();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const OnboardingLimitStockScreen(),
-                      ),
-                    );
+                    _enterApp(context);
                   },
                 ),
               ],
@@ -99,73 +92,117 @@ class OnboardingAuthenticateScreen extends ConsumerWidget {
   }
 }
 
-class _CenterpieceBadge extends StatelessWidget {
-  const _CenterpieceBadge();
+class _CenterpieceIllustration extends StatelessWidget {
+  const _CenterpieceIllustration();
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 256,
-      height: 256,
+      width: 192,
+      height: 203,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Opacity(
-            opacity: 0.2,
-            child: SvgPicture.asset(
-              'assets/images/header_icon.svg',
-              width: 256,
-              height: 256,
-            ),
-          ),
           Container(
             width: 192,
             height: 192,
-            padding: const EdgeInsets.all(17),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.borderMuted, width: 1),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.accent.withValues(alpha: 0.4),
-                  blurRadius: 40,
-                ),
-              ],
-            ),
-            child: ClipOval(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
-                child: DashedCircleBorder(
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.accent.withValues(alpha: 0.6),
-                                blurRadius: 7.5,
-                              ),
-                            ],
-                          ),
-                          child: SvgPicture.asset(
-                            'assets/images/verified_badge_icon.svg',
-                          ),
-                        ),
-                        const SizedBox(height: 11),
-                        Text('ยืนยันแล้ว', style: AppTextStyles.badgeLabel),
-                      ],
-                    ),
-                  ),
-                ),
+              gradient: RadialGradient(
+                colors: [
+                  AppColors.accent.withValues(alpha: 0.15),
+                  AppColors.accent.withValues(alpha: 0),
+                ],
               ),
             ),
           ),
+          Positioned(
+            left: 0,
+            child: Transform.rotate(
+              angle: -15 * math.pi / 180,
+              child: const _FadedPosterCard(),
+            ),
+          ),
+          Positioned(
+            right: 0,
+            child: Transform.rotate(
+              angle: 15 * math.pi / 180,
+              child: const _FadedPosterCard(),
+            ),
+          ),
+          const _HighlightedPosterCard(),
         ],
+      ),
+    );
+  }
+}
+
+class _FadedPosterCard extends StatelessWidget {
+  const _FadedPosterCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return ImageFiltered(
+      imageFilter: ImageFilter.blur(sigmaX: 1, sigmaY: 1),
+      child: Opacity(
+        opacity: 0.3,
+        child: Container(
+          width: 128,
+          height: 176,
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.borderMuted),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HighlightedPosterCard extends StatelessWidget {
+  const _HighlightedPosterCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 144,
+      height: 192,
+      padding: const EdgeInsets.all(9),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceDark,
+        border: Border.all(color: AppColors.accent),
+        borderRadius: BorderRadius.circular(4),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(58, 51, 44, 0.3),
+            offset: Offset(2, 3),
+            blurRadius: 2.5,
+          ),
+        ],
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color.fromRGBO(0, 0, 0, 0.4),
+          border: Border.all(color: AppColors.borderMuted, width: 1),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SvgPicture.asset(
+                'assets/images/poster_placeholder_icon.svg',
+                width: 30,
+                height: 30,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'เหลือ 1\nชิ้นสุดท้าย',
+                style: AppTextStyles.stockBadgeLabel,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -183,11 +220,11 @@ class _CopyBlock extends StatelessWidget {
           TextSpan(
             children: [
               TextSpan(
-                text: 'รับรองความแท้ 100%\n',
+                text: 'สินค้ามีจำนวนจำกัด\n',
                 style: AppTextStyles.heroTitleSmall,
               ),
               TextSpan(
-                text: 'ต้นฉบับ',
+                text: '— ชิ้นเดียวในโลก',
                 style: AppTextStyles.heroTitleSmallEmphasis,
               ),
             ],
@@ -198,8 +235,8 @@ class _CopyBlock extends StatelessWidget {
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 384),
           child: Text(
-            'โปสเตอร์ทุกชิ้นผ่านการตรวจสอบอย่างเข้มงวดโดยผู้เชี่ยวชาญ '
-            'พร้อมใบรับรองความแท้แบบดิจิทัลและการตรวจสอบที่มาโดยละเอียด',
+            'ของหายากหมดเร็วมาก เมื่อโปสเตอร์ชิ้นพิเศษถูกขายไปแล้ว '
+            'มันจะหายไปจากคลังตลอดกาล',
             style: AppTextStyles.bodyDescription,
             textAlign: TextAlign.center,
           ),
