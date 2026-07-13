@@ -7,4 +7,5 @@ abstract final class AppColors {
   static const Color textSecondary = Color(0xFFE2D8C3);
   static const Color accent = Color(0xFFA67C52);
   static const Color white = Color(0xFFFFFFFF);
+  static const Color borderMuted = Color(0xFFE5E7EB);
 }
