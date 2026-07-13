@@ -84,4 +84,72 @@ abstract final class AppTextStyles {
     letterSpacing: 0.45,
     color: AppColors.white,
   );
+
+  // --- Auth (login/register) ---
+
+  static TextStyle get brandTitleLarge => GoogleFonts.libreBaskerville(
+    fontSize: 24,
+    height: 32 / 24,
+    fontWeight: FontWeight.bold,
+    letterSpacing: 1.2,
+    color: AppColors.textPrimary,
+  );
+
+  static TextStyle get authCardHeading => GoogleFonts.notoSerifThai(
+    fontSize: 24,
+    height: 32 / 24,
+    fontWeight: FontWeight.bold,
+    color: AppColors.textPrimary,
+  );
+
+  static TextStyle get cardSubtitle => GoogleFonts.sarabun(
+    fontSize: 14,
+    height: 20 / 14,
+    fontWeight: FontWeight.normal,
+    color: AppColors.textSecondary,
+  );
+
+  static TextStyle get inputLabel => GoogleFonts.sarabun(
+    fontSize: 12,
+    height: 16 / 12,
+    fontWeight: FontWeight.bold,
+    letterSpacing: 0.6,
+    color: AppColors.textSecondary,
+  );
+
+  static TextStyle get inputText => GoogleFonts.sarabun(
+    fontSize: 16,
+    fontWeight: FontWeight.normal,
+    color: AppColors.surfaceDark,
+  );
+
+  static TextStyle get linkSmall => GoogleFonts.sarabun(
+    fontSize: 12,
+    height: 16 / 12,
+    fontWeight: FontWeight.normal,
+    color: AppColors.accent,
+  );
+
+  static TextStyle get linkBold => GoogleFonts.sarabun(
+    fontSize: 14,
+    height: 20 / 14,
+    fontWeight: FontWeight.bold,
+    color: AppColors.accent,
+  );
+
+  static TextStyle get authButtonLabel => GoogleFonts.sarabun(
+    fontSize: 16,
+    height: 24 / 16,
+    fontWeight: FontWeight.bold,
+    letterSpacing: 0.4,
+    color: AppColors.white,
+  );
+
+  static TextStyle get dividerLabel => GoogleFonts.sarabun(
+    fontSize: 12,
+    height: 16 / 12,
+    fontWeight: FontWeight.normal,
+    letterSpacing: 1.2,
+    color: AppColors.textPrimary,
+  );
 }
