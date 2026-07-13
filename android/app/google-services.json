@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "254591535895",
+    "project_id": "posternung",
+    "storage_bucket": "posternung.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:254591535895:android:7fff393e381c369cc40552",
+        "android_client_info": {
+          "package_name": "com.example.posternung"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCgwy5w1gHW4Z_yFXpHBHsQq1nELFZF9Us"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
