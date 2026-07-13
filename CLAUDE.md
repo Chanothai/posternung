@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Architecture and coding guidelines for the **posternung** (Cinevault) Flutter app. Read this before adding or modifying code — it defines the conventions Claude (and any contributor) must follow in this repo.
+Architecture and coding guidelines for the **posternung** (PosterNung) Flutter app. Read this before adding or modifying code — it defines the conventions Claude (and any contributor) must follow in this repo.
 
 ## Overall Architecture
 
@@ -101,6 +101,8 @@ View (ConsumerWidget)
 
   ViewModels depend on usecases, never on repositories directly.
 
+  See `lib/features/auth/` for a real, working instance of this whole chain: `domain/repositories/auth_repository.dart` (interface) → `data/repositories/auth_repository_impl.dart` (maps `FirebaseAuthException` → domain `AuthException` from `core/error/`) → `domain/usecases/sign_in_with_email_password.dart` → `presentation/providers/auth_providers.dart` (`AuthViewModel`) → `presentation/screens/login_screen.dart`.
+
 ## Dependency Injection: Riverpod providers only
 
 No `get_it`, no service locator. Riverpod's provider graph *is* the DI container:
@@ -171,15 +173,32 @@ Every dependency is swappable at any layer via `ProviderScope(overrides: [...])`
 
 ```
 lib/
-  core/theme/                                    # design tokens (Figma-derived)
-  features/onboarding/presentation/               # presentation-only feature, no data/domain layer yet
-  auth/                                           # Firebase Auth (login/signup) — predates this architecture doc,
-                                                   # not yet split into data/domain/presentation
-  home/                                           # placeholder post-login screen
+  core/
+    theme/                                        # design tokens (Figma-derived): AppColors, AppTextStyles
+    error/                                         # shared domain exception types (AuthException, ...)
+    widgets/                                       # cross-feature widgets (AppGradientBackground, ...)
+  features/
+    onboarding/
+      presentation/
+        providers/                                 # OnboardingController — shared page-index state, 3 pages
+        screens/                                    # OnboardingFirstScreen, OnboardingAuthenticateScreen,
+                                                     # OnboardingLimitStockScreen — presentation-only, no
+                                                     # data/domain layer (no data dependency, per the rule above)
+        widgets/                                    # shared onboarding chrome: header, footer, progress dots,
+                                                     # primary button — extracted once 2+ screens needed them
+    auth/
+      domain/                                       # AuthUser entity, AuthRepository interface, sign-in/sign-up
+                                                     # usecases
+      data/                                         # AuthRemoteDataSource + AuthRepositoryImpl
+      presentation/
+        providers/                                  # DI graph + AuthViewModel (AsyncNotifier)
+        screens/                                    # LoginScreen (login/register, mode-toggled)
+        auth_gate.dart                               # gates a destination behind auth state
+  home/                                            # placeholder post-login screen — stock Flutter counter demo
   main.dart
 ```
 
-`auth/` and `home/` predate this document and are not yet reorganized into the feature-first layout — don't block unrelated work on migrating them, but new code in those areas should move toward this structure incrementally rather than add to the old one.
+`onboarding` and `auth` are both fully feature-first. `home/` is the only part of the app that still predates this document — don't block unrelated work migrating it, but new code there should move toward `features/home/` incrementally rather than add to the old flat location.
 
 ## General Rules
 
@@ -211,7 +230,7 @@ lib/
 
 **Types ที่ใช้ได้**: `feat` `fix` `refactor` `perf` `test` `docs` `style` `chore` `build` `ci` `revert`
 
-**Scope**: ต้องตรงกับชื่อ folder ใน `lib/features/<scope>/` เช่น `onboarding` (ปัจจุบัน), หรือ `cart`, `checkout`, `payment` (feature ในอนาคต) — สำหรับโค้ดที่ยังไม่ได้ย้ายเข้า feature-first layout ใช้ชื่อ folder เดิมได้ (เช่น `auth`)
+**Scope**: ต้องตรงกับชื่อ folder ใน `lib/features/<scope>/` เช่น `onboarding`, `auth` (ปัจจุบัน), หรือ `cart`, `checkout`, `payment` (feature ในอนาคต) — สำหรับโค้ดที่ยังไม่ได้ย้ายเข้า feature-first layout ใช้ชื่อ folder เดิมได้ (เช่น `home`)
 ถ้าเป็นงานข้าม feature ทั้งหมด (เช่น dependency, CI) scope เป็น `deps`, `ci`, `config` แทน
 
 **Subject**: imperative mood, ตัวพิมพ์เล็ก, ไม่มีจุดปิดท้าย, ≤ 50 ตัวอักษร
