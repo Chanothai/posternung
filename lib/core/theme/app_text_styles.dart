@@ -36,6 +36,28 @@ abstract final class AppTextStyles {
     color: AppColors.accent,
   );
 
+  static TextStyle get heroTitleSmall => GoogleFonts.lora(
+    fontSize: 30,
+    height: 37.5 / 30,
+    fontWeight: FontWeight.bold,
+    color: AppColors.textPrimary,
+  );
+
+  static TextStyle get heroTitleSmallEmphasis => GoogleFonts.lora(
+    fontSize: 30,
+    height: 37.5 / 30,
+    fontWeight: FontWeight.normal,
+    fontStyle: FontStyle.italic,
+    color: AppColors.accent,
+  );
+
+  static TextStyle get badgeLabel => GoogleFonts.ibmPlexMono(
+    fontSize: 10.4,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 1.04,
+    color: AppColors.textSecondary,
+  );
+
   static TextStyle get bodyDescription => GoogleFonts.libreBaskerville(
     fontSize: 16,
     height: 26 / 16,
