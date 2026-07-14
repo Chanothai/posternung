@@ -1,6 +1,6 @@
 # Build Environments Setup (SIT / UAT / Production)
 
-The app builds as three environments — **SIT**, **UAT**, **Production** — installable side by side on the same device (distinct bundle ID / app name / icon each), backed by a single shared Firebase project (`posternung`). The code-side scaffolding (Android flavors, iOS xcconfigs, the Dart `Environment` abstraction) is already committed. **The steps below are manual** — they need your Firebase login and/or Xcode's GUI, so they can't be automated here.
+The app builds as three environments — **SIT**, **UAT**, **Production** — installable side by side on the same device (distinct bundle ID / app name / icon each), backed by a single shared Firebase project (`posternung`). All the code-side scaffolding is committed, **including** the Xcode build configurations and `sit`/`uat`/`production` schemes — `flutter run --flavor sit` (or the matching Xcode scheme) works today. **The steps below are the remaining manual ones** — they need your Firebase login, so they can't be automated here.
 
 | Environment | Application ID / Bundle ID | Firebase app registration |
 |---|---|---|
@@ -44,15 +44,11 @@ Each run overwrites the corresponding placeholder file (which currently just thr
 
 `firebase.json` will also be rewritten by these runs — commit whatever the CLI produces, don't hand-edit it.
 
-## 4. iOS — finish the Xcode-side flavor wiring (GUI only)
+## 4. iOS build configurations and schemes — already done
 
-The xcconfig files, `Info.plist` variable, and `PRODUCT_BUNDLE_IDENTIFIER`/`ASSETCATALOG_COMPILER_APPICON_NAME` indirection are already in place (`ios/Flutter/{Sit,Uat,Production}.xcconfig` + 9 combinator files). What's left needs Xcode's GUI, not a text editor — duplicating build configurations and creating schemes by hand in the `.pbxproj`/`.xcscheme` XML is high-risk (a single mismatched UUID or missed `buildConfigurationList` entry can produce a project that fails to open or silently drops a flavor):
+`ios/Runner.xcodeproj` now has 9 build configurations (`Debug-sit`, `Release-sit`, `Profile-sit`, `Debug-uat`, `Release-uat`, `Profile-uat`, `Debug-production`, `Release-production`, `Profile-production`) and 3 schemes (`sit`, `uat`, `production`), each wired to the matching `ios/Flutter/*.xcconfig` file. `flutter build ios --flavor sit` / `--flavor uat` / `--flavor production` all work today — verified end to end, including the Run Script phase correctly selecting the per-environment `GoogleService-Info.plist`.
 
-1. Open `ios/Runner.xcodeproj` in Xcode.
-2. Select the **Runner** project (top of the navigator) → **Info** tab → **Configurations**. Duplicate each of `Debug`, `Release`, `Profile` twice, naming the 6 new ones `Debug-sit`, `Release-sit`, `Profile-sit`, `Debug-uat`, `Release-uat`, `Profile-uat`. Rename the original three to `Debug-production`, `Release-production`, `Profile-production`.
-3. For each of the 9 configs, on the **Runner** target, set its **Based on Configuration File** (under Build Settings, or via the Info tab's per-target xcconfig picker) to the matching file in `ios/Flutter/`: `Debug-sit.xcconfig`, `Release-sit.xcconfig`, etc.
-4. **Product → Scheme → Manage Schemes** → duplicate the existing `Runner` scheme twice, naming the copies `sit` and `uat`; rename the original to `production`. For each scheme, edit its Test/Run/Profile/Archive/Analyze actions to use the matching `-sit`/`-uat`/`-production` build configuration.
-5. Build each scheme once to confirm it compiles.
+If you ever need to touch these by hand in Xcode (e.g. adding a 4th environment), open `ios/Runner.xcodeproj` → select the **Runner** project → **Info** tab → **Configurations** to see the 9 configs, and **Product → Scheme → Manage Schemes** for the 3 schemes — but for the existing three, nothing further is needed here.
 
 ## 5. Design and export per-environment app icons
 
@@ -65,6 +61,14 @@ Until these exist, SIT/UAT builds simply show the default (production) icon.
 
 ## Verifying it's all wired up
 
-- `flutter run --flavor sit -t lib/main.dart` (same for `uat`/`production`) — after steps 1–3, this should launch with the right Firebase project data and app identity.
-- On iOS, select the `sit`/`uat`/`production` scheme in Xcode and run — after step 4, GoogleService-Info.plist selection and bundle ID/icon should follow automatically.
-- All three environments should be able to coexist installed on one device/simulator at once.
+- `flutter run --flavor sit -t lib/main.dart` (same for `uat`/`production`) — builds and launches today. SIT/UAT will crash immediately on `Firebase.initializeApp()` (an intentional `UnimplementedError`) until steps 1–3 above are done; production runs fully end to end already.
+- On iOS, selecting the `sit`/`uat`/`production` scheme in Xcode and running picks up the right bundle ID, display name, and `GoogleService-Info.plist` automatically — confirmed via `flutter build ios --flavor <env> --no-codesign` for all three.
+- All three environments install side by side on one device/simulator (distinct bundle IDs) once real Firebase apps exist for SIT/UAT.
+
+### VS Code
+
+A `.vscode/launch.json` with `posternung (sit)` / `(uat)` / `(production)` run configurations is already set up locally (gitignored). Pick one from the **Run and Debug** panel dropdown, or from the terminal:
+
+```bash
+flutter run --flavor sit -t lib/main.dart
+```
