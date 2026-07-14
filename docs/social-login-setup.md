@@ -4,7 +4,7 @@ The Dart code for Google and Apple sign-in is complete and merged, but it **will
 
 Bundle ID / package name: `com.frameshine.posternung`.
 
-> **Note:** the package/bundle identifier was recently renamed from `com.example.posternung`. `android/app/google-services.json`, `ios/Runner/GoogleService-Info.plist`, and `lib/firebase_options.dart` have had the identifier string updated locally so the app still builds, but they still point at the **old** Firebase app registration's OAuth client/API key data. Run step 2 (`flutterfire configure`) before anything else — it will prompt to register a new app under `com.frameshine.posternung` and regenerate all three files with the correct values. Until then, Firebase Auth/Google Sign-In will fail at runtime even though the project compiles.
+> **Status:** the package/bundle identifier was renamed from `com.example.posternung` to `com.frameshine.posternung`. New Android + iOS apps have been registered under the new identifier in the `posternung` Firebase project and `google-services.json` / `GoogleService-Info.plist` / `lib/firebase_options.dart` are regenerated and committed (steps 2 & 3 below are done). The **old** `com.example.posternung` app entries still exist in the Firebase project (Firebase doesn't let you rename an app's package/bundle ID) — they're now unused; delete them from Project settings → Your apps whenever convenient, no rush. Steps 1, 4, and 5 still require manual console/portal access and are not done yet.
 
 ---
 
@@ -15,33 +15,15 @@ Bundle ID / package name: `com.frameshine.posternung`.
 1. **Google** → Enable → set a support email → Save.
 2. **Apple** → Enable → Save. (Full functionality also needs the Apple Developer setup in step 4.)
 
-## 2. Regenerate the Firebase config files
+## 2. ~~Regenerate the Firebase config files~~ — done
 
-Enabling Google creates an OAuth client. Pull the updated config (regenerates `google-services.json`, `GoogleService-Info.plist`, and `lib/firebase_options.dart` — now including the iOS `REVERSED_CLIENT_ID`):
+`google-services.json`, `GoogleService-Info.plist`, and `lib/firebase_options.dart` are already regenerated and committed for the `com.frameshine.posternung` apps (via `flutterfire configure --project=posternung`).
 
-```bash
-flutterfire configure --project=posternung
-```
+## 3. ~~iOS — Google URL scheme~~ — done
 
-Commit the regenerated files.
+`ios/Runner/Info.plist` already has the `CFBundleURLTypes` entry wired with the real `REVERSED_CLIENT_ID`.
 
-## 3. iOS — Google URL scheme
-
-Open the refreshed `ios/Runner/GoogleService-Info.plist`, copy the `REVERSED_CLIENT_ID` value, and add it as a URL scheme in `ios/Runner/Info.plist`:
-
-```xml
-<key>CFBundleURLTypes</key>
-<array>
-  <dict>
-    <key>CFBundleURLSchemes</key>
-    <array>
-      <string>REVERSED_CLIENT_ID_GOES_HERE</string>
-    </array>
-  </dict>
-</array>
-```
-
-(The "Sign in with Apple" entitlement — `ios/Runner/Runner.entitlements`, wired via `CODE_SIGN_ENTITLEMENTS` — is already committed. No Info.plist change is needed for Apple.)
+(The "Sign in with Apple" entitlement — `ios/Runner/Runner.entitlements`, wired via `CODE_SIGN_ENTITLEMENTS` — is already committed. No further Info.plist change is needed for Apple.)
 
 ## 4. Apple Developer — Sign in with Apple
 

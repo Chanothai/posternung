@@ -57,18 +57,18 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCgwy5w1gHW4Z_yFXpHBHsQq1nELFZF9Us',
-    appId: '1:254591535895:android:7fff393e381c369cc40552',
+    appId: '1:254591535895:android:e9ff9b9a2b69871ec40552',
     messagingSenderId: '254591535895',
     projectId: 'posternung',
     storageBucket: 'posternung.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyBjTVZu1SJJ3A5oaYLAJlhMvo_t8TGX0PU',
-    appId: '1:254591535895:ios:86332672fe3549eac40552',
+    appId: '1:254591535895:ios:e1bec80bb44df861c40552',
     messagingSenderId: '254591535895',
     projectId: 'posternung',
     storageBucket: 'posternung.firebasestorage.app',
+    iosClientId: '254591535895-ichs0mjkvr2tv531rtv7ffubp5eilphr.apps.googleusercontent.com',
     iosBundleId: 'com.frameshine.posternung',
   );
 }
