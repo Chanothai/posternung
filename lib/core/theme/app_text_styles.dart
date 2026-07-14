@@ -5,7 +5,7 @@ import 'app_colors.dart';
 
 /// Typography tokens extracted from Figma (PosterNung — Onboarding).
 abstract final class AppTextStyles {
-  static final TextStyle appBarTitle = GoogleFonts.libreBaskerville(
+  static final TextStyle appBarTitle = GoogleFonts.kanit(
     fontSize: 20,
     height: 28 / 20,
     fontWeight: FontWeight.bold,
@@ -17,7 +17,7 @@ abstract final class AppTextStyles {
   // silently falls back to a generic system font for it, breaking the
   // vintage-editorial look. These fields use Thai-covering families chosen
   // to stay close to the original serif/mono character instead.
-  static final TextStyle skipButton = GoogleFonts.sarabun(
+  static final TextStyle skipButton = GoogleFonts.kanit(
     fontSize: 14,
     height: 20 / 14,
     fontWeight: FontWeight.normal,
@@ -25,14 +25,14 @@ abstract final class AppTextStyles {
     color: AppColors.textSecondary,
   );
 
-  static final TextStyle heroTitle = GoogleFonts.notoSerifThai(
+  static final TextStyle heroTitle = GoogleFonts.kanit(
     fontSize: 36,
     height: 45 / 36,
     fontWeight: FontWeight.bold,
     color: AppColors.textPrimary,
   );
 
-  static final TextStyle heroTitleEmphasis = GoogleFonts.notoSerifThai(
+  static final TextStyle heroTitleEmphasis = GoogleFonts.kanit(
     fontSize: 36,
     height: 45 / 36,
     fontWeight: FontWeight.normal,
@@ -40,14 +40,14 @@ abstract final class AppTextStyles {
     color: AppColors.accent,
   );
 
-  static final TextStyle heroTitleSmall = GoogleFonts.notoSerifThai(
+  static final TextStyle heroTitleSmall = GoogleFonts.kanit(
     fontSize: 30,
     height: 37.5 / 30,
     fontWeight: FontWeight.bold,
     color: AppColors.textPrimary,
   );
 
-  static final TextStyle heroTitleSmallEmphasis = GoogleFonts.notoSerifThai(
+  static final TextStyle heroTitleSmallEmphasis = GoogleFonts.kanit(
     fontSize: 30,
     height: 37.5 / 30,
     fontWeight: FontWeight.normal,
@@ -55,14 +55,14 @@ abstract final class AppTextStyles {
     color: AppColors.accent,
   );
 
-  static final TextStyle badgeLabel = GoogleFonts.sarabun(
+  static final TextStyle badgeLabel = GoogleFonts.kanit(
     fontSize: 10.4,
     fontWeight: FontWeight.w600,
     letterSpacing: 1.04,
     color: AppColors.textSecondary,
   );
 
-  static final TextStyle stockBadgeLabel = GoogleFonts.sarabun(
+  static final TextStyle stockBadgeLabel = GoogleFonts.kanit(
     fontSize: 8,
     height: 12 / 8,
     fontWeight: FontWeight.w600,
@@ -70,14 +70,14 @@ abstract final class AppTextStyles {
     color: AppColors.accent,
   );
 
-  static final TextStyle bodyDescription = GoogleFonts.sarabun(
+  static final TextStyle bodyDescription = GoogleFonts.kanit(
     fontSize: 16,
     height: 26 / 16,
     fontWeight: FontWeight.normal,
     color: AppColors.textSecondary,
   );
 
-  static final TextStyle primaryButton = GoogleFonts.sarabun(
+  static final TextStyle primaryButton = GoogleFonts.kanit(
     fontSize: 18,
     height: 28 / 18,
     fontWeight: FontWeight.bold,
@@ -87,7 +87,7 @@ abstract final class AppTextStyles {
 
   // --- Auth (login/register) ---
 
-  static final TextStyle brandTitleLarge = GoogleFonts.libreBaskerville(
+  static final TextStyle brandTitleLarge = GoogleFonts.kanit(
     fontSize: 24,
     height: 32 / 24,
     fontWeight: FontWeight.bold,
@@ -95,21 +95,21 @@ abstract final class AppTextStyles {
     color: AppColors.textPrimary,
   );
 
-  static final TextStyle authCardHeading = GoogleFonts.notoSerifThai(
+  static final TextStyle authCardHeading = GoogleFonts.kanit(
     fontSize: 24,
     height: 32 / 24,
     fontWeight: FontWeight.bold,
     color: AppColors.textPrimary,
   );
 
-  static final TextStyle cardSubtitle = GoogleFonts.sarabun(
+  static final TextStyle cardSubtitle = GoogleFonts.kanit(
     fontSize: 14,
     height: 20 / 14,
     fontWeight: FontWeight.normal,
     color: AppColors.textSecondary,
   );
 
-  static final TextStyle inputLabel = GoogleFonts.sarabun(
+  static final TextStyle inputLabel = GoogleFonts.kanit(
     fontSize: 12,
     height: 16 / 12,
     fontWeight: FontWeight.bold,
@@ -117,27 +117,27 @@ abstract final class AppTextStyles {
     color: AppColors.textSecondary,
   );
 
-  static final TextStyle inputText = GoogleFonts.sarabun(
+  static final TextStyle inputText = GoogleFonts.kanit(
     fontSize: 16,
     fontWeight: FontWeight.normal,
     color: AppColors.surfaceDark,
   );
 
-  static final TextStyle linkSmall = GoogleFonts.sarabun(
+  static final TextStyle linkSmall = GoogleFonts.kanit(
     fontSize: 12,
     height: 16 / 12,
     fontWeight: FontWeight.normal,
     color: AppColors.accent,
   );
 
-  static final TextStyle linkBold = GoogleFonts.sarabun(
+  static final TextStyle linkBold = GoogleFonts.kanit(
     fontSize: 14,
     height: 20 / 14,
     fontWeight: FontWeight.bold,
     color: AppColors.accent,
   );
 
-  static final TextStyle authButtonLabel = GoogleFonts.sarabun(
+  static final TextStyle authButtonLabel = GoogleFonts.kanit(
     fontSize: 16,
     height: 24 / 16,
     fontWeight: FontWeight.bold,
@@ -145,7 +145,7 @@ abstract final class AppTextStyles {
     color: AppColors.white,
   );
 
-  static final TextStyle dividerLabel = GoogleFonts.sarabun(
+  static final TextStyle dividerLabel = GoogleFonts.kanit(
     fontSize: 12,
     height: 16 / 12,
     fontWeight: FontWeight.normal,
