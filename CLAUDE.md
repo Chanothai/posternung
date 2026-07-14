@@ -216,6 +216,18 @@ lib/
 
 ---
 
+## Presenting Plans
+
+When Claude presents an implementation plan (plan mode or otherwise), render it as a color-coded HTML artifact rather than a separate long-form markdown document:
+
+- **red** — deleted files
+- **blue** — modified files
+- **green** — added files
+
+Don't produce a polished markdown plan document as an additional user-facing deliverable alongside the HTML — the HTML artifact is the plan.
+
+---
+
 ## Git Commit Workflow
 
 ### เมื่อถูกขอให้ "commit" งาน ให้ทำตามลำดับนี้เสมอ
