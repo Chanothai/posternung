@@ -126,4 +126,13 @@ jobs:
         run: flutter pub get
 
       - name: Build ${{ matrix.platform }}
-        run: ${{ matrix.build_cmd }}
+        run: |
+          for attempt in 1 2 3; do
+            if ${{ matrix.build_cmd }}; then
+              exit 0
+            fi
+            echo "Attempt $attempt failed, retrying in 15s..."
+            sleep 15
+          done
+          echo "All attempts failed."
+          exit 1
