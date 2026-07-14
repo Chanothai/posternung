@@ -4,16 +4,13 @@ The Dart code for Google and Apple sign-in is complete and merged, but it **will
 
 Bundle ID / package name: `com.frameshine.posternung`.
 
-> **Status:** the package/bundle identifier was renamed from `com.example.posternung` to `com.frameshine.posternung`. New Android + iOS apps have been registered under the new identifier in the `posternung` Firebase project and `google-services.json` / `GoogleService-Info.plist` / `lib/firebase_options.dart` are regenerated and committed (steps 2 & 3 below are done). The **old** `com.example.posternung` app entries still exist in the Firebase project (Firebase doesn't let you rename an app's package/bundle ID) — they're now unused; delete them from Project settings → Your apps whenever convenient, no rush. Steps 1, 4, and 5 still require manual console/portal access and are not done yet.
+> **Status:** the package/bundle identifier was renamed from `com.example.posternung` to `com.frameshine.posternung`. New Android + iOS apps have been registered under the new identifier in the `posternung` Firebase project and `google-services.json` / `GoogleService-Info.plist` / `lib/firebase_options.dart` are regenerated and committed (steps 2 & 3 below are done). The **old** `com.example.posternung` app entries still exist in the Firebase project (Firebase doesn't let you rename an app's package/bundle ID) — they're now unused; delete them from Project settings → Your apps whenever convenient, no rush. Steps 1 and 2 are done; step 4 (Apple Developer portal) and step 5 (Android SHA fingerprints + web client ID) still require manual console/portal access.
 
 ---
 
-## 1. Firebase Console — enable providers
+## 1. ~~Firebase Console — enable providers~~ — done
 
-[Firebase Console](https://console.firebase.google.com/project/posternung) → **Authentication → Sign-in method**:
-
-1. **Google** → Enable → set a support email → Save.
-2. **Apple** → Enable → Save. (Full functionality also needs the Apple Developer setup in step 4.)
+Email/Password, Google, and Apple are all enabled in [Firebase Console](https://console.firebase.google.com/project/posternung) → **Authentication → Sign-in method**. Apple sign-in still needs the Services ID/key from step 4 entered into the provider config before it can verify tokens end-to-end.
 
 ## 2. ~~Regenerate the Firebase config files~~ — done
 
