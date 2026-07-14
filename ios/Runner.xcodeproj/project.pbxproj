@@ -365,6 +365,7 @@
 		066798113006532A0036CEF9 /* Debug-production */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				DEVELOPMENT_TEAM = KRQZ9QT757;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Debug-production";
@@ -372,6 +373,7 @@
 		066798123006532A0036CEF9 /* Release-production */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				DEVELOPMENT_TEAM = KRQZ9QT757;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Release-production";
@@ -379,6 +381,7 @@
 		066798133006532A0036CEF9 /* Profile-production */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				DEVELOPMENT_TEAM = KRQZ9QT757;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Profile-production";
@@ -386,6 +389,7 @@
 		066798143006532A0036CEF9 /* Debug-sit */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				DEVELOPMENT_TEAM = KRQZ9QT757;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Debug-sit";
@@ -393,6 +397,7 @@
 		066798153006532A0036CEF9 /* Release-sit */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				DEVELOPMENT_TEAM = KRQZ9QT757;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Release-sit";
@@ -400,6 +405,7 @@
 		066798163006532A0036CEF9 /* Profile-sit */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				DEVELOPMENT_TEAM = KRQZ9QT757;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Profile-sit";
@@ -407,6 +413,7 @@
 		066798173006532A0036CEF9 /* Debug-uat */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				DEVELOPMENT_TEAM = KRQZ9QT757;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Debug-uat";
@@ -414,6 +421,7 @@
 		066798183006532A0036CEF9 /* Release-uat */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				DEVELOPMENT_TEAM = KRQZ9QT757;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Release-uat";
@@ -421,6 +429,7 @@
 		066798193006532A0036CEF9 /* Profile-uat */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				DEVELOPMENT_TEAM = KRQZ9QT757;
 				PRODUCT_NAME = RunnerTests;
 			};
 			name = "Profile-uat";
