@@ -1,3 +1,4 @@
 PRODUCT_BUNDLE_ID_SUFFIX = .uat
 DISPLAY_NAME = PosterNung UAT
 APP_ICON_NAME = AppIcon-Uat
+REVERSED_CLIENT_ID = com.googleusercontent.apps.254591535895-lq8c4bo0bg7bik10brdlcl0aggnre7d5

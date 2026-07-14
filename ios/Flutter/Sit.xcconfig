@@ -1,3 +1,4 @@
 PRODUCT_BUNDLE_ID_SUFFIX = .sit
 DISPLAY_NAME = PosterNung SIT
 APP_ICON_NAME = AppIcon-Sit
+REVERSED_CLIENT_ID = com.googleusercontent.apps.254591535895-j5kf2idvvolertcspk3hs6rr4h67jgfk
