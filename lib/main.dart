@@ -2,13 +2,21 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/config/environment.dart';
+import 'core/config/environment_provider.dart';
+import 'core/config/firebase_options_selector.dart';
 import 'features/onboarding/presentation/screens/onboarding_first_screen.dart';
-import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(const ProviderScope(child: MyApp()));
+  final environment = resolveEnvironment();
+  await Firebase.initializeApp(options: firebaseOptionsFor(environment));
+  runApp(
+    ProviderScope(
+      overrides: [environmentProvider.overrideWithValue(environment)],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
