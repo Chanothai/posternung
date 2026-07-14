@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- PLACEHOLDER — replace with the real file downloaded from Firebase Console
+     after registering an iOS app for bundle ID com.frameshine.posternung.uat
+     under the `posternung` project. See docs/environments-setup.md. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>BUNDLE_ID</key>
+	<string>com.frameshine.posternung.uat</string>
+</dict>
+</plist>

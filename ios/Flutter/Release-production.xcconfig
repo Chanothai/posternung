@@ -1,2 +1,2 @@
-#include "Generated.xcconfig"
+#include "Release.xcconfig"
 #include "Production.xcconfig"
