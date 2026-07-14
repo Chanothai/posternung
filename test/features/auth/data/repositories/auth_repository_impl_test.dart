@@ -1,9 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:posternung/core/error/auth_cancelled_exception.dart';
 import 'package:posternung/core/error/auth_exception.dart';
 import 'package:posternung/features/auth/data/datasources/auth_remote_data_source.dart';
 import 'package:posternung/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class MockAuthRemoteDataSource extends Mock implements AuthRemoteDataSource {}
 
@@ -101,5 +104,83 @@ void main() {
         ),
       );
     });
+  });
+
+  group('signInWithGoogle', () {
+    test('returns a mapped AuthUser on success', () async {
+      when(() => dataSource.signInWithGoogle()).thenAnswer((_) async => user);
+
+      final result = await repository.signInWithGoogle();
+
+      expect(result.uid, 'uid-1');
+      expect(result.email, email);
+    });
+
+    test('maps a user cancellation to AuthCancelledException', () async {
+      when(() => dataSource.signInWithGoogle()).thenThrow(
+        const GoogleSignInException(code: GoogleSignInExceptionCode.canceled),
+      );
+
+      expect(
+        () => repository.signInWithGoogle(),
+        throwsA(isA<AuthCancelledException>()),
+      );
+    });
+
+    test('maps a non-cancel GoogleSignInException to AuthException', () async {
+      when(() => dataSource.signInWithGoogle()).thenThrow(
+        const GoogleSignInException(
+          code: GoogleSignInExceptionCode.clientConfigurationError,
+          description: 'bad config',
+        ),
+      );
+
+      expect(
+        () => repository.signInWithGoogle(),
+        throwsA(isA<AuthException>()),
+      );
+    });
+  });
+
+  group('signInWithApple', () {
+    test('returns a mapped AuthUser on success', () async {
+      when(() => dataSource.signInWithApple()).thenAnswer((_) async => user);
+
+      final result = await repository.signInWithApple();
+
+      expect(result.uid, 'uid-1');
+      expect(result.email, email);
+    });
+
+    test('maps a user cancellation to AuthCancelledException', () async {
+      when(() => dataSource.signInWithApple()).thenThrow(
+        const SignInWithAppleAuthorizationException(
+          code: AuthorizationErrorCode.canceled,
+          message: 'User canceled authorization',
+        ),
+      );
+
+      expect(
+        () => repository.signInWithApple(),
+        throwsA(isA<AuthCancelledException>()),
+      );
+    });
+
+    test(
+      'maps a non-cancel Apple authorization error to AuthException',
+      () async {
+        when(() => dataSource.signInWithApple()).thenThrow(
+          const SignInWithAppleAuthorizationException(
+            code: AuthorizationErrorCode.failed,
+            message: 'failed',
+          ),
+        );
+
+        expect(
+          () => repository.signInWithApple(),
+          throwsA(isA<AuthException>()),
+        );
+      },
+    );
   });
 }
