@@ -8,14 +8,8 @@ class OnboardingController extends Notifier<int> {
   @override
   int build() => 0;
 
-  void next() {
-    if (state < onboardingPageCount - 1) {
-      state += 1;
-    }
-  }
-
-  void skip() {
-    state = onboardingPageCount - 1;
+  void setPage(int index) {
+    state = index.clamp(0, onboardingPageCount - 1);
   }
 }
 

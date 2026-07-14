@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/config/environment.dart';
 import 'core/config/environment_provider.dart';
 import 'core/config/firebase_options_selector.dart';
-import 'features/onboarding/presentation/screens/onboarding_first_screen.dart';
+import 'features/onboarding/presentation/screens/onboarding_page_view_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,7 +30,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const OnboardingFirstScreen(),
+      home: const OnboardingPageViewScreen(),
     );
   }
 }
