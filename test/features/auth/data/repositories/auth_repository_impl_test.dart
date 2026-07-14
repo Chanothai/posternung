@@ -142,6 +142,35 @@ void main() {
     });
   });
 
+  group('signOut', () {
+    test('calls dataSource.signOut', () async {
+      when(() => dataSource.signOut()).thenAnswer((_) async {});
+
+      await repository.signOut();
+
+      verify(() => dataSource.signOut()).called(1);
+    });
+
+    test('maps a FirebaseAuthException into an AuthException with the same '
+        'code/message', () async {
+      when(() => dataSource.signOut()).thenThrow(
+        FirebaseAuthException(
+          code: 'network-request-failed',
+          message: 'no network',
+        ),
+      );
+
+      expect(
+        () => repository.signOut(),
+        throwsA(
+          isA<AuthException>()
+              .having((e) => e.code, 'code', 'network-request-failed')
+              .having((e) => e.message, 'message', 'no network'),
+        ),
+      );
+    });
+  });
+
   group('signInWithApple', () {
     test('returns a mapped AuthUser on success', () async {
       when(() => dataSource.signInWithApple()).thenAnswer((_) async => user);

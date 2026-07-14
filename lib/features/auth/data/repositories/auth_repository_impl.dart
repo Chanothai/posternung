@@ -36,6 +36,20 @@ class AuthRepositoryImpl implements AuthRepository {
       _guard(_remoteDataSource.signInWithApple);
 
   @override
+  Future<void> signOut() async {
+    try {
+      await _remoteDataSource.signOut();
+    } on firebase.FirebaseAuthException catch (e) {
+      throw AuthException(code: e.code, message: e.message ?? e.code);
+    } catch (_) {
+      throw const AuthException(
+        code: 'unknown',
+        message: 'Something went wrong. Please try again.',
+      );
+    }
+  }
+
+  @override
   Stream<AuthUser?> get authStateChanges => _remoteDataSource.authStateChanges
       .map((user) => user == null ? null : _mapUser(user));
 
