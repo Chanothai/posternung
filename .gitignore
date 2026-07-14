@@ -124,3 +124,6 @@ node_modules/
 # Claude Code local session state
 # ============================
 .claude/
+
+# Local Dart/Flutter DevTools settings
+devtools_options.yaml
