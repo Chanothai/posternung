@@ -2,7 +2,9 @@
 
 The Dart code for Google and Apple sign-in is complete and merged, but it **will not work at runtime until the console/native setup below is done** — none of it can be committed to the repo because it depends on account-specific values and provider enablement. Follow these steps in order. The app still builds and CI stays green without them; sign-in just fails at runtime until they're finished.
 
-Bundle ID / package name: `com.example.posternung`.
+Bundle ID / package name: `com.frameshine.posternung`.
+
+> **Note:** the package/bundle identifier was recently renamed from `com.example.posternung`. `android/app/google-services.json`, `ios/Runner/GoogleService-Info.plist`, and `lib/firebase_options.dart` have had the identifier string updated locally so the app still builds, but they still point at the **old** Firebase app registration's OAuth client/API key data. Run step 2 (`flutterfire configure`) before anything else — it will prompt to register a new app under `com.frameshine.posternung` and regenerate all three files with the correct values. Until then, Firebase Auth/Google Sign-In will fail at runtime even though the project compiles.
 
 ---
 
@@ -45,7 +47,7 @@ Open the refreshed `ios/Runner/GoogleService-Info.plist`, copy the `REVERSED_CLI
 
 In the [Apple Developer portal](https://developer.apple.com/account/resources):
 
-1. **Certificates, Identifiers & Profiles → Identifiers →** your App ID (`com.example.posternung`) → enable the **Sign in with Apple** capability → Save.
+1. **Certificates, Identifiers & Profiles → Identifiers →** your App ID (`com.frameshine.posternung`) → enable the **Sign in with Apple** capability → Save.
 2. Create a **Services ID** and a **Sign in with Apple key**, then enter them in the Firebase Console Apple provider config (Services ID, Team ID, Key ID, private key) — required for Firebase to verify Apple tokens.
 3. In Xcode (or already done via the committed entitlement), confirm the **Sign in with Apple** capability is present on the Runner target.
 
