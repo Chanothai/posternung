@@ -10,7 +10,6 @@ import '../widgets/onboarding_authenticate_page_content.dart';
 import '../widgets/onboarding_first_page_content.dart';
 import '../widgets/onboarding_footer.dart';
 import '../widgets/onboarding_header.dart';
-import '../widgets/onboarding_hero_background.dart';
 import '../widgets/onboarding_limit_stock_page_content.dart';
 
 /// Onboarding flow: 3 swipeable pages ("Own a Piece of Cinema History",
@@ -76,7 +75,7 @@ class _OnboardingPageViewScreenState
           IndexedStack(
             index: currentPage,
             children: const [
-              OnboardingHeroBackground(),
+              AppGradientBackground(),
               AppGradientBackground(),
               AppGradientBackground(),
             ],
