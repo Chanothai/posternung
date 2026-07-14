@@ -68,7 +68,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '254591535895',
     projectId: 'posternung',
     storageBucket: 'posternung.firebasestorage.app',
-    iosClientId: '254591535895-ichs0mjkvr2tv531rtv7ffubp5eilphr.apps.googleusercontent.com',
+    iosClientId:
+        '254591535895-ichs0mjkvr2tv531rtv7ffubp5eilphr.apps.googleusercontent.com',
     iosBundleId: 'com.frameshine.posternung',
   );
 }
