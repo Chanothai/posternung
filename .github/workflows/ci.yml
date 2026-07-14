@@ -73,15 +73,23 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: android
+          # NOTE: only the `production` Android flavor is built in CI for now.
+          # `sit`/`uat` will fail the google-services Gradle plugin's
+          # applicationId-matching check until their Firebase apps are
+          # registered (see docs/environments-setup.md) — add
+          # android-sit/android-uat matrix entries once that's done.
+          - platform: android-production
             os: ubuntu-latest
-            build_cmd: flutter build apk --debug
+            build_cmd: flutter build apk --debug --flavor production
           - platform: web
             os: ubuntu-latest
             build_cmd: flutter build web --release
           - platform: ios
             os: macos-latest
-            build_cmd: flutter build ios --release --no-codesign
+            # The Runner scheme was replaced by sit/uat/production schemes,
+            # so Flutter now requires --flavor for any iOS build (it errors
+            # once more than one scheme exists, regardless of platform).
+            build_cmd: flutter build ios --release --no-codesign --flavor production
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -118,4 +126,13 @@ jobs:
         run: flutter pub get
 
       - name: Build ${{ matrix.platform }}
-        run: ${{ matrix.build_cmd }}
+        run: |
+          for attempt in 1 2 3; do
+            if ${{ matrix.build_cmd }}; then
+              exit 0
+            fi
+            echo "Attempt $attempt failed, retrying in 15s..."
+            sleep 15
+          done
+          echo "All attempts failed."
+          exit 1

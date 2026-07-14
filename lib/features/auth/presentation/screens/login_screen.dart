@@ -1,5 +1,4 @@
-import 'dart:ui';
-
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -55,15 +54,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void _toggleObscurePassword() =>
       setState(() => _obscurePassword = !_obscurePassword);
 
-  void _showComingSoon(String provider) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('เร็ว ๆ นี้: เข้าสู่ระบบด้วย $provider')),
-    );
+  void _onGooglePressed() {
+    if (kIsWeb) return _showMobileOnly();
+    ref.read(authViewModelProvider.notifier).signInWithGoogle();
+  }
+
+  void _onApplePressed() {
+    if (kIsWeb) return _showMobileOnly();
+    ref.read(authViewModelProvider.notifier).signInWithApple();
+  }
+
+  void _showMobileOnly() {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('รองรับเฉพาะบนมือถือ')));
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authViewModelProvider);
+    // Sign in with Apple is hidden in the UI until native entitlements are
+    // restored (see docs/social-login-setup.md, "iOS Sign in with Apple is
+    // currently disabled at the native level"). Flip back to
+    // `!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS` (Apple
+    // sign-in is iOS-only; defaultTargetPlatform is web-safe, unlike
+    // dart:io Platform) to re-enable.
+    const showAppleButton = false;
     final error = authState.error;
     final errorMessage = error is AuthException
         ? error.message
@@ -95,8 +111,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       errorMessage: errorMessage,
                       onSubmit: authState.isLoading ? null : _submit,
                       onToggleMode: _toggleMode,
-                      onGooglePressed: () => _showComingSoon('Google'),
-                      onApplePressed: () => _showComingSoon('Apple'),
+                      onGooglePressed: _onGooglePressed,
+                      onApplePressed: _onApplePressed,
+                      showAppleButton: showAppleButton,
                     ),
                   ),
                 ],
@@ -147,6 +164,7 @@ class _AuthCard extends StatelessWidget {
     required this.onToggleMode,
     required this.onGooglePressed,
     required this.onApplePressed,
+    required this.showAppleButton,
   });
 
   final GlobalKey<FormState> formKey;
@@ -161,59 +179,56 @@ class _AuthCard extends StatelessWidget {
   final VoidCallback onToggleMode;
   final VoidCallback onGooglePressed;
   final VoidCallback onApplePressed;
+  final bool showAppleButton;
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(4),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-        child: Container(
-          padding: const EdgeInsets.all(33),
-          decoration: BoxDecoration(
-            color: AppColors.glassCardFill,
-            border: Border.all(color: AppColors.glassCardBorder),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Form(
-            key: formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _HeadingBlock(isRegistering: isRegistering),
-                const SizedBox(height: 24),
-                _EmailField(controller: emailController),
-                const SizedBox(height: 20),
-                _PasswordField(
-                  controller: passwordController,
-                  obscure: obscurePassword,
-                  onToggleObscure: onToggleObscure,
-                  showForgotPassword: !isRegistering,
-                ),
-                if (errorMessage != null) ...[
-                  const SizedBox(height: 12),
-                  _ErrorBanner(message: errorMessage!),
-                ],
-                const SizedBox(height: 20),
-                _SubmitButton(
-                  isLoading: isLoading,
-                  isRegistering: isRegistering,
-                  onPressed: onSubmit,
-                ),
-                const SizedBox(height: 24),
-                const _OrDivider(),
-                const SizedBox(height: 24),
-                _GoogleSignInButton(onPressed: onGooglePressed),
-                const SizedBox(height: 12),
-                _AppleSignInButton(onPressed: onApplePressed),
-                const SizedBox(height: 8),
-                _ModeToggleRow(
-                  isRegistering: isRegistering,
-                  onToggle: onToggleMode,
-                ),
-              ],
+    return Container(
+      padding: const EdgeInsets.all(33),
+      decoration: BoxDecoration(
+        color: AppColors.glassCardFill,
+        border: Border.all(color: AppColors.glassCardBorder),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Form(
+        key: formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _HeadingBlock(isRegistering: isRegistering),
+            const SizedBox(height: 24),
+            _EmailField(controller: emailController),
+            const SizedBox(height: 20),
+            _PasswordField(
+              controller: passwordController,
+              obscure: obscurePassword,
+              onToggleObscure: onToggleObscure,
+              showForgotPassword: !isRegistering,
             ),
-          ),
+            if (errorMessage != null) ...[
+              const SizedBox(height: 12),
+              _ErrorBanner(message: errorMessage!),
+            ],
+            const SizedBox(height: 20),
+            _SubmitButton(
+              isLoading: isLoading,
+              isRegistering: isRegistering,
+              onPressed: onSubmit,
+            ),
+            const SizedBox(height: 24),
+            const _OrDivider(),
+            const SizedBox(height: 24),
+            _GoogleSignInButton(onPressed: onGooglePressed),
+            if (showAppleButton) ...[
+              const SizedBox(height: 12),
+              _AppleSignInButton(onPressed: onApplePressed),
+            ],
+            const SizedBox(height: 8),
+            _ModeToggleRow(
+              isRegistering: isRegistering,
+              onToggle: onToggleMode,
+            ),
+          ],
         ),
       ),
     );

@@ -31,10 +31,16 @@ Cross-feature, reusable code lives in `lib/core/`:
 lib/core/
   theme/         # design tokens: colors, text styles
   error/         # shared exception/failure types
+  config/        # build-environment resolution (Environment enum, environmentProvider,
+                 # Firebase options selector) — see "Build environments" below
   network/       # shared API client setup (dio/http), interceptors
   widgets/       # generic reusable widgets (buttons, loaders, etc.)
   utils/         # extensions, formatters, validators
 ```
+
+## Build environments
+
+The app builds as three environments — **SIT**, **UAT**, **Production** — via native Android product flavors and iOS Xcode build configurations/schemes (not `--dart-define` alone), so all three can be installed side by side on one device. Environment is resolved at runtime from the native `--flavor` value (`appFlavor` from `package:flutter/services.dart`) in `lib/core/config/environment.dart`, exposed app-wide via `environmentProvider` (overridden with the resolved value in `main.dart`, per the DI pattern below). `lib/core/config/firebase_options_selector.dart` picks between `lib/firebase_options_{sit,uat,production}.dart` accordingly. Full setup checklist (Firebase console registration, `flutterfire configure`, Xcode scheme/config wiring, per-environment app icons): [`docs/environments-setup.md`](docs/environments-setup.md).
 
 ## Presentation: MVVM by default, MVI-style state for complex flows
 
@@ -176,6 +182,8 @@ lib/
   core/
     theme/                                        # design tokens (Figma-derived): AppColors, AppTextStyles
     error/                                         # shared domain exception types (AuthException, ...)
+    config/                                        # Environment enum, environmentProvider, firebase options selector
+                                                     # — see "Build environments" above
     widgets/                                       # cross-feature widgets (AppGradientBackground, ...)
   features/
     onboarding/
@@ -205,6 +213,18 @@ lib/
 - No layer skips: presentation never imports `data/`; domain never imports Flutter or `data/`.
 - Don't create `data/`/`domain/` folders for a feature that has no data dependency.
 - Don't introduce a new state-management, DI, or mocking library without updating this file first.
+
+---
+
+## Presenting Plans
+
+When Claude presents an implementation plan (plan mode or otherwise), render it as a color-coded HTML artifact rather than a separate long-form markdown document:
+
+- **red** — deleted files
+- **blue** — modified files
+- **green** — added files
+
+Don't produce a polished markdown plan document as an additional user-facing deliverable alongside the HTML — the HTML artifact is the plan.
 
 ---
 

@@ -30,6 +30,12 @@ class FakeAuthViewModel extends AuthViewModel {
     required String email,
     required String password,
   }) async {}
+
+  @override
+  Future<void> signInWithGoogle() async {}
+
+  @override
+  Future<void> signInWithApple() async {}
 }
 
 void main() {

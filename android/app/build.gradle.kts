@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.posternung"
+    namespace = "com.frameshine.posternung"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -17,9 +17,13 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    buildFeatures {
+        resValues = true
+    }
+
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.posternung"
+        applicationId = "com.frameshine.posternung"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -33,6 +37,27 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
+    flavorDimensions += "environment"
+
+    productFlavors {
+        create("sit") {
+            dimension = "environment"
+            applicationIdSuffix = ".sit"
+            versionNameSuffix = "-sit"
+            resValue(type = "string", name = "app_name", value = "PosterNung SIT")
+        }
+        create("uat") {
+            dimension = "environment"
+            applicationIdSuffix = ".uat"
+            versionNameSuffix = "-uat"
+            resValue(type = "string", name = "app_name", value = "PosterNung UAT")
+        }
+        create("production") {
+            dimension = "environment"
+            resValue(type = "string", name = "app_name", value = "PosterNung")
         }
     }
 }

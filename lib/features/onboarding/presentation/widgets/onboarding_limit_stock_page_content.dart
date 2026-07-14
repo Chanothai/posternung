@@ -2,92 +2,26 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/widgets/gradient_background.dart';
-import '../../../../home/home_page.dart';
-import '../../../auth/presentation/auth_gate.dart';
-import '../providers/onboarding_providers.dart';
-import '../widgets/onboarding_footer.dart';
-import '../widgets/onboarding_header.dart';
 
-/// Third and final screen of the onboarding flow ("Limited Stock — One of a
-/// Kind"). Its skip action is hidden — there's nothing left to skip to.
+/// Content for onboarding's third page ("Limited Stock — One of a Kind").
 ///
 /// Figma: node 7:90, frame "Onboarding - limit stock".
-class OnboardingLimitStockScreen extends ConsumerWidget {
-  const OnboardingLimitStockScreen({super.key});
-
-  void _enterApp(BuildContext context) {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const AuthGate(builder: _buildHome)),
-    );
-  }
-
-  static Widget _buildHome(BuildContext context) =>
-      const MyHomePage(title: 'PosterNung');
+class OnboardingLimitStockPageContent extends StatelessWidget {
+  const OnboardingLimitStockPageContent({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final currentPage = ref.watch(onboardingControllerProvider);
-    final controller = ref.read(onboardingControllerProvider.notifier);
-
-    return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const AppGradientBackground(),
-          SafeArea(
-            child: Column(
-              children: [
-                const OnboardingHeader(),
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      return SingleChildScrollView(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            minHeight: constraints.maxHeight,
-                          ),
-                          child: Center(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 32,
-                                vertical: 24,
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const _CenterpieceIllustration(),
-                                  const SizedBox(height: 40),
-                                  const _CopyBlock(),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                OnboardingFooter(
-                  currentPage: currentPage,
-                  buttonLabel: 'เริ่มต้นใช้งาน',
-                  showArrowIcon: false,
-                  onNext: () {
-                    controller.next();
-                    _enterApp(context);
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+  Widget build(BuildContext context) {
+    return const Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _CenterpieceIllustration(),
+        SizedBox(height: 40),
+        _CopyBlock(),
+      ],
     );
   }
 }

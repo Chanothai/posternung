@@ -8,7 +8,7 @@ import 'package:flutter/foundation.dart'
 ///
 /// Example:
 /// ```dart
-/// import 'firebase_options.dart';
+/// import 'firebase_options_uat.dart';
 /// // ...
 /// await Firebase.initializeApp(
 ///   options: DefaultFirebaseOptions.currentPlatform,
@@ -57,7 +57,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCgwy5w1gHW4Z_yFXpHBHsQq1nELFZF9Us',
-    appId: '1:254591535895:android:7fff393e381c369cc40552',
+    appId: '1:254591535895:android:4208f757ec1d49f1c40552',
     messagingSenderId: '254591535895',
     projectId: 'posternung',
     storageBucket: 'posternung.firebasestorage.app',
@@ -65,10 +65,12 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyBjTVZu1SJJ3A5oaYLAJlhMvo_t8TGX0PU',
-    appId: '1:254591535895:ios:86332672fe3549eac40552',
+    appId: '1:254591535895:ios:16c01135ae3d3ecfc40552',
     messagingSenderId: '254591535895',
     projectId: 'posternung',
     storageBucket: 'posternung.firebasestorage.app',
-    iosBundleId: 'com.example.posternung',
+    iosClientId:
+        '254591535895-lq8c4bo0bg7bik10brdlcl0aggnre7d5.apps.googleusercontent.com',
+    iosBundleId: 'com.frameshine.posternung.uat',
   );
 }

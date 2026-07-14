@@ -9,13 +9,13 @@ import 'onboarding_progress_indicator.dart';
 class OnboardingFooter extends StatelessWidget {
   const OnboardingFooter({
     super.key,
-    required this.currentPage,
+    required this.pageController,
     required this.onNext,
     this.buttonLabel = 'ถัดไป',
     this.showArrowIcon = true,
   });
 
-  final int currentPage;
+  final PageController pageController;
   final VoidCallback onNext;
   final String buttonLabel;
   final bool showArrowIcon;
@@ -38,7 +38,7 @@ class OnboardingFooter extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            OnboardingProgressIndicator(currentPage: currentPage),
+            OnboardingProgressIndicator(pageController: pageController),
             const SizedBox(height: 32),
             OnboardingPrimaryButton(
               onPressed: onNext,
