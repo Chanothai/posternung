@@ -152,4 +152,84 @@ abstract final class AppTextStyles {
     letterSpacing: 1.2,
     color: AppColors.textPrimary,
   );
+
+  // --- Home ---
+
+  static final TextStyle homeSectionHeading = GoogleFonts.kanit(
+    fontSize: 18,
+    height: 28 / 18,
+    fontWeight: FontWeight.bold,
+    color: AppColors.textPrimary,
+  );
+
+  static final TextStyle homeCollectionEyebrow = GoogleFonts.kanit(
+    fontSize: 10,
+    height: 15 / 10,
+    fontWeight: FontWeight.bold,
+    letterSpacing: 1,
+    color: AppColors.accent,
+  );
+
+  static final TextStyle homeCollectionTitle = GoogleFonts.kanit(
+    fontSize: 18,
+    height: 22.5 / 18,
+    fontWeight: FontWeight.bold,
+    color: AppColors.textPrimary,
+  );
+
+  static final TextStyle homeSearchPlaceholder = GoogleFonts.kanit(
+    fontSize: 14,
+    fontWeight: FontWeight.normal,
+    color: AppColors.placeholderGray,
+  );
+
+  static final TextStyle homePosterTitle = GoogleFonts.kanit(
+    fontSize: 14,
+    height: 20 / 14,
+    fontWeight: FontWeight.bold,
+    color: AppColors.textPrimary,
+  );
+
+  static final TextStyle homePosterSubtitle = GoogleFonts.kanit(
+    fontSize: 12,
+    height: 16 / 12,
+    fontWeight: FontWeight.normal,
+    color: AppColors.textPrimary,
+  );
+
+  static final TextStyle homePosterPrice = GoogleFonts.kanit(
+    fontSize: 14,
+    height: 20 / 14,
+    fontWeight: FontWeight.bold,
+    color: AppColors.textPrimary,
+  );
+
+  static final TextStyle homeConditionTag = GoogleFonts.kanit(
+    fontSize: 9,
+    height: 13.5 / 9,
+    fontWeight: FontWeight.normal,
+    color: AppColors.textSecondary,
+  );
+
+  static final TextStyle homeBadgeLabel = GoogleFonts.kanit(
+    fontSize: 10,
+    height: 15 / 10,
+    fontWeight: FontWeight.bold,
+    color: AppColors.white,
+  );
+
+  static final TextStyle homeLoadMoreLabel = GoogleFonts.kanit(
+    fontSize: 14,
+    height: 20 / 14,
+    fontWeight: FontWeight.normal,
+    color: AppColors.textPrimary,
+  );
+
+  static final TextStyle homeNavTabLabel = GoogleFonts.kanit(
+    fontSize: 10,
+    height: 15 / 10,
+    fontWeight: FontWeight.normal,
+    letterSpacing: 0.25,
+    color: AppColors.textPrimary,
+  );
 }

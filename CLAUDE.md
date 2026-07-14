@@ -195,18 +195,23 @@ lib/
         widgets/                                    # shared onboarding chrome: header, footer, progress dots,
                                                      # primary button — extracted once 2+ screens needed them
     auth/
-      domain/                                       # AuthUser entity, AuthRepository interface, sign-in/sign-up
-                                                     # usecases
+      domain/                                       # AuthUser entity, AuthRepository interface, sign-in/sign-up/
+                                                     # sign-out usecases
       data/                                         # AuthRemoteDataSource + AuthRepositoryImpl
       presentation/
         providers/                                  # DI graph + AuthViewModel (AsyncNotifier)
         screens/                                    # LoginScreen (login/register, mode-toggled)
         auth_gate.dart                               # gates a destination behind auth state
-  home/                                            # placeholder post-login screen — stock Flutter counter demo
+    home/
+      presentation/
+        models/                                     # HomeCollection/HomePoster — presentation-only mock content,
+                                                     # no data/domain layer yet (no poster repository exists)
+        screens/                                    # HomeScreen — post-login poster marketplace listing
+        widgets/                                    # top bar, bottom nav, poster/collection cards, sections
   main.dart
 ```
 
-`onboarding` and `auth` are both fully feature-first. `home/` is the only part of the app that still predates this document — don't block unrelated work migrating it, but new code there should move toward `features/home/` incrementally rather than add to the old flat location.
+`onboarding`, `auth`, and `home` are all fully feature-first.
 
 ## General Rules
 

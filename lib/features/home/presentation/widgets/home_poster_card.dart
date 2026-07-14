@@ -1,0 +1,155 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_text_styles.dart';
+import '../models/home_mock_data.dart';
+import 'home_coming_soon.dart';
+
+/// Poster card shared by the Ending Soon (horizontal) and All Posters (grid)
+/// sections — [imageHeight] and [priceColor] absorb the two sections' only
+/// styling differences; [showWishlistButton] enables the grid-only heart
+/// button.
+///
+/// Figma: nodes 7:310 (Ending Soon item), 7:365 (All Posters grid item).
+class HomePosterCard extends StatelessWidget {
+  const HomePosterCard({
+    super.key,
+    required this.poster,
+    required this.imageHeight,
+    required this.priceColor,
+    this.showWishlistButton = false,
+  });
+
+  final HomePoster poster;
+  final double imageHeight;
+  final Color priceColor;
+  final bool showWishlistButton;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: imageHeight,
+          width: double.infinity,
+          child: Stack(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.posterPlaceholderFill,
+                  border: Border.all(color: AppColors.borderMuted),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Center(
+                  child: SvgPicture.asset(
+                    'assets/images/poster_placeholder_icon.svg',
+                    width: 40,
+                    height: 40,
+                  ),
+                ),
+              ),
+              if (poster.badgeLabel != null)
+                Positioned(
+                  left: 0,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    color: AppColors.accentRed,
+                    child: Text(
+                      poster.badgeLabel!,
+                      style: AppTextStyles.homeBadgeLabel,
+                    ),
+                  ),
+                ),
+              if (showWishlistButton)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: _WishlistButton(
+                    onTap: () => showComingSoonSnackBar(context),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          poster.title,
+          style: AppTextStyles.homePosterTitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        Text(
+          poster.subtitle,
+          style: AppTextStyles.homePosterSubtitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: Text(
+                  poster.price,
+                  style: AppTextStyles.homePosterPrice.copyWith(
+                    color: priceColor,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.borderMuted),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  poster.condition,
+                  style: AppTextStyles.homeConditionTag,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WishlistButton extends StatelessWidget {
+  const _WishlistButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.posterPlaceholderFill,
+      shape: const CircleBorder(side: BorderSide(color: Colors.white24)),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: Center(
+            child: SvgPicture.asset(
+              'assets/images/heart_icon.svg',
+              width: 12,
+              height: 12,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

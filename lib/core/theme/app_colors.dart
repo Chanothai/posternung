@@ -11,4 +11,8 @@ abstract final class AppColors {
   static const Color placeholderGray = Color(0xFF9CA3AF);
   static const Color glassCardFill = Color(0x08FFFCF5);
   static const Color glassCardBorder = Color(0x1ADBD0BA);
+
+  // --- Home ---
+  static const Color accentRed = Color(0xFFB54A35);
+  static const Color posterPlaceholderFill = Color(0x80000000);
 }
