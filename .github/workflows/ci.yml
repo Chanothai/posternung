@@ -86,13 +86,10 @@ jobs:
             build_cmd: flutter build web --release
           - platform: ios
             os: macos-latest
-            # NOTE: not yet passing --flavor production — the iOS `production`
-            # scheme doesn't exist until the Xcode GUI steps in
-            # docs/environments-setup.md are done. The unflavored Runner
-            # scheme already resolves to the production config via
-            # Production.xcconfig, so this build stays correct in the
-            # meantime.
-            build_cmd: flutter build ios --release --no-codesign
+            # The Runner scheme was replaced by sit/uat/production schemes,
+            # so Flutter now requires --flavor for any iOS build (it errors
+            # once more than one scheme exists, regardless of platform).
+            build_cmd: flutter build ios --release --no-codesign --flavor production
     steps:
       - name: Checkout
         uses: actions/checkout@v4
