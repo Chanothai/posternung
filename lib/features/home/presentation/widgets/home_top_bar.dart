@@ -16,6 +16,7 @@ class HomeTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: const BoxDecoration(
+        color: AppColors.surfaceDark,
         border: Border(bottom: BorderSide(color: AppColors.borderMuted)),
       ),
       child: Padding(
