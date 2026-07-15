@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/strings/app_strings.dart';
 import 'providers/auth_providers.dart';
 import 'screens/login_screen.dart';
 
@@ -19,8 +20,9 @@ class AuthGate extends ConsumerWidget {
       data: (user) => user == null ? const LoginScreen() : builder(context),
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (error, stackTrace) =>
-          Scaffold(body: Center(child: Text('Something went wrong: $error'))),
+      error: (error, stackTrace) => Scaffold(
+        body: Center(child: Text('${AppStrings.authGateErrorPrefix}$error')),
+      ),
     );
   }
 }

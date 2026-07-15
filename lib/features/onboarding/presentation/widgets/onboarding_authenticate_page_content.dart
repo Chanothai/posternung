@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import 'dashed_circle_border.dart';
@@ -76,7 +77,10 @@ class _CenterpieceBadge extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 11),
-                      Text('ยืนยันแล้ว', style: AppTextStyles.badgeLabel),
+                      Text(
+                        AppStrings.onboardingVerifiedBadge,
+                        style: AppTextStyles.badgeLabel,
+                      ),
                     ],
                   ),
                 ),
@@ -101,11 +105,11 @@ class _CopyBlock extends StatelessWidget {
           TextSpan(
             children: [
               TextSpan(
-                text: 'รับรองความแท้ 100%\n',
+                text: AppStrings.onboardingHeroTitlePage2Prefix,
                 style: AppTextStyles.heroTitleSmall,
               ),
               TextSpan(
-                text: 'ต้นฉบับ',
+                text: AppStrings.onboardingHeroTitlePage2Emphasis,
                 style: AppTextStyles.heroTitleSmallEmphasis,
               ),
             ],
@@ -116,8 +120,7 @@ class _CopyBlock extends StatelessWidget {
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 384),
           child: Text(
-            'โปสเตอร์ทุกชิ้นผ่านการตรวจสอบอย่างเข้มงวดโดยผู้เชี่ยวชาญ '
-            'พร้อมใบรับรองความแท้แบบดิจิทัลและการตรวจสอบที่มาโดยละเอียด',
+            AppStrings.onboardingBodyPage2,
             style: AppTextStyles.bodyDescription,
             textAlign: TextAlign.center,
           ),

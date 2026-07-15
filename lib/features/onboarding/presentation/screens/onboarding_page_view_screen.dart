@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/gradient_background.dart';
-import '../../../../home/home_page.dart';
 import '../../../auth/presentation/auth_gate.dart';
+import '../../../home/presentation/screens/home_screen.dart';
 import '../providers/onboarding_providers.dart';
 import '../widgets/onboarding_authenticate_page_content.dart';
 import '../widgets/onboarding_first_page_content.dart';
 import '../widgets/onboarding_footer.dart';
 import '../widgets/onboarding_header.dart';
-import '../widgets/onboarding_hero_background.dart';
 import '../widgets/onboarding_limit_stock_page_content.dart';
 
 /// Onboarding flow: 3 swipeable pages ("Own a Piece of Cinema History",
@@ -48,8 +48,7 @@ class _OnboardingPageViewScreenState
     );
   }
 
-  static Widget _buildHome(BuildContext context) =>
-      const MyHomePage(title: 'PosterNung');
+  static Widget _buildHome(BuildContext context) => const HomeScreen();
 
   void _onNext(int currentPage) {
     if (currentPage < onboardingPageCount - 1) {
@@ -76,7 +75,7 @@ class _OnboardingPageViewScreenState
           IndexedStack(
             index: currentPage,
             children: const [
-              OnboardingHeroBackground(),
+              AppGradientBackground(),
               AppGradientBackground(),
               AppGradientBackground(),
             ],
@@ -106,7 +105,9 @@ class _OnboardingPageViewScreenState
                 ),
                 OnboardingFooter(
                   pageController: _pageController,
-                  buttonLabel: isLastPage ? 'เริ่มต้นใช้งาน' : 'ถัดไป',
+                  buttonLabel: isLastPage
+                      ? AppStrings.onboardingGetStartedButton
+                      : AppStrings.onboardingNextButton,
                   showArrowIcon: !isLastPage,
                   onNext: () => _onNext(currentPage),
                 ),

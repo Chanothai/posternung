@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 
@@ -130,7 +131,7 @@ class _HighlightedPosterCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'เหลือ 1\nชิ้นสุดท้าย',
+                AppStrings.onboardingStockBadge,
                 style: AppTextStyles.stockBadgeLabel,
                 textAlign: TextAlign.center,
               ),
@@ -154,11 +155,11 @@ class _CopyBlock extends StatelessWidget {
           TextSpan(
             children: [
               TextSpan(
-                text: 'สินค้ามีจำนวนจำกัด\n',
+                text: AppStrings.onboardingHeroTitlePage3Prefix,
                 style: AppTextStyles.heroTitleSmall,
               ),
               TextSpan(
-                text: '— ชิ้นเดียวในโลก',
+                text: AppStrings.onboardingHeroTitlePage3Emphasis,
                 style: AppTextStyles.heroTitleSmallEmphasis,
               ),
             ],
@@ -169,8 +170,7 @@ class _CopyBlock extends StatelessWidget {
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 384),
           child: Text(
-            'ของหายากหมดเร็วมาก เมื่อโปสเตอร์ชิ้นพิเศษถูกขายไปแล้ว '
-            'มันจะหายไปจากคลังตลอดกาล',
+            AppStrings.onboardingBodyPage3,
             style: AppTextStyles.bodyDescription,
             textAlign: TextAlign.center,
           ),

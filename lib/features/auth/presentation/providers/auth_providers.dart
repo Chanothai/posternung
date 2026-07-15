@@ -11,6 +11,7 @@ import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/sign_in_with_apple.dart';
 import '../../domain/usecases/sign_in_with_email_password.dart';
 import '../../domain/usecases/sign_in_with_google.dart';
+import '../../domain/usecases/sign_out.dart';
 import '../../domain/usecases/sign_up_with_email_password.dart';
 
 final firebaseAuthProvider = Provider<FirebaseAuth>(
@@ -43,6 +44,10 @@ final signInWithGoogleProvider = Provider(
 
 final signInWithAppleProvider = Provider(
   (ref) => SignInWithApple(ref.watch(authRepositoryProvider)),
+);
+
+final signOutProvider = Provider(
+  (ref) => SignOut(ref.watch(authRepositoryProvider)),
 );
 
 /// Drives the login/register form's submit lifecycle. `state.isLoading` and
@@ -79,6 +84,11 @@ class AuthViewModel extends AsyncNotifier<void> {
 
   Future<void> signInWithApple() =>
       _runSocial(() => ref.read(signInWithAppleProvider)());
+
+  Future<void> signOut() async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() => ref.read(signOutProvider)());
+  }
 
   /// Social sign-in can be aborted by the user (native account picker /
   /// Apple sheet). That surfaces as `AuthCancelledException`, which is not a

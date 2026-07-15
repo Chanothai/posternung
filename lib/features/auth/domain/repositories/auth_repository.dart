@@ -19,5 +19,7 @@ abstract class AuthRepository {
 
   Future<AuthUser> signInWithApple();
 
+  Future<void> signOut();
+
   Stream<AuthUser?> get authStateChanges;
 }

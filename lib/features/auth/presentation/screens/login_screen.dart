@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/error/auth_exception.dart';
+import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/gradient_background.dart';
@@ -65,9 +66,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   void _showMobileOnly() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('รองรับเฉพาะบนมือถือ')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text(AppStrings.authMobileOnlyMessage)),
+    );
   }
 
   @override
@@ -143,7 +144,7 @@ class _BrandHeader extends StatelessWidget {
             height: 30,
           ),
           const SizedBox(width: 8),
-          Text('PosterNung', style: AppTextStyles.brandTitleLarge),
+          Text(AppStrings.appName, style: AppTextStyles.brandTitleLarge),
         ],
       ),
     );
@@ -245,15 +246,17 @@ class _HeadingBlock extends StatelessWidget {
     return Column(
       children: [
         Text(
-          isRegistering ? 'สร้างบัญชีใหม่' : 'ยินดีต้อนรับกลับ',
+          isRegistering
+              ? AppStrings.authHeadingRegister
+              : AppStrings.authHeadingLogin,
           style: AppTextStyles.authCardHeading,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
         Text(
           isRegistering
-              ? 'กรอกข้อมูลเพื่อเริ่มต้นสะสมโปสเตอร์ของคุณ'
-              : 'กรอกข้อมูลของคุณเพื่อเข้าสู่คลัง',
+              ? AppStrings.authSubtitleRegister
+              : AppStrings.authSubtitleLogin,
           style: AppTextStyles.cardSubtitle,
           textAlign: TextAlign.center,
         ),
@@ -275,7 +278,7 @@ class _EmailField extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Text(
-            'อีเมลหรือเบอร์โทรศัพท์',
+            AppStrings.authEmailLabel,
             style: AppTextStyles.inputLabel,
           ),
         ),
@@ -288,7 +291,7 @@ class _EmailField extends StatelessWidget {
           decoration: InputDecoration(
             filled: true,
             fillColor: AppColors.white,
-            hintText: 'you@example.com',
+            hintText: AppStrings.authEmailHint,
             hintStyle: AppTextStyles.inputText.copyWith(
               color: AppColors.placeholderGray,
             ),
@@ -307,7 +310,7 @@ class _EmailField extends StatelessWidget {
           ),
           validator: (value) {
             if (value == null || !value.contains('@')) {
-              return 'กรอกอีเมลให้ถูกต้อง';
+              return AppStrings.authEmailValidationError;
             }
             return null;
           },
@@ -340,17 +343,23 @@ class _PasswordField extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('รหัสผ่าน', style: AppTextStyles.inputLabel),
+              Text(
+                AppStrings.authPasswordLabel,
+                style: AppTextStyles.inputLabel,
+              ),
               if (showForgotPassword)
                 GestureDetector(
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('ฟีเจอร์นี้กำลังจะมาเร็ว ๆ นี้'),
+                        content: Text(AppStrings.comingSoonMessage),
                       ),
                     );
                   },
-                  child: Text('ลืมรหัสผ่าน?', style: AppTextStyles.linkSmall),
+                  child: Text(
+                    AppStrings.authForgotPassword,
+                    style: AppTextStyles.linkSmall,
+                  ),
                 ),
             ],
           ),
@@ -364,7 +373,7 @@ class _PasswordField extends StatelessWidget {
           decoration: InputDecoration(
             filled: true,
             fillColor: AppColors.white,
-            hintText: '••••••••',
+            hintText: AppStrings.authPasswordHint,
             hintStyle: AppTextStyles.inputText.copyWith(
               color: AppColors.placeholderGray,
             ),
@@ -396,7 +405,7 @@ class _PasswordField extends StatelessWidget {
           ),
           validator: (value) {
             if (value == null || value.length < 6) {
-              return 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
+              return AppStrings.authPasswordValidationError;
             }
             return null;
           },
@@ -459,7 +468,9 @@ class _SubmitButton extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    isRegistering ? 'สร้างบัญชี' : 'เข้าสู่ระบบ',
+                    isRegistering
+                        ? AppStrings.authSubmitRegister
+                        : AppStrings.authSubmitLogin,
                     style: AppTextStyles.authButtonLabel,
                   ),
                   const SizedBox(width: 8),
@@ -486,7 +497,7 @@ class _OrDivider extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            'หรือดำเนินการต่อด้วย',
+            AppStrings.authOrDivider,
             style: AppTextStyles.dividerLabel,
           ),
         ),
@@ -524,7 +535,7 @@ class _GoogleSignInButton extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Text(
-              'เข้าสู่ระบบด้วย Google',
+              AppStrings.authGoogleSignIn,
               style: AppTextStyles.cardSubtitle.copyWith(
                 color: AppColors.surfaceDark,
               ),
@@ -565,7 +576,7 @@ class _AppleSignInButton extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Text(
-              'เข้าสู่ระบบด้วย Apple',
+              AppStrings.authAppleSignIn,
               style: AppTextStyles.cardSubtitle.copyWith(
                 color: AppColors.white,
               ),
@@ -592,11 +603,15 @@ class _ModeToggleRow extends StatelessWidget {
           TextSpan(
             children: [
               TextSpan(
-                text: isRegistering ? 'มีบัญชีอยู่แล้ว? ' : 'ยังไม่มีบัญชี? ',
+                text: isRegistering
+                    ? AppStrings.authTogglePromptRegister
+                    : AppStrings.authTogglePromptLogin,
                 style: AppTextStyles.cardSubtitle,
               ),
               TextSpan(
-                text: isRegistering ? 'เข้าสู่ระบบ' : 'สร้างบัญชีใหม่',
+                text: isRegistering
+                    ? AppStrings.authSubmitLogin
+                    : AppStrings.authHeadingRegister,
                 style: AppTextStyles.linkBold,
               ),
             ],

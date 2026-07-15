@@ -21,6 +21,8 @@ abstract class AuthRemoteDataSource {
 
   Future<User> signInWithApple();
 
+  Future<void> signOut();
+
   Stream<User?> get authStateChanges;
 }
 
@@ -78,6 +80,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     );
     return userCredential.user!;
   }
+
+  @override
+  Future<void> signOut() => _firebaseAuth.signOut();
 
   @override
   Stream<User?> get authStateChanges => _firebaseAuth.authStateChanges();
