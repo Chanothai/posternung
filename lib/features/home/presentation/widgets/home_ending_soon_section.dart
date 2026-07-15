@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../models/home_mock_data.dart';
@@ -33,13 +34,19 @@ class HomeEndingSoonSection extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Ending Soon', style: AppTextStyles.homeSectionHeading),
+                  Text(
+                    AppStrings.homeSectionEndingSoon,
+                    style: AppTextStyles.homeSectionHeading,
+                  ),
                   GestureDetector(
                     onTap: () => showComingSoonSnackBar(context),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('View all ', style: AppTextStyles.linkSmall),
+                        Text(
+                          AppStrings.homeViewAllLink,
+                          style: AppTextStyles.linkSmall,
+                        ),
                         SvgPicture.asset(
                           'assets/images/chevron_right_icon.svg',
                           width: 6.25,

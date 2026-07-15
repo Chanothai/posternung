@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/gradient_background.dart';
 import '../../../auth/presentation/auth_gate.dart';
@@ -104,7 +105,9 @@ class _OnboardingPageViewScreenState
                 ),
                 OnboardingFooter(
                   pageController: _pageController,
-                  buttonLabel: isLastPage ? 'เริ่มต้นใช้งาน' : 'ถัดไป',
+                  buttonLabel: isLastPage
+                      ? AppStrings.onboardingGetStartedButton
+                      : AppStrings.onboardingNextButton,
                   showArrowIcon: !isLastPage,
                   onNext: () => _onNext(currentPage),
                 ),

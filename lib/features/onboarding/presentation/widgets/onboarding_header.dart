@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_text_styles.dart';
 
 /// Shared chrome across onboarding screens: film-reel icon, "PosterNung"
@@ -28,7 +29,7 @@ class OnboardingHeader extends StatelessWidget {
                 height: 24,
               ),
               const SizedBox(width: 8),
-              Text('PosterNung', style: AppTextStyles.appBarTitle),
+              Text(AppStrings.appName, style: AppTextStyles.appBarTitle),
             ],
           ),
           Opacity(
@@ -41,7 +42,10 @@ class OnboardingHeader extends StatelessWidget {
                   horizontal: 16,
                   vertical: 8,
                 ),
-                child: Text('ข้าม', style: AppTextStyles.skipButton),
+                child: Text(
+                  AppStrings.onboardingSkipButton,
+                  style: AppTextStyles.skipButton,
+                ),
               ),
             ),
           ),

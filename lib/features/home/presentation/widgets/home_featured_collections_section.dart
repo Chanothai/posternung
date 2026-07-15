@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../models/home_mock_data.dart';
 import 'home_collection_card.dart';
@@ -17,7 +18,10 @@ class HomeFeaturedCollectionsSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Featured Collections', style: AppTextStyles.homeSectionHeading),
+          Text(
+            AppStrings.homeSectionFeaturedCollections,
+            style: AppTextStyles.homeSectionHeading,
+          ),
           const SizedBox(height: 16),
           SizedBox(
             height: 160,

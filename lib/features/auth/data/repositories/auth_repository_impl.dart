@@ -4,6 +4,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../../core/error/auth_cancelled_exception.dart';
 import '../../../../core/error/auth_exception.dart';
+import '../../../../core/strings/app_strings.dart';
 import '../../domain/entities/auth_user.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_remote_data_source.dart';
@@ -44,7 +45,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } catch (_) {
       throw const AuthException(
         code: 'unknown',
-        message: 'Something went wrong. Please try again.',
+        message: AppStrings.authGenericErrorMessage,
       );
     }
   }
@@ -79,7 +80,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } catch (_) {
       throw const AuthException(
         code: 'unknown',
-        message: 'Something went wrong. Please try again.',
+        message: AppStrings.authGenericErrorMessage,
       );
     }
   }

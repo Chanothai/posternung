@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import 'home_coming_soon.dart';
@@ -34,7 +35,10 @@ class HomeTopBar extends StatelessWidget {
                       height: 20,
                     ),
                     const SizedBox(width: 8),
-                    Text('Cinevault 2', style: AppTextStyles.appBarTitle),
+                    Text(
+                      AppStrings.homeBrandTitle,
+                      style: AppTextStyles.appBarTitle,
+                    ),
                   ],
                 ),
                 _CartButton(onPressed: () => showComingSoonSnackBar(context)),
@@ -122,7 +126,7 @@ class _HomeSearchBar extends StatelessWidget {
           alignment: Alignment.centerLeft,
           children: [
             Text(
-              'Search movies, directors, years...',
+              AppStrings.homeSearchPlaceholder,
               style: AppTextStyles.homeSearchPlaceholder,
             ),
             Positioned(

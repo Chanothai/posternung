@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../models/home_mock_data.dart';
@@ -20,7 +21,10 @@ class HomeAllPostersSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('All Posters', style: AppTextStyles.homeSectionHeading),
+          Text(
+            AppStrings.homeSectionAllPosters,
+            style: AppTextStyles.homeSectionHeading,
+          ),
           const SizedBox(height: 16),
           GridView.builder(
             shrinkWrap: true,
@@ -55,7 +59,7 @@ class HomeAllPostersSection extends StatelessWidget {
                   ),
                 ),
                 child: Text(
-                  'Load More Titles',
+                  AppStrings.homeLoadMoreButton,
                   style: AppTextStyles.homeLoadMoreLabel,
                 ),
               ),

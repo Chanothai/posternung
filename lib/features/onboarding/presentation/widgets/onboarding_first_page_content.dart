@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_text_styles.dart';
 
 /// Content for onboarding's first page ("Own a Piece of Cinema History").
@@ -19,11 +20,11 @@ class OnboardingFirstPageContent extends StatelessWidget {
             TextSpan(
               children: [
                 TextSpan(
-                  text: 'เป็นเจ้าของชิ้นส่วนหนึ่งของ\n',
+                  text: AppStrings.onboardingHeroTitlePage1Prefix,
                   style: AppTextStyles.heroTitle,
                 ),
                 TextSpan(
-                  text: 'ประวัติศาสตร์ภาพยนตร์',
+                  text: AppStrings.onboardingHeroTitlePage1Emphasis,
                   style: AppTextStyles.heroTitleEmphasis,
                 ),
               ],
@@ -34,8 +35,7 @@ class OnboardingFirstPageContent extends StatelessWidget {
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 384),
             child: Text(
-              'ค้นพบและสะสมโปสเตอร์ภาพยนตร์ต้นฉบับหายากที่ผ่านการรับรอง '
-              'จากยุคที่คุณชื่นชอบ',
+              AppStrings.onboardingBodyPage1,
               style: AppTextStyles.bodyDescription,
               textAlign: TextAlign.center,
             ),

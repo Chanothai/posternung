@@ -30,6 +30,7 @@ Cross-feature, reusable code lives in `lib/core/`:
 ```
 lib/core/
   theme/         # design tokens: colors, text styles
+  strings/       # centralized UI copy: AppStrings (same convention as theme/)
   error/         # shared exception/failure types
   config/        # build-environment resolution (Environment enum, environmentProvider,
                  # Firebase options selector) — see "Build environments" below
@@ -181,6 +182,7 @@ Every dependency is swappable at any layer via `ProviderScope(overrides: [...])`
 lib/
   core/
     theme/                                        # design tokens (Figma-derived): AppColors, AppTextStyles
+    strings/                                       # centralized UI copy: AppStrings
     error/                                         # shared domain exception types (AuthException, ...)
     config/                                        # Environment enum, environmentProvider, firebase options selector
                                                      # — see "Build environments" above

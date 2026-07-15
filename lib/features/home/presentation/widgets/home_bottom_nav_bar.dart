@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
@@ -31,33 +32,33 @@ class HomeBottomNavBar extends ConsumerWidget {
               _NavTab(
                 assetName: 'assets/images/nav_home_icon.svg',
                 iconSize: const Size(20.25, 18),
-                label: 'Home',
+                label: AppStrings.homeNavHome,
                 labelColor: AppColors.accent,
                 onTap: () {},
               ),
               _NavTab(
                 assetName: 'assets/images/nav_search_icon.svg',
                 iconSize: const Size(18, 18),
-                label: 'Search',
+                label: AppStrings.homeNavSearch,
                 onTap: () => showComingSoonSnackBar(context),
               ),
               _NavTab(
                 assetName: 'assets/images/nav_wishlist_icon.svg',
                 iconSize: const Size(18, 18),
-                label: 'Wishlist',
+                label: AppStrings.homeNavWishlist,
                 onTap: () => showComingSoonSnackBar(context),
               ),
               _NavTab(
                 assetName: 'assets/images/nav_cart_icon.svg',
                 iconSize: const Size(15.75, 18),
-                label: 'Cart',
+                label: AppStrings.homeNavCart,
                 showDot: true,
                 onTap: () => showComingSoonSnackBar(context),
               ),
               _NavTab(
                 assetName: 'assets/images/nav_profile_icon.svg',
                 iconSize: const Size(15.75, 18),
-                label: 'Profile',
+                label: AppStrings.homeNavProfile,
                 onTap: () => ref.read(authViewModelProvider.notifier).signOut(),
               ),
             ],

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/config/environment.dart';
 import 'core/config/environment_provider.dart';
 import 'core/config/firebase_options_selector.dart';
+import 'core/strings/app_strings.dart';
 import 'features/onboarding/presentation/screens/onboarding_page_view_screen.dart';
 
 void main() async {
@@ -25,7 +26,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'PosterNung',
+      title: AppStrings.appName,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),

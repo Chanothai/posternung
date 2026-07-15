@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import 'onboarding_primary_button.dart';
 import 'onboarding_progress_indicator.dart';
@@ -11,7 +12,7 @@ class OnboardingFooter extends StatelessWidget {
     super.key,
     required this.pageController,
     required this.onNext,
-    this.buttonLabel = 'ถัดไป',
+    this.buttonLabel = AppStrings.onboardingNextButton,
     this.showArrowIcon = true,
   });
 
