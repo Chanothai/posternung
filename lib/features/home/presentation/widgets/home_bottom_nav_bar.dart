@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/assets/app_images.dart';
+import '../../../../core/design_system/app_dimens.dart';
+import '../../../../core/design_system/app_radius.dart';
+import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -25,38 +29,43 @@ class HomeBottomNavBar extends ConsumerWidget {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 13, 24, 8),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.xl,
+            AppSpacing.md,
+            AppSpacing.xl,
+            AppSpacing.sm,
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _NavTab(
-                assetName: 'assets/images/nav_home_icon.svg',
+                assetName: AppImages.navHomeIcon,
                 iconSize: const Size(20.25, 18),
                 label: AppStrings.homeNavHome,
                 labelColor: AppColors.accent,
                 onTap: () {},
               ),
               _NavTab(
-                assetName: 'assets/images/nav_search_icon.svg',
-                iconSize: const Size(18, 18),
+                assetName: AppImages.navSearchIcon,
+                iconSize: const Size(AppDimens.iconSm, AppDimens.iconSm),
                 label: AppStrings.homeNavSearch,
                 onTap: () => showComingSoonSnackBar(context),
               ),
               _NavTab(
-                assetName: 'assets/images/nav_wishlist_icon.svg',
-                iconSize: const Size(18, 18),
+                assetName: AppImages.navWishlistIcon,
+                iconSize: const Size(AppDimens.iconSm, AppDimens.iconSm),
                 label: AppStrings.homeNavWishlist,
                 onTap: () => showComingSoonSnackBar(context),
               ),
               _NavTab(
-                assetName: 'assets/images/nav_cart_icon.svg',
+                assetName: AppImages.navCartIcon,
                 iconSize: const Size(15.75, 18),
                 label: AppStrings.homeNavCart,
                 showDot: true,
                 onTap: () => showComingSoonSnackBar(context),
               ),
               _NavTab(
-                assetName: 'assets/images/nav_profile_icon.svg',
+                assetName: AppImages.navProfileIcon,
                 iconSize: const Size(15.75, 18),
                 label: AppStrings.homeNavProfile,
                 onTap: () => ref.read(authViewModelProvider.notifier).signOut(),
@@ -90,7 +99,7 @@ class _NavTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(9999),
+      borderRadius: BorderRadius.circular(AppRadius.full),
       child: SizedBox(
         width: 64,
         child: Column(
@@ -128,7 +137,7 @@ class _NavTab extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.xs),
             Text(
               label,
               style: AppTextStyles.homeNavTabLabel.copyWith(color: labelColor),

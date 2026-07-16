@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/assets/app_images.dart';
+import '../../../../core/design_system/app_radius.dart';
+import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -31,9 +34,12 @@ class OnboardingPrimaryButton extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.accent,
             foregroundColor: AppColors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xxl,
+              vertical: AppSpacing.lg,
+            ),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(9999),
+              borderRadius: BorderRadius.circular(AppRadius.full),
             ),
             elevation: 0,
           ),
@@ -42,9 +48,9 @@ class OnboardingPrimaryButton extends StatelessWidget {
             children: [
               Text(label, style: AppTextStyles.primaryButton),
               if (showArrow) ...[
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.md),
                 SvgPicture.asset(
-                  'assets/images/arrow_right.svg',
+                  AppImages.arrowRight,
                   width: 12.25,
                   height: 14,
                 ),

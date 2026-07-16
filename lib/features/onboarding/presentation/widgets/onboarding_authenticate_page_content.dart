@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/assets/app_images.dart';
+import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -35,7 +37,7 @@ class _CenterpieceBadge extends StatelessWidget {
           Opacity(
             opacity: 0.2,
             child: SvgPicture.asset(
-              'assets/images/header_icon.svg',
+              AppImages.headerIcon,
               width: 256,
               height: 256,
             ),
@@ -43,7 +45,7 @@ class _CenterpieceBadge extends StatelessWidget {
           Container(
             width: 192,
             height: 192,
-            padding: const EdgeInsets.all(17),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(color: AppColors.borderMuted, width: 1),
@@ -72,11 +74,9 @@ class _CenterpieceBadge extends StatelessWidget {
                             ),
                           ],
                         ),
-                        child: SvgPicture.asset(
-                          'assets/images/verified_badge_icon.svg',
-                        ),
+                        child: SvgPicture.asset(AppImages.verifiedBadgeIcon),
                       ),
-                      const SizedBox(height: 11),
+                      const SizedBox(height: AppSpacing.md),
                       Text(
                         AppStrings.onboardingVerifiedBadge,
                         style: AppTextStyles.badgeLabel,
@@ -116,7 +116,7 @@ class _CopyBlock extends StatelessWidget {
           ),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: AppSpacing.xl),
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 384),
           child: Text(

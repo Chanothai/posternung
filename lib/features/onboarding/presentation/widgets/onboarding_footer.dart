@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import 'onboarding_primary_button.dart';
@@ -35,12 +36,12 @@ class OnboardingFooter extends StatelessWidget {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(AppSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             OnboardingProgressIndicator(pageController: pageController),
-            const SizedBox(height: 32),
+            const SizedBox(height: AppSpacing.xxl),
             OnboardingPrimaryButton(
               onPressed: onNext,
               label: buttonLabel,

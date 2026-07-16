@@ -50,8 +50,12 @@ void main() {
     expect(find.text('Featured Collections'), findsOneWidget);
     expect(find.text('Ending Soon'), findsOneWidget);
     expect(find.text('All Posters'), findsOneWidget);
-    expect(find.text('70s Sci-Fi Masterpieces'), findsOneWidget);
-    expect(find.text('Blade Runner'), findsOneWidget);
+    // Featured Collections and Ending Soon now loop infinitely (see
+    // HomeLoopingCarousel), so the real first item can legitimately be
+    // built more than once at rest (Ending Soon's viewport fits more
+    // slots than the 3 real items) — assert presence, not uniqueness.
+    expect(find.text('70s Sci-Fi Masterpieces'), findsAtLeastNWidgets(1));
+    expect(find.text('Blade Runner'), findsAtLeastNWidgets(1));
   });
 
   testWidgets(
@@ -109,7 +113,13 @@ void main() {
       final collapsedExtent = paintExtent();
       expect(collapsedExtent, lessThan(fullExtent));
 
-      await tester.drag(find.byType(Scrollable).first, const Offset(0, 150));
+      // Drag up by the same distance as the down-drag (not just a small
+      // amount) so the net scroll offset clearly drops back under the top
+      // bar's own collapse threshold regardless of minor scroll-friction
+      // differences between drags — a small up-drag can leave the offset
+      // just barely above the threshold, which is a flaky, near-zero-margin
+      // assertion rather than a real test of "recovers on scroll up".
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, 300));
       await tester.pump();
       expect(paintExtent(), greaterThan(collapsedExtent));
     },

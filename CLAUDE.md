@@ -32,7 +32,9 @@ Cross-feature, reusable code lives in `lib/core/`:
 ```
 lib/core/
   theme/         # design tokens: colors, text styles
+  design_system/ # layout tokens: spacing, radius, sizing (same convention as theme/)
   strings/       # centralized UI copy: AppStrings (same convention as theme/)
+  assets/        # image asset paths: AppImages (same convention as theme/)
   error/         # shared exception/failure types
   config/        # build-environment resolution — see "Build environments" below
   network/       # shared API client setup (dio/http), interceptors
@@ -41,6 +43,8 @@ lib/core/
 ```
 
 See `lib/core/CLAUDE.md` for what's actually inside each subfolder today.
+
+**New image/icon assets:** when adding a new image or icon under `assets/images/`, add a corresponding `static const String` constant to `AppImages` (`lib/core/assets/app_images.dart`) in the same change. Never reference `'assets/images/...'` as a literal string inside `SvgPicture.asset(...)` or `Image.asset(...)` calls in feature code — this applies to all new feature work going forward, not just existing screens.
 
 ## Build environments
 

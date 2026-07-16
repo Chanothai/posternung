@@ -4,6 +4,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/assets/app_images.dart';
+import '../../../../core/design_system/app_dimens.dart';
+import '../../../../core/design_system/app_radius.dart';
+import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -86,7 +90,7 @@ class _FadedPosterCard extends StatelessWidget {
           height: 176,
           decoration: BoxDecoration(
             border: Border.all(color: AppColors.borderMuted),
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(AppRadius.xs),
           ),
         ),
       ),
@@ -102,11 +106,11 @@ class _HighlightedPosterCard extends StatelessWidget {
     return Container(
       width: 144,
       height: 192,
-      padding: const EdgeInsets.all(9),
+      padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
         color: AppColors.surfaceDark,
         border: Border.all(color: AppColors.accent),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(AppRadius.xs),
         boxShadow: const [
           BoxShadow(
             color: Color.fromRGBO(58, 51, 44, 0.3),
@@ -125,11 +129,11 @@ class _HighlightedPosterCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               SvgPicture.asset(
-                'assets/images/poster_placeholder_icon.svg',
-                width: 30,
-                height: 30,
+                AppImages.posterPlaceholderIcon,
+                width: AppDimens.iconLg,
+                height: AppDimens.iconLg,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               Text(
                 AppStrings.onboardingStockBadge,
                 style: AppTextStyles.stockBadgeLabel,
@@ -166,7 +170,7 @@ class _CopyBlock extends StatelessWidget {
           ),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: AppSpacing.xl),
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 384),
           child: Text(

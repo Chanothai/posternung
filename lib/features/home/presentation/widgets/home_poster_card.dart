@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/assets/app_images.dart';
+import '../../../../core/design_system/app_radius.dart';
+import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../models/home_mock_data.dart';
@@ -41,11 +44,11 @@ class HomePosterCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.posterPlaceholderFill,
                   border: Border.all(color: AppColors.borderMuted),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(AppRadius.xs),
                 ),
                 child: Center(
                   child: SvgPicture.asset(
-                    'assets/images/poster_placeholder_icon.svg',
+                    AppImages.posterPlaceholderIcon,
                     width: 40,
                     height: 40,
                   ),
@@ -54,11 +57,11 @@ class HomePosterCard extends StatelessWidget {
               if (poster.badgeLabel != null)
                 Positioned(
                   left: 0,
-                  top: 8,
+                  top: AppSpacing.sm,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
+                      horizontal: AppSpacing.sm,
+                      vertical: AppSpacing.xs,
                     ),
                     color: AppColors.accentRed,
                     child: Text(
@@ -69,8 +72,8 @@ class HomePosterCard extends StatelessWidget {
                 ),
               if (showWishlistButton)
                 Positioned(
-                  right: 8,
-                  top: 8,
+                  right: AppSpacing.sm,
+                  top: AppSpacing.sm,
                   child: _WishlistButton(
                     onTap: () => showComingSoonSnackBar(context),
                   ),
@@ -78,7 +81,7 @@ class HomePosterCard extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.sm),
         Text(
           poster.title,
           style: AppTextStyles.homePosterTitle,
@@ -92,7 +95,7 @@ class HomePosterCard extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         Padding(
-          padding: const EdgeInsets.only(top: 4),
+          padding: const EdgeInsets.only(top: AppSpacing.xs),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -105,12 +108,15 @@ class HomePosterCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: AppSpacing.xs),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.xs,
+                ),
                 decoration: BoxDecoration(
                   border: Border.all(color: AppColors.borderMuted),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(AppRadius.xs),
                 ),
                 child: Text(
                   poster.condition,
@@ -142,11 +148,7 @@ class _WishlistButton extends StatelessWidget {
           width: 28,
           height: 28,
           child: Center(
-            child: SvgPicture.asset(
-              'assets/images/heart_icon.svg',
-              width: 12,
-              height: 12,
-            ),
+            child: SvgPicture.asset(AppImages.heartIcon, width: 12, height: 12),
           ),
         ),
       ),
