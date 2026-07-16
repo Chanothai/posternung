@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/assets/app_images.dart';
 import '../../../../core/design_system/app_dimens.dart';
 import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
@@ -39,7 +40,7 @@ class HomeTopBar extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     SvgPicture.asset(
-                      'assets/images/header_icon.svg',
+                      AppImages.headerIcon,
                       width: 20,
                       height: 20,
                     ),
@@ -85,7 +86,7 @@ class _CartButton extends StatelessWidget {
               onTap: onPressed,
               child: Center(
                 child: SvgPicture.asset(
-                  'assets/images/cart_icon.svg',
+                  AppImages.cartIcon,
                   width: 15.75,
                   height: 14,
                 ),
@@ -141,7 +142,7 @@ class _HomeSearchBar extends StatelessWidget {
             Positioned(
               left: -29,
               child: SvgPicture.asset(
-                'assets/images/search_icon.svg',
+                AppImages.searchIcon,
                 width: AppDimens.iconSm,
                 height: AppDimens.iconSm,
               ),
@@ -149,7 +150,7 @@ class _HomeSearchBar extends StatelessWidget {
             Positioned(
               right: -29,
               child: SvgPicture.asset(
-                'assets/images/filter_icon.svg',
+                AppImages.filterIcon,
                 width: AppDimens.iconSm,
                 height: AppDimens.iconSm,
               ),

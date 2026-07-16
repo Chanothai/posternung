@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/assets/app_images.dart';
 import '../../../../core/design_system/app_dimens.dart';
 import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
@@ -27,7 +28,7 @@ class OnboardingHeader extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               SvgPicture.asset(
-                'assets/images/header_icon.svg',
+                AppImages.headerIcon,
                 width: AppDimens.iconMd,
                 height: AppDimens.iconMd,
               ),

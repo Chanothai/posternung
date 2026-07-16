@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/assets/app_images.dart';
 import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -36,7 +37,7 @@ class _CenterpieceBadge extends StatelessWidget {
           Opacity(
             opacity: 0.2,
             child: SvgPicture.asset(
-              'assets/images/header_icon.svg',
+              AppImages.headerIcon,
               width: 256,
               height: 256,
             ),
@@ -73,9 +74,7 @@ class _CenterpieceBadge extends StatelessWidget {
                             ),
                           ],
                         ),
-                        child: SvgPicture.asset(
-                          'assets/images/verified_badge_icon.svg',
-                        ),
+                        child: SvgPicture.asset(AppImages.verifiedBadgeIcon),
                       ),
                       const SizedBox(height: AppSpacing.md),
                       Text(

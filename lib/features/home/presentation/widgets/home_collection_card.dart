@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/assets/app_images.dart';
 import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -32,7 +33,7 @@ class HomeCollectionCard extends StatelessWidget {
         children: [
           Center(
             child: SvgPicture.asset(
-              'assets/images/poster_placeholder_icon.svg',
+              AppImages.posterPlaceholderIcon,
               width: 48,
               height: 48,
             ),

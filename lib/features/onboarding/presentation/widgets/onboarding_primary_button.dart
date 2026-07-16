@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/assets/app_images.dart';
 import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/strings/app_strings.dart';
@@ -49,7 +50,7 @@ class OnboardingPrimaryButton extends StatelessWidget {
               if (showArrow) ...[
                 const SizedBox(width: AppSpacing.md),
                 SvgPicture.asset(
-                  'assets/images/arrow_right.svg',
+                  AppImages.arrowRight,
                   width: 12.25,
                   height: 14,
                 ),

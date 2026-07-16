@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/assets/app_images.dart';
 import '../../../../core/design_system/app_dimens.dart';
 import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
@@ -145,7 +146,7 @@ class _BrandHeader extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           SvgPicture.asset(
-            'assets/images/header_icon.svg',
+            AppImages.headerIcon,
             width: AppDimens.iconLg,
             height: AppDimens.iconLg,
           ),
@@ -304,7 +305,7 @@ class _EmailField extends StatelessWidget {
             prefixIcon: Padding(
               padding: const EdgeInsets.all(AppSpacing.lg),
               child: SvgPicture.asset(
-                'assets/images/email_icon.svg',
+                AppImages.emailIcon,
                 width: 14,
                 height: 16,
               ),
@@ -386,7 +387,7 @@ class _PasswordField extends StatelessWidget {
             prefixIcon: Padding(
               padding: const EdgeInsets.all(AppSpacing.lg),
               child: SvgPicture.asset(
-                'assets/images/lock_icon.svg',
+                AppImages.lockIcon,
                 width: 14,
                 height: 16,
               ),
@@ -394,11 +395,7 @@ class _PasswordField extends StatelessWidget {
             suffixIcon: IconButton(
               onPressed: onToggleObscure,
               icon: obscure
-                  ? SvgPicture.asset(
-                      'assets/images/eye_icon.svg',
-                      width: 20,
-                      height: 16,
-                    )
+                  ? SvgPicture.asset(AppImages.eyeIcon, width: 20, height: 16)
                   : const Icon(
                       Icons.visibility,
                       color: AppColors.placeholderGray,
@@ -486,7 +483,7 @@ class _SubmitButton extends StatelessWidget {
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   SvgPicture.asset(
-                    'assets/images/arrow_right.svg',
+                    AppImages.arrowRight,
                     width: AppDimens.iconSm,
                     height: AppDimens.iconSm,
                   ),
@@ -544,11 +541,7 @@ class _GoogleSignInButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SvgPicture.asset(
-              'assets/images/google_logo.svg',
-              width: 17.16,
-              height: 18,
-            ),
+            SvgPicture.asset(AppImages.googleLogo, width: 17.16, height: 18),
             const SizedBox(width: AppSpacing.md),
             Text(
               AppStrings.authGoogleSignIn,
@@ -587,11 +580,7 @@ class _AppleSignInButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SvgPicture.asset(
-              'assets/images/apple_logo.svg',
-              width: 15,
-              height: 20,
-            ),
+            SvgPicture.asset(AppImages.appleLogo, width: 15, height: 20),
             const SizedBox(width: AppSpacing.md),
             Text(
               AppStrings.authAppleSignIn,

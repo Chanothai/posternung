@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/assets/app_images.dart';
 import '../../../../core/design_system/app_dimens.dart';
 import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
@@ -128,7 +129,7 @@ class _HighlightedPosterCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               SvgPicture.asset(
-                'assets/images/poster_placeholder_icon.svg',
+                AppImages.posterPlaceholderIcon,
                 width: AppDimens.iconLg,
                 height: AppDimens.iconLg,
               ),

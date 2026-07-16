@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/assets/app_images.dart';
 import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -47,7 +48,7 @@ class HomePosterCard extends StatelessWidget {
                 ),
                 child: Center(
                   child: SvgPicture.asset(
-                    'assets/images/poster_placeholder_icon.svg',
+                    AppImages.posterPlaceholderIcon,
                     width: 40,
                     height: 40,
                   ),
@@ -147,11 +148,7 @@ class _WishlistButton extends StatelessWidget {
           width: 28,
           height: 28,
           child: Center(
-            child: SvgPicture.asset(
-              'assets/images/heart_icon.svg',
-              width: 12,
-              height: 12,
-            ),
+            child: SvgPicture.asset(AppImages.heartIcon, width: 12, height: 12),
           ),
         ),
       ),
