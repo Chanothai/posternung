@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/design_system/app_dimens.dart';
+import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../models/home_mock_data.dart';
 import 'home_coming_soon.dart';
+import 'home_looping_carousel.dart';
 import 'home_poster_card.dart';
 
 /// "Ending Soon" — a bordered section with a "View all" link and a
@@ -14,6 +17,17 @@ import 'home_poster_card.dart';
 /// Figma: node 7:301.
 class HomeEndingSoonSection extends StatelessWidget {
   const HomeEndingSoonSection({super.key});
+
+  static const double _itemWidth = 140;
+
+  /// Space `HomePosterCard` needs below its image for title, subtitle, and
+  /// price row — plus a little breathing room so the card never clips.
+  static const double _cardTextBlockHeight = 72;
+
+  static const double _itemHeight =
+      _itemWidth / AppDimens.posterCardAspectRatio +
+      _cardTextBlockHeight +
+      AppSpacing.sm;
 
   @override
   Widget build(BuildContext context) {
@@ -24,19 +38,25 @@ class HomeEndingSoonSection extends StatelessWidget {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.only(left: 16, top: 17, bottom: 17),
+        padding: const EdgeInsets.only(
+          top: AppSpacing.lg,
+          bottom: AppSpacing.lg,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.only(right: 16),
+              padding: const EdgeInsets.only(right: AppSpacing.lg),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    AppStrings.homeSectionEndingSoon,
-                    style: AppTextStyles.homeSectionHeading,
+                  Padding(
+                    padding: const EdgeInsets.only(left: AppSpacing.lg),
+                    child: Text(
+                      AppStrings.homeSectionEndingSoon,
+                      style: AppTextStyles.homeSectionHeading,
+                    ),
                   ),
                   GestureDetector(
                     onTap: () => showComingSoonSnackBar(context),
@@ -58,21 +78,16 @@ class HomeEndingSoonSection extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 278,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: endingSoonPosters.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 16),
-                itemBuilder: (context, index) => SizedBox(
-                  width: 140,
-                  child: HomePosterCard(
-                    poster: endingSoonPosters[index],
-                    imageHeight: 208,
-                    priceColor: AppColors.accent,
-                  ),
-                ),
+            const SizedBox(height: AppSpacing.lg),
+            HomeLoopingCarousel<HomePoster>(
+              items: endingSoonPosters,
+              itemWidth: _itemWidth,
+              spacing: AppSpacing.lg,
+              height: _itemHeight,
+              itemBuilder: (context, poster) => HomePosterCard(
+                poster: poster,
+                imageHeight: _itemWidth / AppDimens.posterCardAspectRatio,
+                priceColor: AppColors.accent,
               ),
             ),
           ],

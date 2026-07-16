@@ -32,6 +32,7 @@ Cross-feature, reusable code lives in `lib/core/`:
 ```
 lib/core/
   theme/         # design tokens: colors, text styles
+  design_system/ # layout tokens: spacing, radius, sizing (same convention as theme/)
   strings/       # centralized UI copy: AppStrings (same convention as theme/)
   error/         # shared exception/failure types
   config/        # build-environment resolution — see "Build environments" below

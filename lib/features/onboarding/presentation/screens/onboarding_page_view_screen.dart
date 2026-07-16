@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/gradient_background.dart';
@@ -138,8 +139,8 @@ class _OnboardingPageScroll extends StatelessWidget {
             child: Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 24,
+                  horizontal: AppSpacing.xxl,
+                  vertical: AppSpacing.xl,
                 ),
                 child: child,
               ),

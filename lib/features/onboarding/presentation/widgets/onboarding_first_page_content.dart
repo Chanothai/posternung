@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_text_styles.dart';
 
@@ -31,7 +32,7 @@ class OnboardingFirstPageContent extends StatelessWidget {
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.xl),
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 384),
             child: Text(

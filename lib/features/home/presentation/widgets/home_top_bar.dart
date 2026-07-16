@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/design_system/app_dimens.dart';
+import '../../../../core/design_system/app_radius.dart';
+import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -20,7 +23,12 @@ class HomeTopBar extends StatelessWidget {
         border: Border(bottom: BorderSide(color: AppColors.borderMuted)),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 17),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.lg,
+          AppSpacing.lg,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -35,7 +43,7 @@ class HomeTopBar extends StatelessWidget {
                       width: 20,
                       height: 20,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: AppSpacing.sm),
                     Text(
                       AppStrings.homeBrandTitle,
                       style: AppTextStyles.appBarTitle,
@@ -45,7 +53,7 @@ class HomeTopBar extends StatelessWidget {
                 _CartButton(onPressed: () => showComingSoonSnackBar(context)),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             _HomeSearchBar(onTap: () => showComingSoonSnackBar(context)),
           ],
         ),
@@ -121,7 +129,7 @@ class _HomeSearchBar extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.white,
           border: Border.all(color: AppColors.borderMuted),
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
         ),
         child: Stack(
           alignment: Alignment.centerLeft,
@@ -134,16 +142,16 @@ class _HomeSearchBar extends StatelessWidget {
               left: -29,
               child: SvgPicture.asset(
                 'assets/images/search_icon.svg',
-                width: 14,
-                height: 14,
+                width: AppDimens.iconSm,
+                height: AppDimens.iconSm,
               ),
             ),
             Positioned(
               right: -29,
               child: SvgPicture.asset(
                 'assets/images/filter_icon.svg',
-                width: 14,
-                height: 14,
+                width: AppDimens.iconSm,
+                height: AppDimens.iconSm,
               ),
             ),
           ],

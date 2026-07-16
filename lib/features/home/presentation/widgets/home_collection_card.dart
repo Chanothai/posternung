@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/design_system/app_radius.dart';
+import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../models/home_mock_data.dart';
@@ -24,7 +26,7 @@ class HomeCollectionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.posterPlaceholderFill,
         border: Border.all(color: AppColors.borderMuted),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Stack(
         children: [
@@ -50,9 +52,9 @@ class HomeCollectionCard extends StatelessWidget {
             ),
           ),
           Positioned(
-            left: 16,
-            right: 16,
-            bottom: 16,
+            left: AppSpacing.lg,
+            right: AppSpacing.lg,
+            bottom: AppSpacing.lg,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,

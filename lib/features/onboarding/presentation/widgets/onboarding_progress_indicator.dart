@@ -2,6 +2,8 @@ import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/design_system/app_radius.dart';
+import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../providers/onboarding_providers.dart';
 
@@ -29,7 +31,7 @@ class OnboardingProgressIndicator extends StatelessWidget {
             final proximity = (1 - (page - index).abs()).clamp(0.0, 1.0);
             return Padding(
               padding: EdgeInsets.only(
-                right: index == onboardingPageCount - 1 ? 0 : 12,
+                right: index == onboardingPageCount - 1 ? 0 : AppSpacing.md,
               ),
               child: Container(
                 width: lerpDouble(8, 32, proximity),
@@ -40,7 +42,7 @@ class OnboardingProgressIndicator extends StatelessWidget {
                     AppColors.accent,
                     proximity,
                   ),
-                  borderRadius: BorderRadius.circular(9999),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
                 ),
               ),
             );

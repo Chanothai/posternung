@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/design_system/app_radius.dart';
+import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -17,7 +19,12 @@ class HomeAllPostersSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 40),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.xl,
+        AppSpacing.lg,
+        40,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -25,15 +32,15 @@ class HomeAllPostersSection extends StatelessWidget {
             AppStrings.homeSectionAllPosters,
             style: AppTextStyles.homeSectionHeading,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: allPosters.length,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
+              crossAxisSpacing: AppSpacing.lg,
+              mainAxisSpacing: AppSpacing.lg,
               mainAxisExtent: 321.25,
             ),
             itemBuilder: (context, index) => HomePosterCard(
@@ -44,18 +51,18 @@ class HomeAllPostersSection extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.only(top: 16),
+            padding: const EdgeInsets.only(top: AppSpacing.lg),
             child: Center(
               child: OutlinedButton(
                 onPressed: () => showComingSoonSnackBar(context),
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: AppColors.borderMuted),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 25,
-                    vertical: 11,
+                    horizontal: AppSpacing.xl,
+                    vertical: AppSpacing.md,
                   ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(9999),
+                    borderRadius: BorderRadius.circular(AppRadius.full),
                   ),
                 ),
                 child: Text(

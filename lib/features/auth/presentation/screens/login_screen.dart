@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../core/design_system/app_dimens.dart';
+import '../../../../core/design_system/app_radius.dart';
+import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/error/auth_exception.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -94,11 +97,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           const AppGradientBackground(),
           SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xl,
+                vertical: AppSpacing.xl,
+              ),
               child: Column(
                 children: [
                   const _BrandHeader(),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 448),
                     child: _AuthCard(
@@ -133,17 +139,17 @@ class _BrandHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           SvgPicture.asset(
             'assets/images/header_icon.svg',
-            width: 30,
-            height: 30,
+            width: AppDimens.iconLg,
+            height: AppDimens.iconLg,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.sm),
           Text(AppStrings.appName, style: AppTextStyles.brandTitleLarge),
         ],
       ),
@@ -185,11 +191,11 @@ class _AuthCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(33),
+      padding: const EdgeInsets.all(AppSpacing.xxl),
       decoration: BoxDecoration(
         color: AppColors.glassCardFill,
         border: Border.all(color: AppColors.glassCardBorder),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(AppRadius.xs),
       ),
       child: Form(
         key: formKey,
@@ -197,7 +203,7 @@ class _AuthCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _HeadingBlock(isRegistering: isRegistering),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.xl),
             _EmailField(controller: emailController),
             const SizedBox(height: 20),
             _PasswordField(
@@ -207,7 +213,7 @@ class _AuthCard extends StatelessWidget {
               showForgotPassword: !isRegistering,
             ),
             if (errorMessage != null) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               _ErrorBanner(message: errorMessage!),
             ],
             const SizedBox(height: 20),
@@ -216,15 +222,15 @@ class _AuthCard extends StatelessWidget {
               isRegistering: isRegistering,
               onPressed: onSubmit,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.xl),
             const _OrDivider(),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.xl),
             _GoogleSignInButton(onPressed: onGooglePressed),
             if (showAppleButton) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               _AppleSignInButton(onPressed: onApplePressed),
             ],
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.sm),
             _ModeToggleRow(
               isRegistering: isRegistering,
               onToggle: onToggleMode,
@@ -252,7 +258,7 @@ class _HeadingBlock extends StatelessWidget {
           style: AppTextStyles.authCardHeading,
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.sm),
         Text(
           isRegistering
               ? AppStrings.authSubtitleRegister
@@ -276,13 +282,13 @@ class _EmailField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
           child: Text(
             AppStrings.authEmailLabel,
             style: AppTextStyles.inputLabel,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.sm),
         TextFormField(
           controller: controller,
           keyboardType: TextInputType.emailAddress,
@@ -296,7 +302,7 @@ class _EmailField extends StatelessWidget {
               color: AppColors.placeholderGray,
             ),
             prefixIcon: Padding(
-              padding: const EdgeInsets.all(15),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               child: SvgPicture.asset(
                 'assets/images/email_icon.svg',
                 width: 14,
@@ -304,7 +310,7 @@ class _EmailField extends StatelessWidget {
               ),
             ),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(AppRadius.xs),
               borderSide: const BorderSide(color: AppColors.borderMuted),
             ),
           ),
@@ -339,7 +345,7 @@ class _PasswordField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -364,7 +370,7 @@ class _PasswordField extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: AppSpacing.sm),
         TextFormField(
           controller: controller,
           obscureText: obscure,
@@ -378,7 +384,7 @@ class _PasswordField extends StatelessWidget {
               color: AppColors.placeholderGray,
             ),
             prefixIcon: Padding(
-              padding: const EdgeInsets.all(15),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               child: SvgPicture.asset(
                 'assets/images/lock_icon.svg',
                 width: 14,
@@ -399,7 +405,7 @@ class _PasswordField extends StatelessWidget {
                     ),
             ),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(AppRadius.xs),
               borderSide: const BorderSide(color: AppColors.borderMuted),
             ),
           ),
@@ -450,9 +456,14 @@ class _SubmitButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.accent,
           foregroundColor: AppColors.white,
-          minimumSize: const Size.fromHeight(48),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          minimumSize: const Size.fromHeight(AppDimens.buttonHeight),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.xl,
+            vertical: AppSpacing.md,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.xs),
+          ),
           elevation: 0,
         ),
         child: isLoading
@@ -473,11 +484,11 @@ class _SubmitButton extends StatelessWidget {
                         : AppStrings.authSubmitLogin,
                     style: AppTextStyles.authButtonLabel,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.sm),
                   SvgPicture.asset(
                     'assets/images/arrow_right.svg',
-                    width: 14,
-                    height: 14,
+                    width: AppDimens.iconSm,
+                    height: AppDimens.iconSm,
                   ),
                 ],
               ),
@@ -495,7 +506,7 @@ class _OrDivider extends StatelessWidget {
       children: [
         const Expanded(child: Divider(color: AppColors.borderMuted, height: 1)),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
           child: Text(
             AppStrings.authOrDivider,
             style: AppTextStyles.dividerLabel,
@@ -522,8 +533,13 @@ class _GoogleSignInButton extends StatelessWidget {
           backgroundColor: AppColors.textPrimary,
           side: const BorderSide(color: AppColors.borderMuted),
           minimumSize: const Size.fromHeight(44),
-          padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 11),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.xs),
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -533,7 +549,7 @@ class _GoogleSignInButton extends StatelessWidget {
               width: 17.16,
               height: 18,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             Text(
               AppStrings.authGoogleSignIn,
               style: AppTextStyles.cardSubtitle.copyWith(
@@ -562,8 +578,10 @@ class _AppleSignInButton extends StatelessWidget {
           backgroundColor: Colors.black,
           side: const BorderSide(color: Color(0xFF27272A)),
           minimumSize: const Size.fromHeight(44),
-          padding: const EdgeInsets.symmetric(vertical: 11),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.xs),
+          ),
           elevation: 0,
         ),
         child: Row(
@@ -574,7 +592,7 @@ class _AppleSignInButton extends StatelessWidget {
               width: 15,
               height: 20,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             Text(
               AppStrings.authAppleSignIn,
               style: AppTextStyles.cardSubtitle.copyWith(
