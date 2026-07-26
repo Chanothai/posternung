@@ -59,6 +59,16 @@ Placeholder locations already exist — replace with real artwork:
 
 Until these exist, SIT/UAT builds simply show the default (production) icon.
 
+## 6. Backend API base URL
+
+`lib/core/config/api_base_url_resolver.dart`'s `apiBaseUrlFor(Environment)` holds the base URL per environment. **Production** resolves to the stable domain `https://api.posternung.com` by default — no override needed. **SIT/UAT** have no backend deployed yet (empty default); wire them here once they do.
+
+For ad-hoc testing (a local backend or a `cloudflared` tunnel), or to exercise SIT/UAT before they deploy, override at build/run time instead of editing code:
+
+```bash
+flutter run --flavor production --dart-define=API_BASE_URL=https://your-tunnel-url.trycloudflare.com
+```
+
 ## Verifying it's all wired up
 
 - `flutter run --flavor sit -t lib/main.dart` (same for `uat`/`production`) — builds and launches today. SIT/UAT will crash immediately on `Firebase.initializeApp()` (an intentional `UnimplementedError`) until steps 1–3 above are done; production runs fully end to end already.
