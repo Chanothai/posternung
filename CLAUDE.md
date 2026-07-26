@@ -116,3 +116,4 @@ Don't produce a polished markdown plan document as an additional user-facing del
 - [`docs/git-workflow.md`](docs/git-workflow.md) — commit message format, push rules, branch naming, PR template. Read before running any `git commit`/`git push`.
 - [`docs/environments-setup.md`](docs/environments-setup.md) — SIT/UAT/Production environment setup checklist.
 - [`docs/social-login-setup.md`](docs/social-login-setup.md) — Google/Apple sign-in native setup checklist.
+- [`docs/phone-auth-setup.md`](docs/phone-auth-setup.md) — Firebase Phone Auth native/console setup checklist.
