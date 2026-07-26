@@ -4,6 +4,8 @@ The Dart code for Google and Apple sign-in is complete and merged, but it **will
 
 Bundle ID / package name: `com.frameshine.posternung`.
 
+> **Google is Firebase-mediated, then exchanged for a backend session.** Google Sign-In yields a Google `id_token` → the app signs into Firebase with it (`signInWithCredential`) → sends the resulting **Firebase ID token** to `posternung-backend`'s `POST /api/v1/auth/google` (the backend runs `verify_firebase_token`, so a raw Google token gets a 401 `OAUTH_TOKEN_INVALID`). The returned `{access_token, refresh_token}` JWT session is stored in `flutter_secure_storage`. Consequences: (a) Google **must** be enabled as a Firebase sign-in provider (the app needs Firebase to mint the token — step 1); (b) a Google login establishes *both* a Firebase session and the backend session, and `sessionProvider` gates on either; (c) the Android `GOOGLE_SERVER_CLIENT_ID` (step 5) still applies — it's what makes the SDK return a usable `id_token`; (d) the backend must be reachable, i.e. `--dart-define=API_BASE_URL=...` (see `docs/environments-setup.md`). Firebase backs email/password + Apple as before.
+
 > **Status:** the package/bundle identifier was renamed from `com.example.posternung` to `com.frameshine.posternung`. New Android + iOS apps have been registered under the new identifier in the `posternung` Firebase project and `google-services.json` / `GoogleService-Info.plist` / `lib/firebase_options.dart` are regenerated and committed (steps 2 & 3 below are done). The **old** `com.example.posternung` app entries still exist in the Firebase project (Firebase doesn't let you rename an app's package/bundle ID) — they're now unused; delete them from Project settings → Your apps whenever convenient, no rush. Steps 1 and 2 are done; step 4 (Apple Developer portal) and step 5 (Android SHA fingerprints + web client ID) still require manual console/portal access.
 >
 > **iOS Sign in with Apple is currently disabled at the native level.** A free/Personal Apple ID team cannot generate a provisioning profile for an app with the Sign in with Apple capability — Xcode blocks it outright. The `CODE_SIGN_ENTITLEMENTS` build setting and `ios/Runner/Runner.entitlements` were removed from the Runner target so the app can build and run on a physical device under a Personal Team. The Dart code paths (`signInWithApple()` in the repository/usecase/viewmodel, the Apple button in `login_screen.dart`) are untouched and will simply fail at runtime if tapped. The Apple button is also now hidden in the UI (`appleSignInEnabled = false` in `login_screen.dart`) so users aren't shown a button that would fail — flip that flag back once the capability is restored. To restore Apple sign-in: enroll in the paid [Apple Developer Program](https://developer.apple.com/programs/) ($99/yr), re-add the Sign in with Apple capability to the Runner target in Xcode (Signing & Capabilities → + Capability), which regenerates `Runner.entitlements` and wires `CODE_SIGN_ENTITLEMENTS` automatically, then continue with step 4 below.
@@ -49,11 +51,15 @@ Requires a paid [Apple Developer Program](https://developer.apple.com/programs/)
 
 ## Verify
 
-Once all steps are done, run on a real device or simulator and tap **เข้าสู่ระบบด้วย Google**. A successful sign-in flows through `authStateChangesProvider` → `AuthGate` and lands on the home screen, exactly like email/password. (The Apple button is currently hidden — see the status note above.)
+Once all steps are done, run on a real device or simulator (with `--dart-define=API_BASE_URL=...` and `--dart-define=GOOGLE_SERVER_CLIENT_ID=...`) and tap **เข้าสู่ระบบด้วย Google**. A successful sign-in POSTs the `id_token` to `POST /api/v1/auth/google`, stores the returned JWT session, and flows through `sessionProvider` → `AuthGate` to the home screen. (The Apple button is currently hidden — see the status note above.)
 
 ## How the code is wired (reference)
 
-- `lib/features/auth/data/datasources/auth_remote_data_source.dart` — the google_sign_in / sign_in_with_apple → Firebase credential flow.
-- `lib/features/auth/data/repositories/auth_repository_impl.dart` — maps SDK errors to `AuthException`, and user cancellation to `AuthCancelledException` (shown silently).
-- `lib/features/auth/presentation/providers/auth_providers.dart` — `AuthViewModel.signInWithGoogle()` / `signInWithApple()`.
+- `lib/features/auth/data/datasources/google_sign_in_data_source.dart` — Google SDK → Firebase `signInWithCredential` → Firebase ID token (sent to the backend).
+- `lib/features/auth/data/datasources/backend_auth_data_source.dart` — `POST /auth/google`, `GET /auth/me`, `POST /auth/refresh` via Dio.
+- `lib/features/auth/data/datasources/auth_remote_data_source.dart` — the sign_in_with_apple → Firebase credential flow (email/password + Apple only).
+- `lib/features/auth/presentation/providers/backend_session_provider.dart` — `BackendSessionNotifier`: Google login, token storage, `/auth/me` restore-on-startup, sign-out.
+- `lib/features/auth/presentation/providers/session_provider.dart` — merges the Firebase session and the backend JWT session; `AuthGate` watches this.
+- `lib/features/auth/presentation/providers/auth_providers.dart` — `AuthViewModel.signInWithGoogle()` (→ backend) / `signInWithApple()` (→ Firebase).
 - `lib/features/auth/presentation/screens/login_screen.dart` — the buttons (Apple gated to iOS; both disabled on web with a "mobile only" notice).
+- `lib/core/network/token_storage.dart` — `TokenStorage` over `flutter_secure_storage`.

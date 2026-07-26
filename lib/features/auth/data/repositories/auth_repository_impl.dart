@@ -1,5 +1,4 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase;
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../../core/error/auth_cancelled_exception.dart';
@@ -13,24 +12,6 @@ class AuthRepositoryImpl implements AuthRepository {
   AuthRepositoryImpl(this._remoteDataSource);
 
   final AuthRemoteDataSource _remoteDataSource;
-
-  @override
-  Future<AuthUser> signInWithEmailAndPassword({
-    required String email,
-    required String password,
-  }) =>
-      _guard(() => _remoteDataSource.signIn(email: email, password: password));
-
-  @override
-  Future<AuthUser> signUpWithEmailAndPassword({
-    required String email,
-    required String password,
-  }) =>
-      _guard(() => _remoteDataSource.signUp(email: email, password: password));
-
-  @override
-  Future<AuthUser> signInWithGoogle() =>
-      _guard(_remoteDataSource.signInWithGoogle);
 
   @override
   Future<AuthUser> signInWithApple() =>
@@ -62,14 +43,6 @@ class AuthRepositoryImpl implements AuthRepository {
       return _mapUser(await action());
     } on AuthCancelledException {
       rethrow;
-    } on GoogleSignInException catch (e) {
-      if (e.code == GoogleSignInExceptionCode.canceled) {
-        throw const AuthCancelledException();
-      }
-      throw AuthException(
-        code: e.code.name,
-        message: e.description ?? e.code.name,
-      );
     } on SignInWithAppleAuthorizationException catch (e) {
       if (e.code == AuthorizationErrorCode.canceled) {
         throw const AuthCancelledException();

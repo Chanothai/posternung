@@ -1,0 +1,223 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:posternung/core/error/auth_exception.dart';
+import 'package:posternung/core/network/token_storage.dart';
+import 'package:posternung/features/auth/data/datasources/backend_auth_data_source.dart';
+import 'package:posternung/features/auth/data/datasources/email_password_sign_in_data_source.dart';
+import 'package:posternung/features/auth/data/datasources/google_sign_in_data_source.dart';
+import 'package:posternung/features/auth/data/models/backend_user.dart';
+import 'package:posternung/features/auth/data/models/token_response.dart';
+import 'package:posternung/features/auth/presentation/providers/backend_session_provider.dart';
+
+class MockTokenStorage extends Mock implements TokenStorage {}
+
+class MockGoogleSignInDataSource extends Mock
+    implements GoogleSignInDataSource {}
+
+class MockEmailPasswordSignInDataSource extends Mock
+    implements EmailPasswordSignInDataSource {}
+
+class MockBackendAuthDataSource extends Mock implements BackendAuthDataSource {}
+
+BackendUser _user() => BackendUser(
+  id: 'u1',
+  email: 'a@b.com',
+  phone: null,
+  isVerified: true,
+  createdAt: DateTime(2024),
+);
+
+void main() {
+  late MockTokenStorage storage;
+  late MockGoogleSignInDataSource google;
+  late MockEmailPasswordSignInDataSource emailPassword;
+  late MockBackendAuthDataSource backend;
+
+  setUp(() {
+    storage = MockTokenStorage();
+    google = MockGoogleSignInDataSource();
+    emailPassword = MockEmailPasswordSignInDataSource();
+    backend = MockBackendAuthDataSource();
+    when(
+      () => storage.save(
+        accessToken: any(named: 'accessToken'),
+        refreshToken: any(named: 'refreshToken'),
+      ),
+    ).thenAnswer((_) async {});
+    when(() => storage.clear()).thenAnswer((_) async {});
+  });
+
+  ProviderContainer makeContainer() {
+    final container = ProviderContainer(
+      overrides: [
+        tokenStorageProvider.overrideWithValue(storage),
+        googleSignInDataSourceProvider.overrideWithValue(google),
+        emailPasswordSignInDataSourceProvider.overrideWithValue(emailPassword),
+        backendAuthDataSourceProvider.overrideWithValue(backend),
+      ],
+    );
+    addTearDown(container.dispose);
+    return container;
+  }
+
+  group('build / restore', () {
+    test('returns null when no access token is stored', () async {
+      when(() => storage.readAccessToken()).thenAnswer((_) async => null);
+
+      final user = await makeContainer().read(backendSessionProvider.future);
+
+      expect(user, isNull);
+    });
+
+    test('validates a stored token via /auth/me', () async {
+      when(() => storage.readAccessToken()).thenAnswer((_) async => 'a');
+      when(() => backend.getMe('a')).thenAnswer((_) async => _user());
+
+      final user = await makeContainer().read(backendSessionProvider.future);
+
+      expect(user!.uid, 'u1');
+    });
+
+    test('refreshes once on 401, then returns the user', () async {
+      when(() => storage.readAccessToken()).thenAnswer((_) async => 'expired');
+      when(
+        () => backend.getMe('expired'),
+      ).thenThrow(const AuthException(code: 'unauthorized', message: 'x'));
+      when(() => storage.readRefreshToken()).thenAnswer((_) async => 'refresh');
+      when(() => backend.refresh('refresh')).thenAnswer(
+        (_) async =>
+            const TokenResponse(accessToken: 'new', refreshToken: 'new-r'),
+      );
+      when(() => backend.getMe('new')).thenAnswer((_) async => _user());
+
+      final user = await makeContainer().read(backendSessionProvider.future);
+
+      expect(user!.uid, 'u1');
+      verify(
+        () => storage.save(accessToken: 'new', refreshToken: 'new-r'),
+      ).called(1);
+    });
+
+    test('clears tokens when 401 and no refresh token is available', () async {
+      when(() => storage.readAccessToken()).thenAnswer((_) async => 'expired');
+      when(
+        () => backend.getMe('expired'),
+      ).thenThrow(const AuthException(code: 'unauthorized', message: 'x'));
+      when(() => storage.readRefreshToken()).thenAnswer((_) async => null);
+
+      final user = await makeContainer().read(backendSessionProvider.future);
+
+      expect(user, isNull);
+      verify(() => storage.clear()).called(1);
+    });
+
+    test(
+      'keeps tokens on a non-401 (network) error but reports logged out',
+      () async {
+        when(() => storage.readAccessToken()).thenAnswer((_) async => 'a');
+        when(
+          () => backend.getMe('a'),
+        ).thenThrow(const AuthException(code: 'network_error', message: 'x'));
+
+        final user = await makeContainer().read(backendSessionProvider.future);
+
+        expect(user, isNull);
+        verifyNever(() => storage.clear());
+      },
+    );
+  });
+
+  group('signInWithGoogle', () {
+    test(
+      'exchanges the id_token, saves tokens, and publishes the user',
+      () async {
+        when(() => storage.readAccessToken()).thenAnswer((_) async => null);
+        when(() => google.getIdToken()).thenAnswer((_) async => 'id-tok');
+        when(() => backend.firebaseLogin('id-tok')).thenAnswer(
+          (_) async => const TokenResponse(accessToken: 'a', refreshToken: 'r'),
+        );
+        when(() => backend.getMe('a')).thenAnswer((_) async => _user());
+
+        final container = makeContainer();
+        await container.read(backendSessionProvider.future);
+        await container
+            .read(backendSessionProvider.notifier)
+            .signInWithGoogle();
+
+        expect(container.read(backendSessionProvider).value!.uid, 'u1');
+        verify(
+          () => storage.save(accessToken: 'a', refreshToken: 'r'),
+        ).called(1);
+      },
+    );
+  });
+
+  group('signInWithEmailPassword', () {
+    test(
+      'signs into Firebase, exchanges the id_token, and publishes the user',
+      () async {
+        when(() => storage.readAccessToken()).thenAnswer((_) async => null);
+        when(
+          () => emailPassword.signIn(email: 'a@b.com', password: 'pw'),
+        ).thenAnswer((_) async => 'id-tok');
+        when(() => backend.firebaseLogin('id-tok')).thenAnswer(
+          (_) async => const TokenResponse(accessToken: 'a', refreshToken: 'r'),
+        );
+        when(() => backend.getMe('a')).thenAnswer((_) async => _user());
+
+        final container = makeContainer();
+        await container.read(backendSessionProvider.future);
+        await container
+            .read(backendSessionProvider.notifier)
+            .signInWithEmailPassword(email: 'a@b.com', password: 'pw');
+
+        expect(container.read(backendSessionProvider).value!.uid, 'u1');
+        verify(
+          () => storage.save(accessToken: 'a', refreshToken: 'r'),
+        ).called(1);
+      },
+    );
+  });
+
+  group('registerWithEmailPassword', () {
+    test(
+      'creates the Firebase account, exchanges the id_token, publishes user',
+      () async {
+        when(() => storage.readAccessToken()).thenAnswer((_) async => null);
+        when(
+          () => emailPassword.register(email: 'new@b.com', password: 'pw'),
+        ).thenAnswer((_) async => 'id-tok');
+        when(() => backend.firebaseLogin('id-tok')).thenAnswer(
+          (_) async => const TokenResponse(accessToken: 'a', refreshToken: 'r'),
+        );
+        when(() => backend.getMe('a')).thenAnswer((_) async => _user());
+
+        final container = makeContainer();
+        await container.read(backendSessionProvider.future);
+        await container
+            .read(backendSessionProvider.notifier)
+            .registerWithEmailPassword(email: 'new@b.com', password: 'pw');
+
+        expect(container.read(backendSessionProvider).value!.uid, 'u1');
+        verify(
+          () => storage.save(accessToken: 'a', refreshToken: 'r'),
+        ).called(1);
+      },
+    );
+  });
+
+  group('signOut', () {
+    test('clears storage and nulls the session', () async {
+      when(() => storage.readAccessToken()).thenAnswer((_) async => 'a');
+      when(() => backend.getMe('a')).thenAnswer((_) async => _user());
+
+      final container = makeContainer();
+      await container.read(backendSessionProvider.future);
+      await container.read(backendSessionProvider.notifier).signOut();
+
+      expect(container.read(backendSessionProvider).value, isNull);
+      verify(() => storage.clear()).called(1);
+    });
+  });
+}

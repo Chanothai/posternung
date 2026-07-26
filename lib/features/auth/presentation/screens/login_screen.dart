@@ -1,23 +1,40 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/assets/app_images.dart';
-import '../../../../core/design_system/app_dimens.dart';
 import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/error/auth_exception.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/widgets/gradient_background.dart';
+import '../../../../core/utils/thai_phone_number.dart';
+import '../../data/datasources/phone_sign_in_data_source.dart';
+import '../auth_error_display.dart';
 import '../providers/auth_providers.dart';
+import '../widgets/auth_email_field.dart';
+import '../widgets/auth_error_banner.dart';
+import '../widgets/auth_nav_link_row.dart';
+import '../widgets/auth_password_field.dart';
+import '../widgets/auth_primary_button.dart';
+import '../widgets/auth_scaffold.dart';
+import 'otp_verification_screen.dart';
+import 'register_screen.dart';
 
-/// Login/Register screen — a single form, mode-toggled between the two,
-/// matching the old `LoginPage`'s behavior under the new design.
+/// Which credential the auth card is collecting. Email is the login flow;
+/// phone is passwordless — entering a number sends straight to
+/// [OtpVerificationScreen]. Register lives on its own screen ([RegisterScreen]),
+/// reached via the nav link at the bottom of email mode.
+enum _AuthMethod { email, phone }
+
+/// Login screen — email/phone method tabs, matching the old `LoginPage`'s
+/// behavior under the new design.
 ///
-/// Figma: node 7:130, frame "Login/Register".
+/// Figma: node 7:130, frame "Login/Register" (phone tab has no Figma spec —
+/// built to match the existing theme).
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -29,32 +46,61 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _phoneController = TextEditingController();
 
-  bool _isRegistering = false;
+  _AuthMethod _method = _AuthMethod.email;
   bool _obscurePassword = true;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final viewModel = ref.read(authViewModelProvider.notifier);
+    if (_method == _AuthMethod.phone) {
+      final phoneNumber = thaiMobileToE164(_phoneController.text);
+      if (phoneNumber == null) return;
+      final result = await ref
+          .read(authViewModelProvider.notifier)
+          .sendPhoneCode(phoneNumber);
+      if (!mounted) return;
+      if (result is SmsCodeSent) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => OtpVerificationScreen(
+              phoneNumber: phoneNumber,
+              verificationId: result.verificationId,
+              resendToken: result.resendToken,
+            ),
+          ),
+        );
+      }
+      // PhoneAutoVerified: the session is already published — AuthGate
+      // reacts on its own since LoginScreen is the root, not a pushed route.
+      // Error: already surfaced by the AuthErrorBanner below, which watches
+      // the same authState this method also drives.
+      return;
+    }
+
     final email = _emailController.text.trim();
     final password = _passwordController.text;
-
-    if (_isRegistering) {
-      await viewModel.signUp(email: email, password: password);
-    } else {
-      await viewModel.signIn(email: email, password: password);
-    }
+    await ref
+        .read(authViewModelProvider.notifier)
+        .signIn(email: email, password: password);
   }
 
-  void _toggleMode() => setState(() => _isRegistering = !_isRegistering);
+  void _setMethod(_AuthMethod method) => setState(() => _method = method);
+
+  void _goToRegister() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const RegisterScreen()));
+  }
 
   void _toggleObscurePassword() =>
       setState(() => _obscurePassword = !_obscurePassword);
@@ -86,73 +132,38 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // dart:io Platform) to re-enable.
     const showAppleButton = false;
     final error = authState.error;
-    final errorMessage = error is AuthException
-        ? error.message
-        : error?.toString();
+    final String? errorMessage;
+    final String? errorCode;
+    if (error is AuthException) {
+      final display = authErrorDisplay(error);
+      errorMessage = display.message;
+      errorCode = display.code;
+    } else if (error != null) {
+      errorMessage = AppStrings.authErrorGeneric;
+      errorCode = null;
+    } else {
+      errorMessage = null;
+      errorCode = null;
+    }
 
-    return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const AppGradientBackground(),
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.xl,
-                vertical: AppSpacing.xl,
-              ),
-              child: Column(
-                children: [
-                  const _BrandHeader(),
-                  const SizedBox(height: AppSpacing.sm),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 448),
-                    child: _AuthCard(
-                      formKey: _formKey,
-                      emailController: _emailController,
-                      passwordController: _passwordController,
-                      isRegistering: _isRegistering,
-                      obscurePassword: _obscurePassword,
-                      onToggleObscure: _toggleObscurePassword,
-                      isLoading: authState.isLoading,
-                      errorMessage: errorMessage,
-                      onSubmit: authState.isLoading ? null : _submit,
-                      onToggleMode: _toggleMode,
-                      onGooglePressed: _onGooglePressed,
-                      onApplePressed: _onApplePressed,
-                      showAppleButton: showAppleButton,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BrandHeader extends StatelessWidget {
-  const _BrandHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SvgPicture.asset(
-            AppImages.headerIcon,
-            width: AppDimens.iconLg,
-            height: AppDimens.iconLg,
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Text(AppStrings.appName, style: AppTextStyles.brandTitleLarge),
-        ],
+    return AuthScaffold(
+      card: _AuthCard(
+        formKey: _formKey,
+        method: _method,
+        onMethodChanged: _setMethod,
+        emailController: _emailController,
+        passwordController: _passwordController,
+        phoneController: _phoneController,
+        obscurePassword: _obscurePassword,
+        onToggleObscure: _toggleObscurePassword,
+        isLoading: authState.isLoading,
+        errorMessage: errorMessage,
+        errorCode: errorCode,
+        onSubmit: authState.isLoading ? null : _submit,
+        onGoToRegister: _goToRegister,
+        onGooglePressed: _onGooglePressed,
+        onApplePressed: _onApplePressed,
+        showAppleButton: showAppleButton,
       ),
     );
   }
@@ -161,36 +172,43 @@ class _BrandHeader extends StatelessWidget {
 class _AuthCard extends StatelessWidget {
   const _AuthCard({
     required this.formKey,
+    required this.method,
+    required this.onMethodChanged,
     required this.emailController,
     required this.passwordController,
-    required this.isRegistering,
+    required this.phoneController,
     required this.obscurePassword,
     required this.onToggleObscure,
     required this.isLoading,
     required this.errorMessage,
+    required this.errorCode,
     required this.onSubmit,
-    required this.onToggleMode,
+    required this.onGoToRegister,
     required this.onGooglePressed,
     required this.onApplePressed,
     required this.showAppleButton,
   });
 
   final GlobalKey<FormState> formKey;
+  final _AuthMethod method;
+  final ValueChanged<_AuthMethod> onMethodChanged;
   final TextEditingController emailController;
   final TextEditingController passwordController;
-  final bool isRegistering;
+  final TextEditingController phoneController;
   final bool obscurePassword;
   final VoidCallback onToggleObscure;
   final bool isLoading;
   final String? errorMessage;
+  final String? errorCode;
   final VoidCallback? onSubmit;
-  final VoidCallback onToggleMode;
+  final VoidCallback onGoToRegister;
   final VoidCallback onGooglePressed;
   final VoidCallback onApplePressed;
   final bool showAppleButton;
 
   @override
   Widget build(BuildContext context) {
+    final isPhone = method == _AuthMethod.phone;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.xxl),
       decoration: BoxDecoration(
@@ -203,24 +221,32 @@ class _AuthCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _HeadingBlock(isRegistering: isRegistering),
+            _MethodTabs(method: method, onChanged: onMethodChanged),
             const SizedBox(height: AppSpacing.xl),
-            _EmailField(controller: emailController),
-            const SizedBox(height: 20),
-            _PasswordField(
-              controller: passwordController,
-              obscure: obscurePassword,
-              onToggleObscure: onToggleObscure,
-              showForgotPassword: !isRegistering,
-            ),
+            _HeadingBlock(method: method),
+            const SizedBox(height: AppSpacing.xl),
+            if (isPhone)
+              _PhoneField(controller: phoneController)
+            else ...[
+              AuthEmailField(controller: emailController, autofocus: true),
+              const SizedBox(height: 20),
+              AuthPasswordField(
+                controller: passwordController,
+                obscure: obscurePassword,
+                onToggleObscure: onToggleObscure,
+                showForgotPassword: true,
+              ),
+            ],
             if (errorMessage != null) ...[
               const SizedBox(height: AppSpacing.md),
-              _ErrorBanner(message: errorMessage!),
+              AuthErrorBanner(message: errorMessage!, code: errorCode),
             ],
             const SizedBox(height: 20),
-            _SubmitButton(
+            AuthPrimaryButton(
+              label: isPhone
+                  ? AppStrings.authSubmitPhoneOtp
+                  : AppStrings.authSubmitLogin,
               isLoading: isLoading,
-              isRegistering: isRegistering,
               onPressed: onSubmit,
             ),
             const SizedBox(height: AppSpacing.xl),
@@ -231,11 +257,14 @@ class _AuthCard extends StatelessWidget {
               const SizedBox(height: AppSpacing.md),
               _AppleSignInButton(onPressed: onApplePressed),
             ],
-            const SizedBox(height: AppSpacing.sm),
-            _ModeToggleRow(
-              isRegistering: isRegistering,
-              onToggle: onToggleMode,
-            ),
+            if (!isPhone) ...[
+              const SizedBox(height: AppSpacing.sm),
+              AuthNavLinkRow(
+                promptText: AppStrings.authTogglePromptLogin,
+                actionText: AppStrings.authHeadingRegister,
+                onTap: onGoToRegister,
+              ),
+            ],
           ],
         ),
       ),
@@ -243,27 +272,96 @@ class _AuthCard extends StatelessWidget {
   }
 }
 
-class _HeadingBlock extends StatelessWidget {
-  const _HeadingBlock({required this.isRegistering});
+class _MethodTabs extends StatelessWidget {
+  const _MethodTabs({required this.method, required this.onChanged});
 
-  final bool isRegistering;
+  final _AuthMethod method;
+  final ValueChanged<_AuthMethod> onChanged;
 
   @override
   Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _MethodTab(
+            label: AppStrings.authMethodEmailTab,
+            selected: method == _AuthMethod.email,
+            onTap: () => onChanged(_AuthMethod.email),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: _MethodTab(
+            label: AppStrings.authMethodPhoneTab,
+            selected: method == _AuthMethod.phone,
+            onTap: () => onChanged(_AuthMethod.phone),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MethodTab extends StatelessWidget {
+  const _MethodTab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.accent : Colors.transparent,
+          border: Border.all(
+            color: selected ? AppColors.accent : AppColors.borderMuted,
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.xs),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: AppTextStyles.inputLabel.copyWith(
+            color: selected ? AppColors.white : AppColors.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeadingBlock extends StatelessWidget {
+  const _HeadingBlock({required this.method});
+
+  final _AuthMethod method;
+
+  @override
+  Widget build(BuildContext context) {
+    final heading = method == _AuthMethod.phone
+        ? AppStrings.authPhoneHeading
+        : AppStrings.authHeadingLogin;
+    final subtitle = method == _AuthMethod.phone
+        ? AppStrings.authPhoneSubtitle
+        : AppStrings.authSubtitleLogin;
     return Column(
       children: [
         Text(
-          isRegistering
-              ? AppStrings.authHeadingRegister
-              : AppStrings.authHeadingLogin,
+          heading,
           style: AppTextStyles.authCardHeading,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
-          isRegistering
-              ? AppStrings.authSubtitleRegister
-              : AppStrings.authSubtitleLogin,
+          subtitle,
           style: AppTextStyles.cardSubtitle,
           textAlign: TextAlign.center,
         ),
@@ -272,8 +370,8 @@ class _HeadingBlock extends StatelessWidget {
   }
 }
 
-class _EmailField extends StatelessWidget {
-  const _EmailField({required this.controller});
+class _PhoneField extends StatelessWidget {
+  const _PhoneField({required this.controller});
 
   final TextEditingController controller;
 
@@ -285,30 +383,40 @@ class _EmailField extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
           child: Text(
-            AppStrings.authEmailLabel,
+            AppStrings.authPhoneLabel,
             style: AppTextStyles.inputLabel,
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
         TextFormField(
           controller: controller,
-          keyboardType: TextInputType.emailAddress,
-          autofillHints: const [AutofillHints.email],
+          autofocus: true,
+          keyboardType: TextInputType.phone,
+          autofillHints: const [AutofillHints.telephoneNumber],
           style: AppTextStyles.inputText,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            // 10, not 9: people habitually type the leading 0
+            // (`0812345678`) even though the `+66 ` prefix already implies
+            // it — thaiMobileToE164 strips it before dialing.
+            LengthLimitingTextInputFormatter(10),
+          ],
           decoration: InputDecoration(
             filled: true,
             fillColor: AppColors.white,
-            hintText: AppStrings.authEmailHint,
+            hintText: AppStrings.authPhoneHint,
             hintStyle: AppTextStyles.inputText.copyWith(
               color: AppColors.placeholderGray,
             ),
-            prefixIcon: Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: SvgPicture.asset(
-                AppImages.emailIcon,
-                width: 14,
-                height: 16,
-              ),
+            // No phone icon in AppImages — a fixed dial-code prefix reads
+            // clearly on its own and avoids adding a new asset for this.
+            prefixText: '+66 ',
+            prefixStyle: AppTextStyles.inputText.copyWith(
+              color: AppColors.placeholderGray,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.lg,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppRadius.xs),
@@ -316,180 +424,13 @@ class _EmailField extends StatelessWidget {
             ),
           ),
           validator: (value) {
-            if (value == null || !value.contains('@')) {
-              return AppStrings.authEmailValidationError;
+            if (value == null || thaiMobileToE164(value) == null) {
+              return AppStrings.authPhoneValidationError;
             }
             return null;
           },
         ),
       ],
-    );
-  }
-}
-
-class _PasswordField extends StatelessWidget {
-  const _PasswordField({
-    required this.controller,
-    required this.obscure,
-    required this.onToggleObscure,
-    required this.showForgotPassword,
-  });
-
-  final TextEditingController controller;
-  final bool obscure;
-  final VoidCallback onToggleObscure;
-  final bool showForgotPassword;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                AppStrings.authPasswordLabel,
-                style: AppTextStyles.inputLabel,
-              ),
-              if (showForgotPassword)
-                GestureDetector(
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(AppStrings.comingSoonMessage),
-                      ),
-                    );
-                  },
-                  child: Text(
-                    AppStrings.authForgotPassword,
-                    style: AppTextStyles.linkSmall,
-                  ),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        TextFormField(
-          controller: controller,
-          obscureText: obscure,
-          autofillHints: const [AutofillHints.password],
-          style: AppTextStyles.inputText,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: AppColors.white,
-            hintText: AppStrings.authPasswordHint,
-            hintStyle: AppTextStyles.inputText.copyWith(
-              color: AppColors.placeholderGray,
-            ),
-            prefixIcon: Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: SvgPicture.asset(
-                AppImages.lockIcon,
-                width: 14,
-                height: 16,
-              ),
-            ),
-            suffixIcon: IconButton(
-              onPressed: onToggleObscure,
-              icon: obscure
-                  ? SvgPicture.asset(AppImages.eyeIcon, width: 20, height: 16)
-                  : const Icon(
-                      Icons.visibility,
-                      color: AppColors.placeholderGray,
-                    ),
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppRadius.xs),
-              borderSide: const BorderSide(color: AppColors.borderMuted),
-            ),
-          ),
-          validator: (value) {
-            if (value == null || value.length < 6) {
-              return AppStrings.authPasswordValidationError;
-            }
-            return null;
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      message,
-      style: AppTextStyles.cardSubtitle.copyWith(color: Colors.redAccent),
-      textAlign: TextAlign.center,
-    );
-  }
-}
-
-class _SubmitButton extends StatelessWidget {
-  const _SubmitButton({
-    required this.isLoading,
-    required this.isRegistering,
-    required this.onPressed,
-  });
-
-  final bool isLoading;
-  final bool isRegistering;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.accent,
-          foregroundColor: AppColors.white,
-          minimumSize: const Size.fromHeight(AppDimens.buttonHeight),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.xl,
-            vertical: AppSpacing.md,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.xs),
-          ),
-          elevation: 0,
-        ),
-        child: isLoading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.white,
-                ),
-              )
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    isRegistering
-                        ? AppStrings.authSubmitRegister
-                        : AppStrings.authSubmitLogin,
-                    style: AppTextStyles.authButtonLabel,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  SvgPicture.asset(
-                    AppImages.arrowRight,
-                    width: AppDimens.iconSm,
-                    height: AppDimens.iconSm,
-                  ),
-                ],
-              ),
-      ),
     );
   }
 }
@@ -589,41 +530,6 @@ class _AppleSignInButton extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ModeToggleRow extends StatelessWidget {
-  const _ModeToggleRow({required this.isRegistering, required this.onToggle});
-
-  final bool isRegistering;
-  final VoidCallback onToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: GestureDetector(
-        onTap: onToggle,
-        child: Text.rich(
-          TextSpan(
-            children: [
-              TextSpan(
-                text: isRegistering
-                    ? AppStrings.authTogglePromptRegister
-                    : AppStrings.authTogglePromptLogin,
-                style: AppTextStyles.cardSubtitle,
-              ),
-              TextSpan(
-                text: isRegistering
-                    ? AppStrings.authSubmitLogin
-                    : AppStrings.authHeadingRegister,
-                style: AppTextStyles.linkBold,
-              ),
-            ],
-          ),
-          textAlign: TextAlign.center,
         ),
       ),
     );
