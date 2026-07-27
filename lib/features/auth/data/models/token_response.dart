@@ -1,19 +1,18 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'token_response.freezed.dart';
+part 'token_response.g.dart';
+
 /// DTO for the backend's `TokenResponse` — returned by `/auth/firebase` and
 /// `/auth/refresh`.
-class TokenResponse {
-  const TokenResponse({
-    required this.accessToken,
-    required this.refreshToken,
-    this.tokenType = 'bearer',
-  });
+@freezed
+abstract class TokenResponse with _$TokenResponse {
+  const factory TokenResponse({
+    @JsonKey(name: 'access_token') required String accessToken,
+    @JsonKey(name: 'refresh_token') required String refreshToken,
+    @JsonKey(name: 'token_type') @Default('bearer') String tokenType,
+  }) = _TokenResponse;
 
-  final String accessToken;
-  final String refreshToken;
-  final String tokenType;
-
-  factory TokenResponse.fromJson(Map<String, dynamic> json) => TokenResponse(
-    accessToken: json['access_token'] as String,
-    refreshToken: json['refresh_token'] as String,
-    tokenType: json['token_type'] as String? ?? 'bearer',
-  );
+  factory TokenResponse.fromJson(Map<String, dynamic> json) =>
+      _$TokenResponseFromJson(json);
 }
