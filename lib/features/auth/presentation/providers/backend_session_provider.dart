@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/error/auth_exception.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/network/session_expiry.dart';
 import '../../../../core/network/token_storage.dart';
 import '../../data/datasources/backend_auth_data_source.dart';
 import '../../data/datasources/email_password_sign_in_data_source.dart';
@@ -41,7 +44,18 @@ final backendAuthDataSourceProvider = Provider<BackendAuthDataSource>(
 /// the two.
 class BackendSessionNotifier extends AsyncNotifier<AuthUser?> {
   @override
-  Future<AuthUser?> build() => _restore();
+  Future<AuthUser?> build() {
+    // AuthInterceptor bumps this when it clears tokens because the refresh
+    // token was missing/rejected on some later authenticated call — react
+    // the same way an explicit sign-out does, so sessionProvider/AuthGate
+    // drop back to the login screen without a manual signOut() call.
+    ref.listen(sessionExpiryProvider, (previous, next) {
+      if (previous != null && next != previous) {
+        state = const AsyncData(null);
+      }
+    });
+    return _restore();
+  }
 
   /// On startup: validate any stored access token against `/auth/me`. A
   /// transient infra failure (`network_error`/`server_error`) leaves tokens
@@ -156,6 +170,15 @@ class BackendSessionNotifier extends AsyncNotifier<AuthUser?> {
     final backend = ref.read(backendAuthDataSourceProvider);
     final storage = ref.read(tokenStorageProvider);
 
+    // Printed whole, on one line, so it can be selected and copied straight
+    // into Postman/curl against `/auth/firebase` — PrettyDioLogger's request
+    // body log (below this call, once the POST actually fires) wraps and
+    // truncates long values, which a ~1000-char JWT always is. Debug-only;
+    // never present in a release build.
+    if (kDebugMode) {
+      developer.log(idToken, name: 'firebase-id-token');
+    }
+
     final tokens = await backend.firebaseLogin(idToken);
     await storage.save(
       accessToken: tokens.accessToken,
@@ -165,8 +188,24 @@ class BackendSessionNotifier extends AsyncNotifier<AuthUser?> {
     state = AsyncData(user.toEntity());
   }
 
+  /// Best-effort revoke, then an unconditional local clear. The revoke can
+  /// only fail from offline/server trouble — the endpoint is idempotent by
+  /// contract (unknown/expired/already-revoked tokens still answer 204) — so
+  /// a failure here must never block the local sign-out; worst case the
+  /// refresh token just lives out its natural expiry server-side instead of
+  /// dying immediately. Read the refresh token *before* clearing: once
+  /// storage is cleared there's nothing left to identify the session with.
   Future<void> signOut() async {
-    await ref.read(tokenStorageProvider).clear();
+    final storage = ref.read(tokenStorageProvider);
+    final refreshToken = await storage.readRefreshToken();
+    if (refreshToken != null) {
+      try {
+        await ref.read(backendAuthDataSourceProvider).logout(refreshToken);
+      } on AuthException {
+        // Offline sign-out is normal — fall through to the local clear.
+      }
+    }
+    await storage.clear();
     state = const AsyncData(null);
   }
 }

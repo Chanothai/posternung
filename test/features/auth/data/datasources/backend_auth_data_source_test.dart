@@ -11,6 +11,10 @@ Response<Map<String, dynamic>> _resp(Map<String, dynamic> data) => Response(
   requestOptions: RequestOptions(path: '/'),
 );
 
+// /auth/logout answers 204 with an empty body — nothing to decode.
+Response<void> _voidResp() =>
+    Response(statusCode: 204, requestOptions: RequestOptions(path: '/'));
+
 DioException _dioError(int status, {Object? data}) => DioException(
   requestOptions: RequestOptions(path: '/'),
   response: Response(
@@ -39,7 +43,11 @@ void main() {
       'POSTs the id_token to /auth/firebase and parses TokenResponse',
       () async {
         when(
-          () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
+          () => dio.post<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
         ).thenAnswer(
           (_) async => _resp({'access_token': 'a', 'refresh_token': 'r'}),
         );
@@ -52,6 +60,7 @@ void main() {
           () => dio.post<Map<String, dynamic>>(
             captureAny(),
             data: captureAny(named: 'data'),
+            options: any(named: 'options'),
           ),
         ).captured;
         expect(captured[0], '/api/v1/auth/firebase');
@@ -61,7 +70,11 @@ void main() {
 
     test('surfaces the backend {error_code, message} envelope', () async {
       when(
-        () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
       ).thenThrow(
         _dioError(
           401,
@@ -88,7 +101,11 @@ void main() {
 
     test('maps a no-response failure to code network_error', () async {
       when(
-        () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
       ).thenThrow(_dioNoResponse());
 
       expect(
@@ -101,7 +118,11 @@ void main() {
 
     test('maps a 5xx without an envelope to code server_error', () async {
       when(
-        () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
       ).thenThrow(_dioError(502));
 
       expect(
@@ -111,6 +132,75 @@ void main() {
         ),
       );
     });
+
+    test(
+      "surfaces FastAPI's own request-validation 422 ({detail: [...]}, not "
+      'the {error_code, message} AppError envelope) with the field that '
+      'failed — this is what an empty id_token (a real regression: '
+      'getIdToken() resolving to "" instead of null) looks like on the wire',
+      () async {
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenThrow(
+          _dioError(
+            422,
+            data: {
+              'detail': [
+                {
+                  'type': 'string_too_short',
+                  'loc': ['body', 'id_token'],
+                  'msg': 'String should have at least 1 character',
+                },
+              ],
+            },
+          ),
+        );
+
+        expect(
+          () => dataSource.firebaseLogin(''),
+          throwsA(
+            isA<AuthException>()
+                .having((e) => e.code, 'code', 'validation_error')
+                .having((e) => e.message, 'message', contains('id_token')),
+          ),
+        );
+      },
+    );
+
+    test(
+      'a non-DioException failure (a 200 response with no body, so '
+      "response.data! hits null) still reaches the caller as an "
+      'AuthException, not a raw TypeError with no code to show on screen',
+      () async {
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer(
+          (_) async => Response<Map<String, dynamic>>(
+            data: null,
+            requestOptions: RequestOptions(path: '/'),
+          ),
+        );
+
+        expect(
+          () => dataSource.firebaseLogin('x'),
+          throwsA(
+            isA<AuthException>().having(
+              (e) => e.code,
+              'code',
+              startsWith('unexpected_'),
+            ),
+          ),
+        );
+      },
+    );
   });
 
   group('getMe', () {
@@ -147,6 +237,33 @@ void main() {
       );
     });
 
+    test('parses a phone-only user whose email is null — the backend genuinely '
+        'sends `"email": null` for a signup with no email claim on the '
+        'Firebase token, and this used to crash BackendUser.fromJson with a '
+        "bare TypeError ('Null' is not a subtype of 'String') the moment a "
+        'phone-only user hit this endpoint', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => _resp({
+          'id': 'u2',
+          'email': null,
+          'phone': '+66949948249',
+          'is_verified': true,
+          'created_at': '2024-01-01T00:00:00Z',
+        }),
+      );
+
+      final user = await dataSource.getMe('access-2');
+
+      expect(user.email, isNull);
+      expect(user.phone, '+66949948249');
+      expect(user.toEntity().email, isNull);
+    });
+
     test('surfaces the backend UNAUTHORIZED envelope', () async {
       when(
         () => dio.get<Map<String, dynamic>>(
@@ -172,7 +289,11 @@ void main() {
   group('refresh', () {
     test('POSTs the refresh_token to /auth/refresh', () async {
       when(
-        () => dio.post<Map<String, dynamic>>(any(), data: any(named: 'data')),
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
       ).thenAnswer(
         (_) async => _resp({'access_token': 'a2', 'refresh_token': 'r2'}),
       );
@@ -184,10 +305,53 @@ void main() {
         () => dio.post<Map<String, dynamic>>(
           captureAny(),
           data: captureAny(named: 'data'),
+          options: any(named: 'options'),
         ),
       ).captured;
       expect(captured[0], '/api/v1/auth/refresh');
       expect(captured[1], {'refresh_token': 'r1'});
+    });
+  });
+
+  group('logout', () {
+    test('POSTs the refresh_token to /auth/logout with skipAuth set', () async {
+      when(
+        () => dio.post<void>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer((_) async => _voidResp());
+
+      await dataSource.logout('r1');
+
+      final captured = verify(
+        () => dio.post<void>(
+          captureAny(),
+          data: captureAny(named: 'data'),
+          options: captureAny(named: 'options'),
+        ),
+      ).captured;
+      expect(captured[0], '/api/v1/auth/logout');
+      expect(captured[1], {'refresh_token': 'r1'});
+      expect((captured[2] as Options).extra?['skipAuth'], isTrue);
+    });
+
+    test('maps a transport failure to code network_error', () async {
+      when(
+        () => dio.post<void>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(_dioNoResponse());
+
+      expect(
+        () => dataSource.logout('r1'),
+        throwsA(
+          isA<AuthException>().having((e) => e.code, 'code', 'network_error'),
+        ),
+      );
     });
   });
 }

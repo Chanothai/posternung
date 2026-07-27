@@ -104,13 +104,27 @@ class AuthViewModel extends AsyncNotifier<void> {
   Future<void> signInWithApple() =>
       _runSocial(() => ref.read(signInWithAppleProvider)());
 
+  /// Drops a stale error left in `state` — e.g. a failed OTP attempt whose
+  /// banner must not still be showing once the user backs out to
+  /// `LoginScreen`, which watches this same provider. A no-op when there's
+  /// nothing to clear, so it's safe to call unconditionally on return.
+  void clearError() {
+    if (state.hasError) state = const AsyncData(null);
+  }
+
   /// Clears both sessions — the active one signs the user out, the other is
-  /// already empty and clears harmlessly.
+  /// already empty and clears harmlessly. The backend clear runs in `finally`
+  /// so a Firebase sign-out failure can never leave backend JWTs on disk
+  /// with `sessionProvider` still reporting authenticated; the original
+  /// error still propagates to `state` via `AsyncValue.guard`.
   Future<void> signOut() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      await ref.read(signOutProvider)();
-      await ref.read(backendSessionProvider.notifier).signOut();
+      try {
+        await ref.read(signOutProvider)();
+      } finally {
+        await ref.read(backendSessionProvider.notifier).signOut();
+      }
     });
   }
 

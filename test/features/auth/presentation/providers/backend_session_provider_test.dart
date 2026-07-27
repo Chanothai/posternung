@@ -208,15 +208,57 @@ void main() {
   });
 
   group('signOut', () {
-    test('clears storage and nulls the session', () async {
+    test('revokes the stored refresh token, then clears storage and nulls '
+        'the session', () async {
       when(() => storage.readAccessToken()).thenAnswer((_) async => 'a');
       when(() => backend.getMe('a')).thenAnswer((_) async => _user());
+      when(
+        () => storage.readRefreshToken(),
+      ).thenAnswer((_) async => 'refresh-token');
+      when(() => backend.logout('refresh-token')).thenAnswer((_) async {});
 
       final container = makeContainer();
       await container.read(backendSessionProvider.future);
       await container.read(backendSessionProvider.notifier).signOut();
 
       expect(container.read(backendSessionProvider).value, isNull);
+      verify(() => backend.logout('refresh-token')).called(1);
+      verify(() => storage.clear()).called(1);
+    });
+
+    test(
+      'still clears storage and nulls the session when the revoke fails '
+      '— signing out offline must never leave the app looking logged in',
+      () async {
+        when(() => storage.readAccessToken()).thenAnswer((_) async => 'a');
+        when(() => backend.getMe('a')).thenAnswer((_) async => _user());
+        when(
+          () => storage.readRefreshToken(),
+        ).thenAnswer((_) async => 'refresh-token');
+        when(
+          () => backend.logout('refresh-token'),
+        ).thenThrow(const AuthException(code: 'network_error', message: 'x'));
+
+        final container = makeContainer();
+        await container.read(backendSessionProvider.future);
+        await container.read(backendSessionProvider.notifier).signOut();
+
+        expect(container.read(backendSessionProvider).value, isNull);
+        verify(() => storage.clear()).called(1);
+      },
+    );
+
+    test('never calls logout when no refresh token is stored', () async {
+      when(() => storage.readAccessToken()).thenAnswer((_) async => 'a');
+      when(() => backend.getMe('a')).thenAnswer((_) async => _user());
+      when(() => storage.readRefreshToken()).thenAnswer((_) async => null);
+
+      final container = makeContainer();
+      await container.read(backendSessionProvider.future);
+      await container.read(backendSessionProvider.notifier).signOut();
+
+      expect(container.read(backendSessionProvider).value, isNull);
+      verifyNever(() => backend.logout(any()));
       verify(() => storage.clear()).called(1);
     });
   });
