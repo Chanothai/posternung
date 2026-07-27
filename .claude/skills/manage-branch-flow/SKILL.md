@@ -35,8 +35,13 @@ git checkout -b feature/<scope>-<desc> origin/develop
 gh pr create --base develop --title "..." --body "..."
 ```
 
-> ⚠️ **ลืม `--base` = PR ยิงเข้า default branch เงียบๆ** ไม่มี error ไม่มีคำเตือน
-> `gh pr view <n> --json baseRefName` ทุกครั้งหลังเปิด PR แล้วดูว่าได้ `develop` จริง
+> ⚠️ **`--base` ห้ามลืมเด็ดขาด** — default branch ของ repo ยังตั้งเป็น `main` ไว้ตั้งใจ
+> (repo เป็น public อยากให้คนเข้ามาเห็น `main` ก่อน) แปลว่าลืม `--base` เมื่อไหร่ PR จะยิงเข้า
+> `main` **เงียบๆ ไม่มี error ไม่มีคำเตือน** ตรงนี้ไม่มีระบบกันให้ มีแต่วินัย
+> ```bash
+> gh pr view <n> --json baseRefName --jq .baseRefName   # ต้องได้ develop
+> ```
+> เปิด PR จากหน้าเว็บก็เหมือนกัน — ช่อง base จะขึ้น `main` มาให้ ต้องเปลี่ยนเอง
 
 ## 2. ทำ branch ให้ทัน develop
 
