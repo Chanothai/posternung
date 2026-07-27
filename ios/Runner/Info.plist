@@ -49,6 +49,23 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- The SIT flavor's API base URL (lib/core/config/api_base_url_resolver.dart)
+	     is a local-network http:// address for hitting posternung-backend on
+	     the developer's machine — ATS blocks plain HTTP by default.
+	     NSAllowsLocalNetworking scopes the exception to local-network
+	     destinations only (not arbitrary HTTP everywhere), and is shared
+	     across all three flavors since Info.plist isn't per-flavor here;
+	     harmless on uat/production since neither talks to a local backend. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<!-- Required since iOS 14 whenever the app can reach local-network
+	     destinations (posternung-backend on the developer's LAN during SIT
+	     testing) — shown in the OS's local-network-access permission prompt. -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>PosterNung ต่อกับเซิร์ฟเวอร์ทดสอบบนเครือข่ายเดียวกันระหว่างการพัฒนา</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -66,6 +83,19 @@
 			</array>
 		</dict>
 	</array>
+	<!-- The reCAPTCHA redirect above is auth plumbing, not app navigation —
+	     firebase_auth's scene-delegate handling already consumes it
+	     (canHandleURL:). This app also has no route table at all
+	     (MaterialApp only sets home:, see lib/main.dart), so left at the
+	     Flutter default, the engine ALSO pushes that same URL to the
+	     framework as a route name, and _WidgetsAppState logs "Could not
+	     find a generator for route /link?deep_link_id=...=verifyApp&...".
+	     Harmless (auth still completes) but pure noise. False here opts
+	     out of that second path only; if real deep/universal links are
+	     ever added, remove this and add onGenerateRoute (or move to
+	     MaterialApp.router) first. -->
+	<key>FlutterDeepLinkingEnabled</key>
+	<false/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

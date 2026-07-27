@@ -4,4 +4,12 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Debug/profile only, deliberately not in src/main/ — targetSdk 28+
+         blocks plain HTTP by default, but the SIT flavor's API base URL
+         (lib/core/config/api_base_url_resolver.dart) is a local-network
+         http:// address for hitting posternung-backend on the developer's
+         machine. A release build must never accept cleartext traffic, so
+         this attribute is scoped to debug/profile; the manifest merger
+         combines it with <application> in src/main/ automatically. -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>

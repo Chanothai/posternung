@@ -9,8 +9,8 @@ void main() {
     // is compile-time (String.fromEnvironment) and can't be flipped at test
     // runtime — verified manually via
     // `flutter run --dart-define=API_BASE_URL=...` instead.
-    test('sit has no backend deployed yet', () {
-      expect(apiBaseUrlFor(Environment.sit), '');
+    test('sit points at the local backend over the developer LAN', () {
+      expect(apiBaseUrlFor(Environment.sit), 'http://192.168.68.102:8000');
     });
 
     test('uat has no backend deployed yet', () {
