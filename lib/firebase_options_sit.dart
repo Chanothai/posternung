@@ -56,21 +56,20 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCgwy5w1gHW4Z_yFXpHBHsQq1nELFZF9Us',
-    appId: '1:254591535895:android:7f7e0d34b9a6ac84c40552',
-    messagingSenderId: '254591535895',
-    projectId: 'posternung',
-    storageBucket: 'posternung.firebasestorage.app',
+    apiKey: 'AIzaSyDRcWCtBFNUBGQ7pxw70VkUMS4suuBID-g',
+    appId: '1:533903881255:android:b3c4d5a2a376ed7341ca02',
+    messagingSenderId: '533903881255',
+    projectId: 'posternung-sit',
+    storageBucket: 'posternung-sit.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBjTVZu1SJJ3A5oaYLAJlhMvo_t8TGX0PU',
-    appId: '1:254591535895:ios:ed095cf9fc6c2594c40552',
-    messagingSenderId: '254591535895',
-    projectId: 'posternung',
-    storageBucket: 'posternung.firebasestorage.app',
+    apiKey: 'AIzaSyDxtlqjLZmSigpxHMRf6T03FLk-isEU2F0',
+    appId: '1:533903881255:ios:530e3bf51aa3565041ca02',
+    messagingSenderId: '533903881255',
+    projectId: 'posternung-sit',
+    storageBucket: 'posternung-sit.firebasestorage.app',
     iosClientId:
-        '254591535895-j5kf2idvvolertcspk3hs6rr4h67jgfk.apps.googleusercontent.com',
+        '533903881255-bra0e4fdu2l7kba1hknq105uli8rb3vc.apps.googleusercontent.com',
     iosBundleId: 'com.frameshine.posternung.sit',
   );
 }
