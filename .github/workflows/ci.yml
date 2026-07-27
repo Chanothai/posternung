@@ -46,6 +46,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Generate code (freezed/json_serializable)
+        run: dart run build_runner build --delete-conflicting-outputs
+
       - name: Verify formatting
         run: dart format --output=none --set-exit-if-changed .
 
@@ -73,11 +76,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # NOTE: only the `production` Android flavor is built in CI for now.
-          # `sit`/`uat` will fail the google-services Gradle plugin's
-          # applicationId-matching check until their Firebase apps are
-          # registered (see docs/environments-setup.md) — add
-          # android-sit/android-uat matrix entries once that's done.
+          # All three Android flavors build here. This is deliberate coverage,
+          # not redundancy: each flavor resolves its own Firebase config
+          # (android/app/src/<flavor>/google-services.json) through the
+          # google-services Gradle plugin's applicationId-matching check, and
+          # that wiring has silently drifted before after a Firebase project
+          # was re-pointed. Building only `production` would leave sit/uat
+          # regressions to be found by hand on a device.
+          - platform: android-sit
+            os: ubuntu-latest
+            build_cmd: flutter build apk --debug --flavor sit
+          - platform: android-uat
+            os: ubuntu-latest
+            build_cmd: flutter build apk --debug --flavor uat
           - platform: android-production
             os: ubuntu-latest
             build_cmd: flutter build apk --debug --flavor production
@@ -124,6 +135,9 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Generate code (freezed/json_serializable)
+        run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Build ${{ matrix.platform }}
         run: |

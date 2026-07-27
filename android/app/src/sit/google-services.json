@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "533903881255",
+    "project_id": "posternung-sit",
+    "storage_bucket": "posternung-sit.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:533903881255:android:b3c4d5a2a376ed7341ca02",
+        "android_client_info": {
+          "package_name": "com.frameshine.posternung.sit"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "533903881255-5p17hb4knslqvno0htnc6t8rl8o4ooel.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDRcWCtBFNUBGQ7pxw70VkUMS4suuBID-g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "533903881255-5p17hb4knslqvno0htnc6t8rl8o4ooel.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

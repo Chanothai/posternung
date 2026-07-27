@@ -4,4 +4,7 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- See src/debug/AndroidManifest.xml — same reasoning, kept out of
+         src/main/ so release builds still reject cleartext traffic. -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>

@@ -2,28 +2,68 @@
 
 Fully feature-first — the reference implementation of the whole Repository + UseCase chain described in root `CLAUDE.md`. Read this feature's source before building the same chain for a new feature.
 
+**Dual-session model.** Auth runs on two coexisting sessions: the **backend JWT session** (`posternung-backend`) for email/password, register, and Google — all Firebase-mediated, exchanged at `/auth/firebase` — and **Firebase** directly for Apple. A Firebase sign-in also establishes a Firebase session as a side effect, so `sessionProvider` merges the two — the app is logged in if either has a user — and `AuthGate` watches that merged provider, not Firebase directly.
+
 ```
 domain/
-  entities/       # AuthUser
-  repositories/   # AuthRepository interface — signIn/signUp/signInWithGoogle/
+  entities/       # AuthUser (uid, email) — used by both sessions
+  repositories/   # AuthRepository interface — Firebase ops only:
                   # signInWithApple/signOut/authStateChanges
-  usecases/       # one class per action (SignInWithEmailPassword, SignOut, ...)
+                  # (email/password + Google are NOT here — backend-mediated)
+  usecases/       # one class per Firebase action (SignInWithApple, SignOut)
 data/
-  datasources/    # AuthRemoteDataSource — wraps FirebaseAuth + GoogleSignIn +
-                  # SignInWithApple SDK calls directly
-  repositories/   # AuthRepositoryImpl — maps every SDK-specific exception
-                  # (FirebaseAuthException, GoogleSignInException,
-                  # SignInWithAppleAuthorizationException) into AuthException or
-                  # AuthCancelledException from core/error/; user-cancelled social
-                  # sign-in becomes AuthCancelledException (silent), everything
-                  # else becomes AuthException
+  datasources/    # AuthRemoteDataSource — FirebaseAuth Apple + session
+                  #   lifecycle (signInWithApple/signOut/authStateChanges)
+                  # EmailPasswordSignInDataSource — FirebaseAuth email/password
+                  #   → Firebase ID token (backend verifies it)
+                  # GoogleSignInDataSource — Google SDK → Firebase
+                  #   signInWithCredential → Firebase ID token (backend verifies it)
+                  # PhoneSignInDataSource — FirebaseAuth.verifyPhoneNumber
+                  #   (send code / confirm code) → Firebase ID token
+                  # BackendAuthDataSource — Dio → /auth/firebase, /auth/me,
+                  #   /auth/refresh, /auth/logout
+  models/         # TokenResponse, BackendUser (UserResponse → toEntity → AuthUser)
+                  #   — both @freezed + json_serializable; see root
+                  #   CLAUDE.md's State Management section
+  repositories/   # AuthRepositoryImpl — maps FirebaseAuthException /
+                  # SignInWithAppleAuthorizationException into AuthException or
+                  # AuthCancelledException (user-cancel → silent)
 presentation/
-  providers/      # full DI graph (datasource → repository → usecases) +
-                  # AuthViewModel (AsyncNotifier<void>, AsyncValue.guard pattern)
-  screens/        # LoginScreen — single form, mode-toggled between login/register
-  auth_gate.dart  # gates a destination behind auth state (AuthGate)
+  providers/      # auth_providers.dart — Firebase DI graph + AuthViewModel
+                  #   (AsyncNotifier<void>; signIn/signUp/signInWithGoogle/
+                  #   sendPhoneCode/confirmPhoneCode all → backend session;
+                  #   signInWithApple → Firebase)
+                  # backend_session_provider.dart — BackendSessionNotifier
+                  #   (AsyncNotifier<AuthUser?>): email/password + register +
+                  #   Google + phone, all via /auth/firebase, secure-storage
+                  #   tokens, /auth/me restore-on-startup, sign-out
+                  # session_provider.dart — merges Firebase + backend sessions
+  screens/        # LoginScreen — email/phone method tabs (email = login only;
+                  #   phone = passwordless, → OtpVerificationScreen)
+                  # RegisterScreen — email/password sign-up, pushed from
+                  #   LoginScreen's nav link, no Google/Apple buttons
+                  # OtpVerificationScreen — 6-digit code entry, confirms via
+                  #   PhoneSignInDataSource → /auth/firebase; resend re-sends
+                  #   a real code
+  widgets/        # Shared building blocks used by 2+ auth screens:
+                  #   AuthScaffold, AuthBrandHeader, AuthEmailField,
+                  #   AuthPasswordField, AuthErrorBanner, AuthPrimaryButton,
+                  #   AuthNavLinkRow. Screen-specific widgets (method tabs,
+                  #   phone field, social buttons) stay private to their screen.
+  auth_gate.dart  # gates a destination behind sessionProvider (AuthGate)
 ```
 
+- **Email/password, register, Google, and phone are all Firebase-mediated, then backend-session** via the unified `POST /auth/firebase` endpoint: the client signs into Firebase (email/password → `EmailPasswordSignInDataSource.signIn`; register → `.register` = `createUserWithEmailAndPassword`; Google → `GoogleSignInDataSource` → `signInWithCredential`; phone → `PhoneSignInDataSource.sendCode`/`confirmCode` wrapping `FirebaseAuth.verifyPhoneNumber`), gets the **Firebase ID token**, and `BackendSessionNotifier._exchangeAndPublish` sends it to `/auth/firebase` (backend reads `sign_in_provider` from the token and **find-or-creates** the user). Tokens are stored via `core/network/TokenStorage` and `BackendSessionNotifier` publishes the `AuthUser`. On startup it validates a stored token via `/auth/me` (single `/auth/refresh` retry on 401, hand-rolled in `_restore`/`_refreshAndRetry` — this predates and is independent of the interceptor below, which covers every *other* request). **Consequence:** any of these establishes *both* a Firebase session (which also gates the app via `authStateChangesProvider`) and the backend JWT session; `signOut` clears both. No cleanup-on-backend-failure yet (a half-registered Firebase account on a failed exchange is a known gap) — add when authenticated app API calls (posters/cart) land. `/auth/google` is deprecated — everything uses `/auth/firebase`.
+- **Account linking across providers is a backend concern, not a client one — mostly.** `firebase_login()` in `posternung-backend` (`app/services/auth_service.py`) auto-links a new sign-in to an existing user two ways: (1) same Firebase `uid` seen under a different provider, (2) `email` matches an existing user's *and* the token's `email_verified=true`. This client doesn't need to do anything for either case. **The one gap: a phone-only user (`email` never set) who later signs in with Google gets a second, disconnected backend user** — Firebase issues a new `uid` it's never seen, and there's no email to match against either, so both of the backend's linking checks miss silently (no error). The backend deliberately does not guess from the phone number (carriers recycle numbers — auto-linking on phone would be an account-takeover vector). The correct client-side fix is calling `linkWithCredential()` on the *existing signed-in user* when they add a second sign-in method — that requires an account-settings screen this app doesn't have yet, so it's not implemented. Don't try to fix this on the backend; see `posternung-backend/docs/api-contract-f1-f3.md` §6 for the authoritative spec.
+- **`core/network/AuthInterceptor` handles auth for every *other* request** — every call through `dioProvider` besides the three above (`/auth/firebase`, `/auth/refresh` are marked `skipAuth`; `/auth/me` sets its own header manually and is left alone) gets `Authorization: Bearer <token>` attached automatically, and a 401 transparently refreshes + retries. When it can't recover (refresh token missing/rejected), it bumps `core/network/session_expiry.dart`'s `sessionExpiryProvider` — `BackendSessionNotifier.build()` listens to that and nulls its own state, so a dead session drops the app back to `LoginScreen` the same way an explicit `signOut()` does, without the interceptor needing to import anything from this feature. See `lib/core/CLAUDE.md`'s `network/` entry for how the interceptor itself works.
+- **`signOut()` on `AuthViewModel` clears the backend session in a `finally`**, not just after a successful Firebase sign-out — if `ref.read(signOutProvider)()` throws, the backend JWTs still get cleared and the original Firebase error still propagates to `state`. (Before this was a plain sequential `await`+`await`: a Firebase failure would skip the backend clear entirely, leaving JWTs on disk with `sessionProvider` still reporting authenticated. Regression-tested in `test/features/auth/presentation/providers/auth_providers_test.dart`.)
+- **`BackendSessionNotifier.signOut()` revokes, then unconditionally clears.** It reads the stored refresh token *before* clearing (once storage is cleared there's nothing left to identify the session with), calls `POST /auth/logout` with it if one exists, then clears storage and nulls state regardless of whether the revoke succeeded, failed, or was skipped. The revoke failure is deliberately swallowed (caught as `AuthException` — `_guard` guarantees every transport/server failure arrives as one, so this can't hide a real bug) rather than surfaced: signing out while offline is normal and must never leave the app looking logged in. **The revoke only kills the refresh token** — the current access token is a stateless JWT the backend can't recall, so it keeps working for up to ~30 min after logout; this is the backend's contract, not a bug here. `sessionExpiryProvider`'s listener (above) intentionally does *not* revoke — it only fires once the refresh token was already rejected server-side, so there's nothing left to revoke.
+- **Phone is two calls, not one**: `sendCode` returns either `SmsCodeSent(verificationId, resendToken: …)` (normal path — show the OTP screen; named to avoid colliding with `firebase_auth`'s own `PhoneCodeSent` type) or `PhoneAutoVerified(idToken)` (Android silently verified the device before any code was sent — `BackendSessionNotifier` exchanges it immediately, no OTP screen needed; `LoginScreen` is the root so `AuthGate` just reacts). `confirmCode` on the OTP screen turns the entered digits + `verificationId` into the ID token. **Resend requires threading `resendToken` back into `sendCode`'s `forceResendingToken`** — Firebase silently sends no SMS without it; `OtpVerificationScreen` holds and refreshes it locally alongside `_verificationId`. The phone field accepts the habitual Thai leading-zero form (`0812345678`); `core/utils/thai_phone_number.dart`'s `thaiMobileToE164` normalizes it before dialing. **iOS uses Firebase's reCAPTCHA fallback** (a brief Safari challenge) rather than silent APNs push — the Push Notifications/Background Modes capability was deliberately not added; see `docs/phone-auth-setup.md` for how it works and how to upgrade to silent verification later. The `ios/Runner/Info.plist` URL-scheme entry for `$(PRODUCT_BUNDLE_IDENTIFIER)` is what lets that reCAPTCHA fallback redirect back into the app — this needs no `AppDelegate`/`SceneDelegate` code because `firebase_auth` conforms to Flutter's `FlutterSceneLifeCycleDelegate` and handles the callback itself (verified in the doc, not assumed). That redirect URL is *also* seen by the Flutter engine as a would-be route, and since this app has no route table (`main.dart` only sets `MaterialApp`'s `home:`), it used to log a harmless-but-noisy `Could not find a generator for route /link?deep_link_id=...` on every reCAPTCHA completion — `Info.plist`'s `FlutterDeepLinkingEnabled: false` suppresses that specific path without affecting the scene-delegate path above; see `docs/phone-auth-setup.md` §3.5.1.
+- **Apple is Firebase-only** (still): `AuthRepositoryImpl.signInWithApple` → `AuthRemoteDataSource` → Firebase, gating the app via the Firebase session. Not yet migrated to `/auth/firebase` (button is hidden pending native entitlements).
 - Google/Apple sign-in buttons are web-guarded (`kIsWeb` → `_showMobileOnly()` snackbar) since those SDKs are mobile-only here. The Apple button is currently hidden (`showAppleButton = false` in `login_screen.dart`) pending native entitlements — see `docs/social-login-setup.md`.
+- **Login errors** show a friendly Thai message + the raw code (second, muted line). Every screen (login/register/OTP) calls one shared conversion, `authErrorDisplayFor(authState.error)` (`presentation/auth_error_display.dart`) — `null` if there's nothing to show, otherwise always a display with a non-empty code. Firebase codes (English, e.g. `wrong-password`) are mapped to Thai via the lower-level `authErrorDisplay(AuthException)`; the backend's `{error_code, message}` envelope (already Thai) is surfaced verbatim by `BackendAuthDataSource` and passed through. Cancellations never reach the banner (swallowed in `_runSocial`).
+- **Every data-source guard must wrap failures into an `AuthException`, not let anything else escape** — this was violated in practice (`PhoneSignInDataSourceImpl.confirmCode`/`verificationCompleted` caught only `FirebaseAuthException`; `BackendAuthDataSource._guard` caught only `DioException`), and the symptom was invisible: `authErrorDisplayFor` used to render a non-`AuthException` as a generic Thai line with **no code at all**, which is indistinguishable from "the app is fine, just vague" — there was no way to tell from the UI that something was actually being swallowed. Both are now caught with a trailing `catch (e)` that wraps into `AuthException(code: 'somewhere_${e.runtimeType}', ...)`, and `authErrorDisplayFor` itself falls back to `error.runtimeType.toString()` as a last resort so a code is *always* on screen. If you add a new data-source method, give it the same shape: narrow catches for the errors you understand, one broad `catch` at the end so nothing reaches the UI unlabeled.
+- **`confirmCode`/`verificationCompleted` check `idToken == null || idToken.isEmpty`, not just `== null`** — `getIdToken()` can resolve to `''`, which used to sail through and get POSTed as `{"id_token": ""}`, tripping the backend's Pydantic `min_length=1` with a 422 that looked identical to any other failure. `BackendAuthDataSource._guard` now also parses FastAPI's `{detail: [...]}` validation-error shape into `AuthException(code: 'validation_error', ...)` instead of falling through to a generic `unknown_error`.
+- **`verificationCompleted` bails out immediately if the completer is already done** (`phone_sign_in_data_source.dart`) — it can race `codeSent` (both are legitimate `verifyPhoneNumber` callbacks for the same call, and a Firebase Console *test* phone number in particular tends to auto-verify instantly). Without the guard, `codeSent` wins, the OTP screen shows, and `verificationCompleted`'s body still runs `signInWithCredential` in the background — any error from that path used to vanish silently since `completeError` is a no-op once the completer is settled.
 - `AuthGate` is the destination-agnostic gate: pass it any `WidgetBuilder` for the authenticated destination. Onboarding uses it as `AuthGate(builder: _buildHome)`.
 - All user-facing copy in this feature comes from `AppStrings` (`core/strings/app_strings.dart`) — see that file's `// --- Auth ---` section. Some constants are deliberately reused across two different UI slots within this feature (e.g. `authSubmitLogin` for both the submit button and the mode-toggle link) because they're the same wording with the same meaning, just two roles.

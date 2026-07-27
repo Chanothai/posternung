@@ -60,8 +60,9 @@ The app builds as three environments — **SIT**, **UAT**, **Production** — vi
 **Riverpod** (`flutter_riverpod`), no other state management library.
 
 - Prefer `Notifier` / `AsyncNotifier` over legacy `StateProvider`/`StateNotifier`.
-- Manual provider declarations (as used today) — no `riverpod_generator`/`build_runner` codegen unless the team explicitly adopts it later.
+- Manual provider declarations (as used today) — no `riverpod_generator` codegen unless the team explicitly adopts it later. (`build_runner` itself *is* in the project now — see below — this rule is about the state-management layer specifically, not codegen in general.)
 - Providers are declared next to what they provide, not centralized in one giant file: a repository provider lives in `data/repositories/xxx_repository_impl.dart` (or the feature's `presentation/providers/xxx_providers.dart`), a usecase provider lives near its usecase, a viewmodel provider lives in `presentation/providers/`.
+- **`data/models/` DTOs use `freezed` + `json_serializable`** (adopted for the auth feature's `TokenResponse`/`BackendUser`; extend the same pattern to new DTOs rather than hand-writing `fromJson`). Run `dart run build_runner build --delete-conflicting-outputs` after adding/editing a `@freezed` model — CI runs the same step before analyze/test. Generated `*.freezed.dart`/`*.g.dart` files are gitignored, not committed. This is scoped to the data layer only; it is not the `riverpod_generator` codegen the previous bullet declines.
 
 ## Data Flow: Repository Pattern + UseCase (Interactor) Pattern
 
@@ -116,3 +117,4 @@ Don't produce a polished markdown plan document as an additional user-facing del
 - [`docs/git-workflow.md`](docs/git-workflow.md) — commit message format, push rules, branch naming, PR template. Read before running any `git commit`/`git push`.
 - [`docs/environments-setup.md`](docs/environments-setup.md) — SIT/UAT/Production environment setup checklist.
 - [`docs/social-login-setup.md`](docs/social-login-setup.md) — Google/Apple sign-in native setup checklist.
+- [`docs/phone-auth-setup.md`](docs/phone-auth-setup.md) — Firebase Phone Auth native/console setup checklist.
