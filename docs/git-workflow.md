@@ -52,7 +52,26 @@ chore(deps): bump riverpod to 3.4.0
 feature/<scope>-<short-description>   เช่น feature/onboarding-progress-dots
 fix/<scope>-<short-description>       เช่น fix/auth-race-condition
 chore/<short-description>             เช่น chore/upgrade-riverpod
+hotfix/<scope>-<short-description>    เช่น hotfix/auth-token-refresh-loop
 ```
+
+## Branch Model
+
+**`develop` คือ base branch ของงานปกติ ไม่ใช่ `main`** — `develop` เป็นที่รวมงานที่ integrate แล้ว
+ส่วน `main` แทนสิ่งที่ (จะ) อยู่บน store
+
+| branch | แตกจาก | merge เข้า | วิธี merge | ลบหลัง merge |
+|---|---|---|---|---|
+| `develop` | `main` (ครั้งเดียว) | `main` ตอน release | **merge commit** | ไม่ลบ |
+| `feature/*` `fix/*` `chore/*` | `develop` | `develop` | squash | ลบ |
+| `hotfix/*` | **`main`** | `main` แล้ว back-merge เข้า `develop` | merge commit | ลบ |
+
+**PR `develop` → `main` ต้องกด "Create a merge commit" เท่านั้น ห้าม squash** — squash ทำให้
+`develop` กับ `main` มี ancestry คนละสาย แล้ว PR release รอบถัดไปจะชนทุกครั้งทั้งที่โค้ดไม่ได้ขัดกัน
+(เกิดมาแล้วกับ PR #10 เพราะ `92c3130` และ `3afc09d` ถูก squash เข้า `main`)
+
+ขั้นตอนลงมือจริง — เริ่มงาน, ทำ branch ให้ทัน `develop`, release, hotfix — อยู่ใน skill
+`manage-branch-flow` (`.claude/skills/manage-branch-flow/SKILL.md`)
 
 ## Pull Request Description Template (เมื่อสร้าง PR ให้)
 
