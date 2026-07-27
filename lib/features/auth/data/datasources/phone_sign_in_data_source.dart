@@ -77,13 +77,20 @@ class PhoneSignInDataSourceImpl implements PhoneSignInDataSource {
       forceResendingToken: resendToken,
       verificationCompleted: (PhoneAuthCredential credential) async {
         // Android SMS Retriever / instant verification — Firebase already
-        // has a usable credential before any code was sent.
+        // has a usable credential before any code was sent. This can race
+        // `codeSent` (both are legitimate outcomes of the same call, and a
+        // Firebase Console *test* phone number in particular tends to
+        // auto-verify instantly). If `codeSent` already won, bail out before
+        // touching Firebase again — otherwise this still signs in in the
+        // background while the OTP screen is showing, and any failure here
+        // would vanish silently (`completeError` is a no-op once completed).
+        if (completer.isCompleted) return;
         try {
           final userCredential = await _firebaseAuth.signInWithCredential(
             credential,
           );
           final idToken = await userCredential.user?.getIdToken();
-          if (idToken == null) {
+          if (idToken == null || idToken.isEmpty) {
             completeError(
               const AuthException(
                 code: 'missing_id_token',
@@ -98,6 +105,17 @@ class PhoneSignInDataSourceImpl implements PhoneSignInDataSource {
         } on FirebaseAuthException catch (e) {
           completeError(
             AuthException(code: e.code, message: e.message ?? e.code),
+          );
+        } catch (e) {
+          // Anything other than FirebaseAuthException (a PlatformException
+          // from the plugin channel, etc.) used to escape uncaught — surface
+          // it as an AuthException instead, with the real type in the code
+          // so it doesn't read as a generic, undiagnosable failure.
+          completeError(
+            AuthException(
+              code: 'phone_signin_${e.runtimeType}',
+              message: e.toString(),
+            ),
           );
         }
       },
@@ -139,7 +157,11 @@ class PhoneSignInDataSourceImpl implements PhoneSignInDataSource {
         credential,
       );
       final idToken = await userCredential.user?.getIdToken();
-      if (idToken == null) {
+      // Not just `== null` — `getIdToken()` can resolve to an empty string,
+      // which would otherwise sail through this check and get POSTed as
+      // `{"id_token": ""}`, failing the backend's `min_length=1` validation
+      // with a 422 that's indistinguishable from any other bad request.
+      if (idToken == null || idToken.isEmpty) {
         throw const AuthException(
           code: 'missing_id_token',
           message: AppStrings.authErrorGeneric,
@@ -148,6 +170,17 @@ class PhoneSignInDataSourceImpl implements PhoneSignInDataSource {
       return idToken;
     } on FirebaseAuthException catch (e) {
       throw AuthException(code: e.code, message: e.message ?? e.code);
+    } on AuthException {
+      rethrow; // the missing_id_token throw above — don't re-wrap it below.
+    } catch (e) {
+      // Anything else (PlatformException from the plugin channel, a
+      // MissingPluginException, ...) used to escape this method uncaught,
+      // reaching the UI as a bare object with no `code` to show — the exact
+      // symptom of a wrong-verification-code report with no diagnostic line.
+      throw AuthException(
+        code: 'phone_signin_${e.runtimeType}',
+        message: e.toString(),
+      );
     }
   }
 }

@@ -80,5 +80,54 @@ void main() {
       );
       expect(quota.message, AppStrings.authErrorQuotaExceeded);
     });
+
+    test('maps account-exists-with-different-credential (social sign-in) to '
+        'Thai instead of the raw English code', () {
+      final display = authErrorDisplay(
+        const AuthException(
+          code: 'account-exists-with-different-credential',
+          message:
+              'An account already exists with the same email address '
+              'but different sign-in credentials.',
+        ),
+      );
+
+      expect(
+        display.message,
+        AppStrings.authErrorAccountExistsWithDifferentCredential,
+      );
+      expect(display.code, 'account-exists-with-different-credential');
+    });
+  });
+
+  group('authErrorDisplayFor', () {
+    test('returns null when there is nothing to show', () {
+      expect(authErrorDisplayFor(null), isNull);
+    });
+
+    test('delegates to authErrorDisplay for an AuthException', () {
+      final display = authErrorDisplayFor(
+        const AuthException(code: 'wrong-password', message: 'invalid'),
+      );
+
+      expect(display, isNotNull);
+      expect(display!.message, AppStrings.authErrorWrongPassword);
+      expect(display.code, 'wrong-password');
+    });
+
+    test(
+      'falls back to the runtime type as the code for anything that is not '
+      'an AuthException — every data-source guard is supposed to wrap '
+      "failures into one before they reach state, so this case is itself a "
+      'bug; it must still show *something* diagnosable rather than a '
+      'code-less generic line that looks identical to "everything is fine"',
+      () {
+        final display = authErrorDisplayFor(StateError('boom'));
+
+        expect(display, isNotNull);
+        expect(display!.message, AppStrings.authErrorGeneric);
+        expect(display.code, 'StateError');
+      },
+    );
   });
 }
