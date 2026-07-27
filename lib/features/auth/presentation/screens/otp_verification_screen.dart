@@ -9,16 +9,15 @@ import '../../../../core/assets/app_images.dart';
 import '../../../../core/design_system/app_dimens.dart';
 import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
-import '../../../../core/error/auth_exception.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/gradient_background.dart';
 import '../../data/datasources/phone_sign_in_data_source.dart';
 import '../auth_error_display.dart';
+import '../auth_flow_navigation.dart';
 import '../providers/auth_providers.dart';
 import '../widgets/auth_error_banner.dart';
-import '../widgets/auth_primary_button.dart';
 
 /// OTP verification screen — user enters the 6-digit code Firebase texted to
 /// [phoneNumber]. Shares the login screen's visual shell (gradient + glass
@@ -58,9 +57,14 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
 
   late String _verificationId = widget.verificationId;
   late int? _resendToken = widget.resendToken;
-  bool _showIncompleteError = false;
   int _secondsRemaining = _resendCountdownSeconds;
   Timer? _resendTimer;
+
+  /// Guards against the auto-submit listener firing twice for one code —
+  /// `_controller`'s listener fires on every keystroke, so without this a
+  /// second notification (or a stray one during the clear-on-failure below)
+  /// could call [_submit] again while the first attempt is still in flight.
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -79,10 +83,14 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
   }
 
   void _onCodeChanged() {
-    setState(() {
-      // Clear the "incomplete" hint as soon as the user resumes typing.
-      if (_showIncompleteError) _showIncompleteError = false;
-    });
+    // Repaints the digit cells (they read `controller.text` directly, so
+    // nothing else schedules a rebuild on keystroke) and, once the code is
+    // complete, submits automatically — there is no submit button.
+    setState(() {});
+    final isComplete = _controller.text.length == _codeLength;
+    final alreadyBusy =
+        _isSubmitting || ref.read(authViewModelProvider).isLoading;
+    if (isComplete && !alreadyBusy) _submit();
   }
 
   void _startResendCountdown() {
@@ -113,48 +121,39 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
     } else if (result is PhoneAutoVerified) {
       // Rare on resend, but handle it the same way the initial send does:
       // the session is already published, so just leave the flow.
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      completeAuthFlow(context);
     }
     // On error, the banner below (driven by the same authState) shows it.
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting) return;
+    _isSubmitting = true;
     final code = _controller.text;
-    if (code.length < _codeLength) {
-      setState(() => _showIncompleteError = true);
-      _focusNode.requestFocus();
-      return;
-    }
     await ref
         .read(authViewModelProvider.notifier)
         .confirmPhoneCode(verificationId: _verificationId, smsCode: code);
     if (!mounted) return;
-    if (!ref.read(authViewModelProvider).hasError) {
-      // Pushed on top of the login screen, so — unlike login, which
-      // AuthGate swaps out directly — success needs an explicit pop back to
-      // root to reveal the destination AuthGate already switched to
-      // underneath. Same pattern as RegisterScreen.
-      Navigator.of(context).popUntil((route) => route.isFirst);
+    if (ref.read(authViewModelProvider).hasError) {
+      // Wrong code: clear the input so the user can retype without manually
+      // deleting 6 digits first, and re-focus so the keyboard is still up.
+      // Clearing fires `_onCodeChanged` (length 0, no re-submit) which also
+      // repaints the cells with the new error styling.
+      _isSubmitting = false;
+      _controller.clear();
+      _focusNode.requestFocus();
+      return;
     }
+    // Pushed on top of the login screen, so — unlike login, which AuthGate
+    // swaps out directly — success needs an explicit pop back to root to
+    // reveal the destination AuthGate already switched to underneath.
+    completeAuthFlow(context);
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authViewModelProvider);
-    final error = authState.error;
-    final String? errorMessage;
-    final String? errorCode;
-    if (error is AuthException) {
-      final display = authErrorDisplay(error);
-      errorMessage = display.message;
-      errorCode = display.code;
-    } else if (error != null) {
-      errorMessage = AppStrings.authErrorGeneric;
-      errorCode = null;
-    } else {
-      errorMessage = null;
-      errorCode = null;
-    }
+    final display = authErrorDisplayFor(authState.error);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDark,
@@ -184,11 +183,10 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                       phoneNumber: widget.phoneNumber,
                       controller: _controller,
                       focusNode: _focusNode,
-                      showIncompleteError: _showIncompleteError,
+                      hasError: authState.hasError,
                       isLoading: authState.isLoading,
-                      errorMessage: errorMessage,
-                      errorCode: errorCode,
-                      onSubmit: authState.isLoading ? null : _submit,
+                      errorMessage: display?.message,
+                      errorCode: display?.code,
                       secondsRemaining: _secondsRemaining,
                       onResend: _onResend,
                     ),
@@ -250,11 +248,10 @@ class _OtpCard extends StatelessWidget {
     required this.phoneNumber,
     required this.controller,
     required this.focusNode,
-    required this.showIncompleteError,
+    required this.hasError,
     required this.isLoading,
     required this.errorMessage,
     required this.errorCode,
-    required this.onSubmit,
     required this.secondsRemaining,
     required this.onResend,
   });
@@ -262,11 +259,10 @@ class _OtpCard extends StatelessWidget {
   final String phoneNumber;
   final TextEditingController controller;
   final FocusNode focusNode;
-  final bool showIncompleteError;
+  final bool hasError;
   final bool isLoading;
   final String? errorMessage;
   final String? errorCode;
-  final VoidCallback? onSubmit;
   final int secondsRemaining;
   final VoidCallback onResend;
 
@@ -306,28 +302,28 @@ class _OtpCard extends StatelessWidget {
           _OtpInput(
             controller: controller,
             focusNode: focusNode,
-            hasError: showIncompleteError,
+            hasError: hasError,
           ),
-          if (showIncompleteError) ...[
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              AppStrings.authOtpIncompleteError,
-              style: AppTextStyles.cardSubtitle.copyWith(
-                color: Colors.redAccent,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
           if (errorMessage != null) ...[
             const SizedBox(height: AppSpacing.md),
             AuthErrorBanner(message: errorMessage!, code: errorCode),
           ],
-          const SizedBox(height: 20),
-          AuthPrimaryButton(
-            label: AppStrings.authOtpSubmit,
-            isLoading: isLoading,
-            onPressed: onSubmit,
-          ),
+          // No submit button — verification fires automatically once all 6
+          // digits are entered (see `_onCodeChanged`). This is the only
+          // feedback that a request is in flight.
+          if (isLoading) ...[
+            const SizedBox(height: 20),
+            const Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.accent,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: AppSpacing.xl),
           _ResendRow(secondsRemaining: secondsRemaining, onResend: onResend),
         ],

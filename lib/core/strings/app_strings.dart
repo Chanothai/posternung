@@ -67,8 +67,6 @@ abstract final class AppStrings {
   // --- Auth: OTP verification ---
   static const String authOtpHeading = 'ยืนยันเบอร์โทรศัพท์ของคุณ';
   static const String authOtpSubtitlePrefix = 'กรอกรหัส 6 หลักที่เราส่งไปยัง';
-  static const String authOtpSubmit = 'ยืนยันรหัส';
-  static const String authOtpIncompleteError = 'กรุณากรอกรหัสให้ครบ 6 หลัก';
   static const String authOtpResendPrompt = 'ไม่ได้รับรหัส? ';
   static const String authOtpResendAction = 'ส่งรหัสอีกครั้ง';
   static const String authOtpResendCountdownPrefix = 'ส่งรหัสอีกครั้งได้ใน ';
@@ -115,6 +113,9 @@ abstract final class AppStrings {
       'ยืนยันตัวตนไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
   static const String authErrorCredentialAlreadyInUse =
       'หมายเลขนี้ถูกใช้กับบัญชีอื่นแล้ว';
+  // Firebase (social — Google/Apple) codes → Thai.
+  static const String authErrorAccountExistsWithDifferentCredential =
+      'อีเมลนี้เคยสมัครไว้ด้วยวิธีอื่นแล้ว กรุณาเข้าสู่ระบบด้วยวิธีเดิม';
 
   // --- Home ---
   static const String homeSectionFeaturedCollections = 'Featured Collections';

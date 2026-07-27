@@ -7,13 +7,13 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/assets/app_images.dart';
 import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
-import '../../../../core/error/auth_exception.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/utils/thai_phone_number.dart';
 import '../../data/datasources/phone_sign_in_data_source.dart';
 import '../auth_error_display.dart';
+import '../auth_flow_navigation.dart';
 import '../providers/auth_providers.dart';
 import '../widgets/auth_email_field.dart';
 import '../widgets/auth_error_banner.dart';
@@ -61,6 +61,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
 
     if (_method == _AuthMethod.phone) {
       final phoneNumber = thaiMobileToE164(_phoneController.text);
@@ -70,7 +71,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           .sendPhoneCode(phoneNumber);
       if (!mounted) return;
       if (result is SmsCodeSent) {
-        Navigator.of(context).push(
+        await Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => OtpVerificationScreen(
               phoneNumber: phoneNumber,
@@ -79,9 +80,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ),
         );
+        // Back from OTP without having completed it (or after a failed
+        // attempt there) must not leave that screen's error banner showing
+        // here — both screens watch the same authViewModelProvider.
+        if (!mounted) return;
+        ref.read(authViewModelProvider.notifier).clearError();
+        return;
       }
-      // PhoneAutoVerified: the session is already published — AuthGate
-      // reacts on its own since LoginScreen is the root, not a pushed route.
+      if (result is PhoneAutoVerified) {
+        // The session is already published — LoginScreen is AuthGate's
+        // child, not a pushed route, so completeAuthFlow's popUntil is a
+        // no-op here; it still owns the unfocus for consistency with the
+        // other paths below.
+        completeAuthFlow(context);
+      }
       // Error: already surfaced by the AuthErrorBanner below, which watches
       // the same authState this method also drives.
       return;
@@ -92,6 +104,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     await ref
         .read(authViewModelProvider.notifier)
         .signIn(email: email, password: password);
+    if (!mounted) return;
+    if (!ref.read(authViewModelProvider).hasError) completeAuthFlow(context);
   }
 
   void _setMethod(_AuthMethod method) => setState(() => _method = method);
@@ -105,14 +119,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void _toggleObscurePassword() =>
       setState(() => _obscurePassword = !_obscurePassword);
 
-  void _onGooglePressed() {
+  Future<void> _onGooglePressed() async {
     if (kIsWeb) return _showMobileOnly();
-    ref.read(authViewModelProvider.notifier).signInWithGoogle();
+    FocusScope.of(context).unfocus();
+    await ref.read(authViewModelProvider.notifier).signInWithGoogle();
+    if (!mounted) return;
+    if (!ref.read(authViewModelProvider).hasError) completeAuthFlow(context);
   }
 
-  void _onApplePressed() {
+  Future<void> _onApplePressed() async {
     if (kIsWeb) return _showMobileOnly();
-    ref.read(authViewModelProvider.notifier).signInWithApple();
+    FocusScope.of(context).unfocus();
+    await ref.read(authViewModelProvider.notifier).signInWithApple();
+    if (!mounted) return;
+    if (!ref.read(authViewModelProvider).hasError) completeAuthFlow(context);
   }
 
   void _showMobileOnly() {
@@ -131,20 +151,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // sign-in is iOS-only; defaultTargetPlatform is web-safe, unlike
     // dart:io Platform) to re-enable.
     const showAppleButton = false;
-    final error = authState.error;
-    final String? errorMessage;
-    final String? errorCode;
-    if (error is AuthException) {
-      final display = authErrorDisplay(error);
-      errorMessage = display.message;
-      errorCode = display.code;
-    } else if (error != null) {
-      errorMessage = AppStrings.authErrorGeneric;
-      errorCode = null;
-    } else {
-      errorMessage = null;
-      errorCode = null;
-    }
+    final display = authErrorDisplayFor(authState.error);
 
     return AuthScaffold(
       card: _AuthCard(
@@ -157,8 +164,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         obscurePassword: _obscurePassword,
         onToggleObscure: _toggleObscurePassword,
         isLoading: authState.isLoading,
-        errorMessage: errorMessage,
-        errorCode: errorCode,
+        errorMessage: display?.message,
+        errorCode: display?.code,
         onSubmit: authState.isLoading ? null : _submit,
         onGoToRegister: _goToRegister,
         onGooglePressed: _onGooglePressed,

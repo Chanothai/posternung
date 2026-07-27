@@ -13,9 +13,13 @@ import 'package:posternung/features/auth/presentation/screens/register_screen.da
 import 'package:posternung/features/auth/presentation/widgets/auth_email_field.dart';
 
 class FakeAuthViewModel extends AuthViewModel {
-  FakeAuthViewModel({this.errorToThrow});
+  FakeAuthViewModel({this.errorToThrow, this.confirmPhoneCodeErrorToThrow});
 
   final Object? errorToThrow;
+
+  /// Set to make [confirmPhoneCode] fail, for exercising the OTP screen's
+  /// error banner (which shares this same provider with [LoginScreen]).
+  final Object? confirmPhoneCodeErrorToThrow;
 
   @override
   FutureOr<void> build() {
@@ -47,14 +51,30 @@ class FakeAuthViewModel extends AuthViewModel {
     String phoneNumber, {
     int? resendToken,
   }) async => SmsCodeSent('test-verification-id');
+
+  @override
+  Future<void> confirmPhoneCode({
+    required String verificationId,
+    required String smsCode,
+  }) async {
+    // Mirror what the real method does via `AsyncValue.guard` — set `state`
+    // rather than throw, so `state.error` actually reflects the failure.
+    final error = confirmPhoneCodeErrorToThrow;
+    state = error != null
+        ? AsyncError(error, StackTrace.current)
+        : const AsyncData(null);
+  }
 }
 
 void main() {
-  Widget wrap({Object? errorToThrow}) {
+  Widget wrap({Object? errorToThrow, Object? confirmPhoneCodeErrorToThrow}) {
     return ProviderScope(
       overrides: [
         authViewModelProvider.overrideWith(
-          () => FakeAuthViewModel(errorToThrow: errorToThrow),
+          () => FakeAuthViewModel(
+            errorToThrow: errorToThrow,
+            confirmPhoneCodeErrorToThrow: confirmPhoneCodeErrorToThrow,
+          ),
         ),
       ],
       child: const MaterialApp(home: LoginScreen()),
@@ -204,6 +224,53 @@ void main() {
 
         expect(find.byType(OtpVerificationScreen), findsOneWidget);
         expect(find.text('+66812345678'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'backing out of a failed OTP attempt clears its error banner — it and '
+      'the login screen share authViewModelProvider, so a wrong-code error '
+      'must not still be showing once the user is back here',
+      (tester) async {
+        await tester.pumpWidget(
+          wrap(
+            confirmPhoneCodeErrorToThrow: const AuthException(
+              code: 'invalid-verification-code',
+              message: 'The SMS code has expired.',
+            ),
+          ),
+        );
+
+        await tester.tap(find.text(AppStrings.authMethodPhoneTab));
+        await tester.pump();
+        await tester.enterText(find.byType(TextFormField), '812345678');
+        final submit = find.text(AppStrings.authSubmitPhoneOtp);
+        await tester.ensureVisible(submit);
+        await tester.tap(submit);
+        await tester.pumpAndSettle();
+        expect(find.byType(OtpVerificationScreen), findsOneWidget);
+
+        // Entering a full code on the real OTP screen auto-submits and,
+        // with the fake configured to fail, leaves its error banner up.
+        await tester.enterText(find.byType(TextField), '472019');
+        await tester.pumpAndSettle();
+        expect(
+          find.text(
+            '${AppStrings.authErrorCodeLabel}invalid-verification-code',
+          ),
+          findsOneWidget,
+        );
+
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+
+        expect(find.byType(OtpVerificationScreen), findsNothing);
+        expect(
+          find.text(
+            '${AppStrings.authErrorCodeLabel}invalid-verification-code',
+          ),
+          findsNothing,
+        );
       },
     );
   });

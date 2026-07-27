@@ -154,39 +154,42 @@ void main() {
     expect(find.text(testPhoneNumber), findsOneWidget);
   });
 
+  testWidgets('there is no submit button — verification is automatic', (
+    tester,
+  ) async {
+    await tester.pumpWidget(wrap());
+
+    // The only ElevatedButton on this screen was the removed submit button;
+    // resend is a GestureDetector/RichText and back is an IconButton.
+    expect(find.byType(ElevatedButton), findsNothing);
+  });
+
+  testWidgets('entering fewer than 6 digits does not call confirmPhoneCode', (
+    tester,
+  ) async {
+    String? capturedCode;
+    await tester.pumpWidget(
+      wrap(onConfirmPhoneCode: (_, code) => capturedCode = code),
+    );
+
+    await tester.enterText(find.byType(TextField), '12345');
+    await tester.pump();
+
+    expect(capturedCode, isNull);
+  });
+
   testWidgets(
-    'tapping verify with fewer than 6 digits shows the incomplete error '
-    'and does not call confirmPhoneCode',
+    'entering a complete 6-digit code calls confirmPhoneCode automatically '
+    'exactly once, with the verification ID and code, then pops to root on '
+    'success',
     (tester) async {
-      String? capturedCode;
-      await tester.pumpWidget(
-        wrap(onConfirmPhoneCode: (_, code) => capturedCode = code),
-      );
-
-      await tester.enterText(find.byType(TextField), '123');
-      await tester.pump();
-
-      final verifyButton = find.text(AppStrings.authOtpSubmit);
-      await tester.ensureVisible(verifyButton);
-      await tester.tap(verifyButton);
-      await tester.pump();
-
-      expect(find.text(AppStrings.authOtpIncompleteError), findsOneWidget);
-      expect(capturedCode, isNull);
-    },
-  );
-
-  testWidgets(
-    'tapping verify with a complete 6-digit code calls confirmPhoneCode '
-    'with the verification ID and code, then pops to root on success',
-    (tester) async {
+      final capturedCodes = <String>[];
       String? capturedVerificationId;
-      String? capturedCode;
       await tester.pumpWidget(
         wrapPushed(
           onConfirmPhoneCode: (verificationId, code) {
             capturedVerificationId = verificationId;
-            capturedCode = code;
+            capturedCodes.add(code);
           },
         ),
       );
@@ -195,29 +198,27 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField), '472019');
-      await tester.pump();
-
-      final verifyButton = find.text(AppStrings.authOtpSubmit);
-      await tester.ensureVisible(verifyButton);
-      await tester.tap(verifyButton);
       await tester.pumpAndSettle();
 
       expect(capturedVerificationId, testVerificationId);
-      expect(capturedCode, '472019');
+      expect(capturedCodes, ['472019']);
       expect(find.byType(OtpVerificationScreen), findsNothing);
       expect(find.text('root'), findsOneWidget);
     },
   );
 
   testWidgets(
-    'a confirmPhoneCode failure shows the error banner and stays on screen',
+    'a confirmPhoneCode failure shows the error banner, stays on screen, and '
+    'clears the code so the user can retype without deleting it manually',
     (tester) async {
+      final capturedCodes = <String>[];
       await tester.pumpWidget(
         wrapPushed(
           confirmPhoneCodeErrorToThrow: const AuthException(
             code: 'invalid-verification-code',
             message: 'The SMS code has expired.',
           ),
+          onConfirmPhoneCode: (_, code) => capturedCodes.add(code),
         ),
       );
 
@@ -225,11 +226,6 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField), '472019');
-      await tester.pump();
-
-      final verifyButton = find.text(AppStrings.authOtpSubmit);
-      await tester.ensureVisible(verifyButton);
-      await tester.tap(verifyButton);
       await tester.pumpAndSettle();
 
       expect(find.byType(OtpVerificationScreen), findsOneWidget);
@@ -237,6 +233,13 @@ void main() {
         find.text('${AppStrings.authErrorCodeLabel}invalid-verification-code'),
         findsOneWidget,
       );
+      expect(capturedCodes, ['472019']);
+
+      // Field was cleared on failure (not left full), so retyping a fresh
+      // 6-digit code auto-submits again instead of being a no-op.
+      await tester.enterText(find.byType(TextField), '111111');
+      await tester.pumpAndSettle();
+      expect(capturedCodes, ['472019', '111111']);
     },
   );
 

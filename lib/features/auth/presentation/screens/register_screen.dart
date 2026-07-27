@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
-import '../../../../core/error/auth_exception.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../auth_error_display.dart';
+import '../auth_flow_navigation.dart';
 import '../providers/auth_providers.dart';
 import '../widgets/auth_email_field.dart';
 import '../widgets/auth_error_banner.dart';
@@ -43,6 +43,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
 
     final email = _emailController.text.trim();
     final password = _passwordController.text;
@@ -51,13 +52,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         .signUp(email: email, password: password);
 
     if (!mounted) return;
-    if (!ref.read(authViewModelProvider).hasError) {
-      // Register was pushed on top of the login screen, so — unlike login,
-      // which AuthGate swaps out directly — success needs an explicit pop
-      // back to root to reveal the destination AuthGate already switched to
-      // underneath. Same pattern as OtpVerificationScreen.
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    }
+    if (!ref.read(authViewModelProvider).hasError) completeAuthFlow(context);
   }
 
   void _toggleObscurePassword() =>
@@ -66,20 +61,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authViewModelProvider);
-    final error = authState.error;
-    final String? errorMessage;
-    final String? errorCode;
-    if (error is AuthException) {
-      final display = authErrorDisplay(error);
-      errorMessage = display.message;
-      errorCode = display.code;
-    } else if (error != null) {
-      errorMessage = AppStrings.authErrorGeneric;
-      errorCode = null;
-    } else {
-      errorMessage = null;
-      errorCode = null;
-    }
+    final display = authErrorDisplayFor(authState.error);
 
     return AuthScaffold(
       card: _RegisterCard(
@@ -89,8 +71,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         obscurePassword: _obscurePassword,
         onToggleObscure: _toggleObscurePassword,
         isLoading: authState.isLoading,
-        errorMessage: errorMessage,
-        errorCode: errorCode,
+        errorMessage: display?.message,
+        errorCode: display?.code,
         onSubmit: authState.isLoading ? null : _submit,
       ),
     );
