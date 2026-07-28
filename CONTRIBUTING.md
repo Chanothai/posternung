@@ -60,7 +60,12 @@ Scope ต้องตรงกับชื่อ folder ใน `lib/features/<sc
 feature/<scope>-<short-description>
 fix/<scope>-<short-description>
 chore/<short-description>
+hotfix/<scope>-<short-description>
 ```
+
+**base branch คือ `develop` ไม่ใช่ `main`** — งานปกติแตกจาก `develop` และ PR กลับเข้า `develop`
+ส่วน `hotfix/*` แตกจาก `main` ตารางเต็มว่าอะไร merge เข้าอะไรด้วยวิธีไหน อยู่ที่
+`docs/git-workflow.md` หัวข้อ `## Branch Model`
 
 ## Pull Request
 
