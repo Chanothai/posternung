@@ -96,7 +96,7 @@ gh pr create --base main
 ```
 
 **merge เข้า `main` แล้ว back-merge กลับ `develop` ทันที ห้ามค้างข้ามวัน** — `develop` มี branch
-protection ต้องผ่าน PR ห้าม push ตรง:
+protection ให้เข้าผ่าน PR (admin ยัง push ตรงได้เพราะ `enforce_admins` ปิดอยู่ แต่ **อย่าทำ**):
 ```bash
 git fetch origin
 git checkout -b chore/backmerge-<hotfix-name> origin/develop
