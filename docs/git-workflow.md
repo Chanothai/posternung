@@ -43,8 +43,8 @@ chore(deps): bump riverpod to 3.4.0
 ## Git Push Workflow
 
 1. **ก่อน push ทุกครั้ง** ให้สรุปให้ผู้ใช้เห็นก่อนว่าจะ push commit อะไรบ้าง (`git log origin/<branch>..HEAD --oneline`)
-2. **ห้าม push ตรงเข้า `main` หรือ `develop` โดยไม่ถามยืนยันก่อน** — ทั้งสองตัวเป็น branch ถาวรที่ต้องเข้าผ่าน PR เสมอ ให้ push ไป feature branch แล้วเปิด PR แทน ยกเว้นผู้ใช้ระบุชัดเจนว่าอนุญาต
-   ข้อยกเว้นเดียว: **back-merge `main` กลับเข้า `develop` หลัง hotfix** ซึ่งเป็นการ push เข้า `develop` โดยตั้งใจ (ดู skill `manage-branch-flow` §4)
+2. **ห้าม push ตรงเข้า `main` หรือ `develop`** — ทั้งสองตัวมี branch protection บน GitHub อยู่แล้ว (ต้องผ่าน PR, ห้าม force push, ห้ามลบ) การ push ตรงจะถูกปฏิเสธ ไม่ใช่แค่ข้อตกลง
+   รวมถึง **back-merge หลัง hotfix** ด้วย — ต้องเปิด PR เข้า `develop` เหมือนงานอื่น (ดู skill `manage-branch-flow` §4)
 3. ถ้า branch ปัจจุบันคือ `main` หรือ `develop` และผู้ใช้ขอ commit งานใหม่ ให้ถามก่อนว่าต้องการสร้าง branch ใหม่จาก `develop` หรือไม่ (ตาม branch naming ด้านล่าง)
 4. หลัง push สำเร็จ ถ้าผู้ใช้ต้องการเปิด Pull Request ให้ใช้ `gh pr create` พร้อม title/description ที่สรุปการเปลี่ยนแปลงจาก commit history (ไม่ใช่ copy commit message ตรงๆ)
 

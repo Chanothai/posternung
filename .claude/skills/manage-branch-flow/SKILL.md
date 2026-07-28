@@ -95,11 +95,17 @@ git checkout -b hotfix/<scope>-<desc> origin/main
 gh pr create --base main
 ```
 
-**merge เข้า `main` แล้ว back-merge กลับ `develop` ทันที ห้ามค้างข้ามวัน:**
+**merge เข้า `main` แล้ว back-merge กลับ `develop` ทันที ห้ามค้างข้ามวัน** — `develop` มี branch
+protection ต้องผ่าน PR ห้าม push ตรง:
 ```bash
 git fetch origin
-git checkout develop && git merge origin/main && git push origin develop
+git checkout -b chore/backmerge-<hotfix-name> origin/develop
+git merge origin/main
+git push -u origin chore/backmerge-<hotfix-name>
+gh pr create --base develop --title "chore: back-merge <hotfix-name> into develop"
 ```
+ตอน merge PR นี้ **กด "Create a merge commit"** เหมือน release — squash จะทำให้ ancestry ขาดอีกจุด
+
 ลืมขั้นนี้ = release รอบหน้าจะ **ลบ hotfix ทิ้ง** เพราะ `develop` ยังถือโค้ดเวอร์ชันก่อนแก้
 
 ## กับดักที่เจอมาแล้ว
