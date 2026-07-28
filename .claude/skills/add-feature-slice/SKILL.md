@@ -104,4 +104,5 @@ skill `run-and-verify-on-device`
 
 - ต่อ API แล้ว auth/token มีปัญหา → skill **`debug-auth-failure`**
 - ต้องเห็นผลบนอุปกรณ์จริง → skill **`run-and-verify-on-device`**
+- แตก branch จากไหน / เปิด PR เข้าตัวไหน → skill **`manage-branch-flow`**
 - ก่อน commit/เปิด PR → **`docs/git-workflow.md`**
