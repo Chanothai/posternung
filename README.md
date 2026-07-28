@@ -94,11 +94,12 @@ This repo enforces [Conventional Commits](https://www.conventionalcommits.org/) 
 
 ## CI/CD
 
-`.github/workflows/ci.yml` runs on every push to `main` and every pull request:
+`.github/workflows/ci.yml` runs on every push to `main` or `develop`, and on every pull request:
 
-1. **format** — `dart format --set-exit-if-changed`
-2. **analyze** — `flutter analyze`
-3. **test** — `flutter test --coverage`, coverage report uploaded as a build artifact
-4. **build** (after format/analyze/test pass) — Android APK, iOS (no codesign), Web
+1. **codegen** — `dart run build_runner build --delete-conflicting-outputs` (freezed/json_serializable output is gitignored, so CI has to generate it first)
+2. **format** — `dart format --set-exit-if-changed`
+3. **analyze** — `flutter analyze --fatal-infos`
+4. **test** — `flutter test --coverage`, coverage report uploaded as a build artifact
+5. **build** (after the above pass) — Android APK for all three flavors (sit, uat, production), iOS (no codesign), Web
 
 All jobs are cached (Flutter SDK + pub packages) and cancel superseded runs on the same branch/PR automatically.
