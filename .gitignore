@@ -129,12 +129,15 @@ node_modules/
 # Claude Code local session state
 # ============================
 # Everything directly under .claude/ is per-machine (settings.local.json,
-# launch.json, scheduled_tasks.lock) — except skills/, which is shared team
-# knowledge and must be committed. The parent must be `.claude/*` rather than
-# `.claude/`: git never descends into an ignored *directory*, so a `!` negation
-# under a plain `.claude/` would never be reached.
+# launch.json, scheduled_tasks.lock) — except skills/ and agents/, which are
+# shared team knowledge and must be committed. The parent must be `.claude/*`
+# rather than `.claude/`: git never descends into an ignored *directory*, so a
+# `!` negation under a plain `.claude/` would never be reached.
 .claude/*
 !.claude/skills/
+!.claude/agents/
+!.claude/settings.json
+!.claude/hooks/
 
 # Local Dart/Flutter DevTools settings
 devtools_options.yaml

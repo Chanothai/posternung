@@ -46,6 +46,21 @@ See `lib/core/CLAUDE.md` for what's actually inside each subfolder today.
 
 **New image/icon assets:** when adding a new image or icon under `assets/images/`, add a corresponding `static const String` constant to `AppImages` (`lib/core/assets/app_images.dart`) in the same change. Never reference `'assets/images/...'` as a literal string inside `SvgPicture.asset(...)` or `Image.asset(...)` calls in feature code — this applies to all new feature work going forward, not just existing screens.
 
+## Shared files outside this repo
+
+This app is one of three repos. Cross-cutting contracts and decisions live in `../workspace/`:
+
+| What | Where |
+|---|---|
+| **API contract (source of truth)** | `../workspace/docs/api/openapi.yaml` — **never edit it from this repo**, and don't read `../posternung-backend/docs/openapi.yaml` (it's a stale pointer now) |
+| Architecture decisions | `../workspace/docs/adr/` — `ADR-0003` is required reading before building any UI that shows a condition grade |
+| System overview + daily start command | `../workspace/CLAUDE.md` |
+
+Paths marked `x-status: DRAFT` in the contract must not be wired up — see the contract file.
+
+**Agent:** `mobile-dev` (`.claude/agents/mobile-dev.md`) writes code in this repo.
+The full pipeline is orchestrated with `/feature` from `../workspace/`.
+
 ## Build environments
 
 The app builds as three environments — **SIT**, **UAT**, **Production** — via native Android product flavors and iOS Xcode build configurations/schemes (not `--dart-define` alone), so all three can be installed side by side on one device. Environment is resolved at runtime from the native `--flavor` value (`appFlavor` from `package:flutter/services.dart`) in `lib/core/config/environment.dart`, exposed app-wide via `environmentProvider` (overridden with the resolved value in `main.dart`, per the DI pattern below). Full setup checklist: [`docs/environments-setup.md`](docs/environments-setup.md).
@@ -94,6 +109,22 @@ No `get_it`, no service locator. Riverpod's provider graph *is* the DI container
 - Mirror `lib/` structure under `test/`: `lib/features/poster/domain/usecases/get_featured_posters.dart` → `test/features/poster/domain/usecases/get_featured_posters_test.dart`.
 - `flutter test` must pass before every commit; CI enforces this (see `.github/workflows/ci.yml`).
 
+### Verify exactly what CI runs
+
+`.github/workflows/ci.yml` job `quality` runs these, in this order. Anything less is not a
+verification — run the same commands locally:
+
+```bash
+flutter pub get
+dart run build_runner build --delete-conflicting-outputs
+dart format --output=none --set-exit-if-changed .
+flutter analyze --fatal-infos
+flutter test --coverage
+```
+
+Builds always need a flavor (`sit` / `uat` / `production`) — there is no `Runner` scheme
+any more, so `flutter build ios` without `--flavor` fails.
+
 ## General Rules
 
 - No layer skips: presentation never imports `data/`; domain never imports Flutter or `data/`.
@@ -101,6 +132,13 @@ No `get_it`, no service locator. Riverpod's provider graph *is* the DI container
 - Don't introduce a new state-management, DI, or mocking library without updating this file first.
 
 ## Presenting Plans
+
+**The line is who receives it.** If a human reads it, this rule applies — including the
+plan the `/feature` orchestrator puts in front of you at a GATE. If another agent consumes
+it, it doesn't — `solution-architect` and `code-critic` return text to the orchestrator in
+their own locked formats (see `../workspace/.claude/agents/`), and those never render as
+artifacts. The orchestrator is responsible for converting what it received into the format
+below before showing you anything.
 
 When Claude presents an implementation plan (plan mode or otherwise), render it as a color-coded HTML artifact rather than a separate long-form markdown document:
 
