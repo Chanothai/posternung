@@ -136,6 +136,8 @@ node_modules/
 .claude/*
 !.claude/skills/
 !.claude/agents/
+!.claude/settings.json
+!.claude/hooks/
 
 # Local Dart/Flutter DevTools settings
 devtools_options.yaml
