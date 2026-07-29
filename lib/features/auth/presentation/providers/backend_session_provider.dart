@@ -123,14 +123,29 @@ class BackendSessionNotifier extends AsyncNotifier<AuthUser?> {
 
   /// Firebase account creation → Firebase ID token → `/auth/firebase`. The
   /// backend find-or-creates its own user record on first exchange.
+  ///
+  /// If the exchange fails the Firebase account is deleted again. Firebase has
+  /// already created *and signed in* the account by that point, so leaving it
+  /// puts the app in a state that contradicts what the user is being told: the
+  /// register screen shows an error, but the address is now taken (the retry
+  /// gets `email-already-in-use`) and `sessionProvider` reports authenticated
+  /// off the Firebase half alone, so `AuthGate` advances behind the banner.
+  /// Registration either completes on both halves or leaves nothing behind.
   Future<void> registerWithEmailPassword({
     required String email,
     required String password,
   }) async {
-    final idToken = await ref
-        .read(emailPasswordSignInDataSourceProvider)
-        .register(email: email, password: password);
-    await _exchangeAndPublish(idToken);
+    final emailPassword = ref.read(emailPasswordSignInDataSourceProvider);
+    final idToken = await emailPassword.register(
+      email: email,
+      password: password,
+    );
+    try {
+      await _exchangeAndPublish(idToken);
+    } catch (_) {
+      await emailPassword.deleteCurrentUser();
+      rethrow;
+    }
   }
 
   /// Starts phone verification. Returns the result so the caller (e.g.
