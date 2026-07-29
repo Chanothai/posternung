@@ -151,7 +151,7 @@ Don't produce a polished markdown plan document as an additional user-facing del
 ## Scoped files index
 
 - `lib/core/CLAUDE.md` — what's inside each `core/` subfolder today.
-- `lib/features/onboarding/CLAUDE.md`, `lib/features/auth/CLAUDE.md`, `lib/features/home/CLAUDE.md` — each feature's current file structure and feature-specific notes.
+- `lib/features/onboarding/CLAUDE.md`, `lib/features/auth/CLAUDE.md`, `lib/features/home/CLAUDE.md`, `lib/features/poster/CLAUDE.md` — each feature's current file structure and feature-specific notes.
 - [`docs/git-workflow.md`](docs/git-workflow.md) — commit message format, push rules, branch naming, PR template. Read before running any `git commit`/`git push`.
 - [`docs/environments-setup.md`](docs/environments-setup.md) — SIT/UAT/Production environment setup checklist.
 - [`docs/social-login-setup.md`](docs/social-login-setup.md) — Google/Apple sign-in native setup checklist.
