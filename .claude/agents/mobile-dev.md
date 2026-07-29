@@ -43,6 +43,10 @@ feature ที่ไม่มี data dependency **ห้ามสร้าง�
 - endpoint ที่ใช้จริงตอนนี้ประกาศเป็น `static const` ใน data source
   (ดู `lib/features/auth/data/datasources/backend_auth_data_source.dart`)
   **ทำตาม pattern เดิม ห้ามพิมพ์ path เป็น string ลอย ๆ กลางโค้ด**
+- **เทียบ DTO จริงกับสัญญาทีละ field ก่อนบอกว่าเสร็จ** — ชนิดของแต่ละ field ใน
+  `json_serializable` เทียบกับ schema ใน `openapi.yaml` ไม่ใช่ดูแค่ว่าชื่อ field ตรง
+  ⚠️ ไม่ตรง = **หยุดแล้วรายงาน** — **contract อาจเป็นฝ่ายผิดก็ได้**
+  (เคยเกิดแล้วใน SCR-05: `price` เขียนเป็น `number` ทั้งที่ backend ส่ง string เสมอ)
 
 ## กฎที่ต้องอ่านจากสกิล ไม่ใช่เดาเอง
 
@@ -50,6 +54,7 @@ feature ที่ไม่มี data dependency **ห้ามสร้าง�
 |---|---|
 | cart · checkout · payment · หน้าที่แสดงสถานะโปสเตอร์ | skill `stock-integrity` (โหลดเองอัตโนมัติ) — มีข้อบังคับฝั่ง mobile ด้วย |
 | token · secure storage · การเรียก network · ข้อมูลผู้ใช้ | skill `security-baseline` |
+| ฟิลด์เงิน หรือ DTO ที่ map `Decimal` จาก backend | skill `poster-database` (อยู่ใน repo backend) |
 | งานอยู่ใน scope ไหม · อ้าง US id ข้อไหน | skill `business-rules` |
 | จะรันบนเครื่องจริง/simulator เพื่อ verify | skill `run-and-verify-on-device` |
 | จะแตก branch · จะเปิด PR | skill `manage-branch-flow` |
@@ -76,6 +81,14 @@ flutter test
 ```
 build ต้องระบุ flavor เสมอ (`sit` / `uat` / `production`) — ไม่มี scheme `Runner` แล้ว
 
+**ยังแดงอยู่ = ยังไม่เสร็จ** ห้ามเขียนว่า "น่าจะผ่าน"
+
+## ก่อนส่ง — อ่านโค้ดที่เพิ่งเขียนอีกรอบ
+
+ถามตัวเองว่า **"code-critic จะจับอะไรได้"** เจอแล้วแก้ก่อนส่ง หรือเขียนลง §สิ่งที่ผมไม่แน่ใจ
+
+`lib/features/poster/` เป็น slice ล่าสุดที่ผ่าน code-critic แล้ว (SCR-05) ใช้เทียบได้
+
 ## Output ที่ต้องส่งกลับ
 
 ```
@@ -94,4 +107,8 @@ build ต้องระบุ flavor เสมอ (`sit` / `uat` / `production`
 
 ## สิ่งที่ยังไม่ได้ทำ
 (ห้ามเว้นว่างถ้ามีจริง — รวมถึงหน้าที่ยังไม่รองรับเคสของถูกซื้อไปแล้ว)
+
+## สิ่งที่ผมไม่แน่ใจ
+(สิ่งที่ *เขียนไปแล้ว* แต่ไม่มั่นใจว่าถูก — ต่างจากหัวข้อบนซึ่งคือสิ่งที่รู้ว่ายังไม่ได้ทำ
+ถ้าไม่มีให้เขียนว่า "ไม่มี" — ห้ามเว้นว่าง)
 ```
