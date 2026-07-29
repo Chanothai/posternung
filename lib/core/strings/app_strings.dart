@@ -131,4 +131,41 @@ abstract final class AppStrings {
   static const String homeBrandTitle = 'Cinevault 2';
   static const String homeSearchPlaceholder =
       'Search movies, directors, years...';
+
+  // --- Condition grade guide (shared bottom sheet — ADR-0003, used from
+  // ConditionGradeIndicator in core/widgets/) ---
+  static const String conditionGuideTitle = 'คู่มือระดับสภาพสินค้า';
+  static const String conditionGuideSubtitle =
+      'เรียงจากสภาพดีที่สุดไปแย่ที่สุด ตามมาตรฐานที่วงการนักสะสมใช้';
+  static const String conditionGuideCurrentBadge = 'สภาพชิ้นนี้';
+  static const String conditionGradeUnspecifiedLabel = 'ไม่ระบุสภาพ';
+
+  // --- Poster Detail (SCR-05) ---
+  static const String posterDetailSingleStockNotice =
+      'มีชิ้นเดียว ของหายากที่เมื่อขายแล้วจะไม่กลับมาอีก';
+  static const String posterDetailReservedNotice =
+      'ขณะนี้มีผู้อื่นกำลังจองโปสเตอร์ชิ้นนี้อยู่';
+  static const String posterDetailSoldTitle = 'โปสเตอร์ชิ้นนี้ถูกซื้อไปแล้ว';
+  static const String posterDetailSoldBody =
+      'ของชิ้นนี้มีเพียงชิ้นเดียวและมีผู้ซื้อไปเรียบร้อยแล้วระหว่างที่คุณกำลังดูอยู่';
+  static const String posterDetailSoldCta = 'เลือกดูโปสเตอร์ชิ้นอื่น';
+  static const String posterDetailAuthenticitySectionTitle =
+      'ความถูกต้องแท้จริง';
+  static const String posterDetailAuthenticVerifiedLabel =
+      'ผ่านการตรวจสอบความแท้แล้ว';
+  static const String posterDetailAuthenticUnverifiedLabel =
+      'ยังไม่ผ่านการตรวจสอบความแท้';
+  static const String posterDetailDetailsSectionTitle = 'รายละเอียด';
+  static const String posterDetailProvenanceLabel = 'ที่มา (Provenance)';
+  static const String posterDetailSizeLabel = 'ขนาด';
+  static const String posterDetailDescriptionLabel = 'คำอธิบายเพิ่มเติม';
+  static const String posterDetailNotFoundTitle = 'ไม่พบโปสเตอร์นี้';
+  static const String posterDetailNotFoundBody =
+      'โปสเตอร์นี้อาจถูกลบออกไปแล้ว หรือลิงก์ไม่ถูกต้อง';
+  static const String posterDetailNotFoundCta = 'กลับหน้าหลัก';
+  static const String posterDetailErrorTitle = 'เกิดข้อผิดพลาด';
+  static const String posterDetailErrorBody =
+      'ไม่สามารถโหลดข้อมูลโปสเตอร์ได้ กรุณาลองใหม่อีกครั้ง';
+  static const String posterDetailErrorRetryCta = 'ลองใหม่อีกครั้ง';
+  static const String posterDetailBackButtonTooltip = 'ย้อนกลับ';
 }
