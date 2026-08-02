@@ -16,6 +16,17 @@ import '../widgets/home_top_bar_header_delegate.dart';
 /// table, no tag/genre column, no expiry timestamp), so the sections and
 /// their mock content were removed rather than left rendering invented
 /// data.
+///
+/// **This screen calls the backend only when the user asks it to** —
+/// pull-to-refresh, the load-more pager, and the retry button. There is
+/// deliberately no `WidgetsBindingObserver` re-fetching on
+/// `AppLifecycleState.resumed`: every foreground switch re-read the whole
+/// loaded span (up to N requests once the user has paged down), which is a
+/// lot of traffic for a read-only catalog. The trade-off is that a poster
+/// sold while the app sat in the background keeps its old badge until the
+/// user pulls to refresh or opens it — `PosterDetailScreen` still
+/// re-fetches on resume and shows `PosterSoldBanner`, so nothing can be
+/// bought off a stale card.
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -23,8 +34,7 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen>
-    with WidgetsBindingObserver {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   static const double _fallbackTopBarHeight = 130.0;
 
   final GlobalKey _topBarContentKey = GlobalKey();
@@ -33,26 +43,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _measureTopBarHeight());
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  /// A poster can be bought by someone else while this grid is on screen.
-  /// Re-fetching on foreground resume (and on pull-to-refresh below) is how
-  /// SCR-03 meets the `stock-integrity` skill's mobile requirement without
-  /// polling — the affected card flips to its unavailable state in place.
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-    if (state == AppLifecycleState.resumed) {
-      ref.read(homePostersProvider.notifier).refresh();
-    }
   }
 
   void _measureTopBarHeight() {
