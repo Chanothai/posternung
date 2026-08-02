@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../../../../core/error/catalog_exception.dart';
 import '../../../../core/strings/app_strings.dart';
+import '../models/paginated_posters_model.dart';
 import '../models/poster_detail_model.dart';
 
 /// Talks to `posternung-backend`'s public catalog endpoints. Maps every
@@ -12,6 +13,14 @@ abstract class PosterRemoteDataSource {
   /// `GET /posters/{poster_id}` — public, no auth required. Throws
   /// `CatalogException(code: 'POSTER_NOT_FOUND', ...)` on 404.
   Future<PosterDetailModel> getPosterDetail(String posterId);
+
+  /// `GET /posters?limit=&offset=` — public, no auth required. Only these
+  /// two query params are sent; the contract's filter params belong to
+  /// SCR-04 (see `PosterRepository.listPosters`).
+  Future<PaginatedPostersModel> listPosters({
+    required int limit,
+    required int offset,
+  });
 }
 
 class PosterRemoteDataSourceImpl implements PosterRemoteDataSource {
@@ -29,6 +38,18 @@ class PosterRemoteDataSourceImpl implements PosterRemoteDataSource {
         );
         return PosterDetailModel.fromJson(response.data!);
       });
+
+  @override
+  Future<PaginatedPostersModel> listPosters({
+    required int limit,
+    required int offset,
+  }) => _guard(() async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      _posters,
+      queryParameters: {'limit': limit, 'offset': offset},
+    );
+    return PaginatedPostersModel.fromJson(response.data!);
+  });
 
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {

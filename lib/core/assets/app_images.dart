@@ -19,7 +19,6 @@ abstract final class AppImages {
 
   // --- Home ---
   static const String heartIcon = 'assets/images/heart_icon.svg';
-  static const String chevronRightIcon = 'assets/images/chevron_right_icon.svg';
   static const String cartIcon = 'assets/images/cart_icon.svg';
   static const String searchIcon = 'assets/images/search_icon.svg';
   static const String filterIcon = 'assets/images/filter_icon.svg';

@@ -1,23 +1,36 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
+import '../../../../core/error/catalog_exception.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../models/home_mock_data.dart';
-import 'home_coming_soon.dart';
+import '../../../poster/presentation/screens/poster_detail_screen.dart';
+import '../providers/home_posters_provider.dart';
+import '../state/home_posters_state.dart';
+import 'home_load_more_footer.dart';
 import 'home_poster_card.dart';
+import 'home_posters_empty_view.dart';
+import 'home_posters_error_view.dart';
 
-/// "All Posters" — a 2-column grid of poster cards, plus a "Load More
-/// Titles" button.
+/// SCR-03's catalog grid, fed by the real `GET /posters`.
 ///
-/// Figma: node 7:361.
-class HomeAllPostersSection extends StatelessWidget {
+/// This is where all four `required_states` land: `loading`, `error` (with
+/// retry), `empty` (`total == 0`), and — per row rather than per screen —
+/// `sold_out`, which `HomePosterCard` renders from `PosterSummary.status`.
+class HomeAllPostersSection extends ConsumerWidget {
   const HomeAllPostersSection({super.key});
 
+  /// Fixed cell height. The card gives its image whatever is left after the
+  /// title/subtitle/price/condition block, so this only needs to be
+  /// comfortably larger than that block — it can't overflow.
+  static const double _cellExtent = 340;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncPosters = ref.watch(homePostersProvider);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.lg,
@@ -33,47 +46,75 @@ class HomeAllPostersSection extends StatelessWidget {
             style: AppTextStyles.homeSectionHeading,
           ),
           const SizedBox(height: AppSpacing.lg),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: allPosters.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: AppSpacing.lg,
-              mainAxisSpacing: AppSpacing.lg,
-              mainAxisExtent: 321.25,
-            ),
-            itemBuilder: (context, index) => HomePosterCard(
-              poster: allPosters[index],
-              imageHeight: 243.25,
-              priceColor: AppColors.textPrimary,
-              showWishlistButton: true,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.lg),
-            child: Center(
-              child: OutlinedButton(
-                onPressed: () => showComingSoonSnackBar(context),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.borderMuted),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.xl,
-                    vertical: AppSpacing.md,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                  ),
-                ),
-                child: Text(
-                  AppStrings.homeLoadMoreButton,
-                  style: AppTextStyles.homeLoadMoreLabel,
-                ),
+          asyncPosters.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: AppSpacing.xxxl),
+              child: Center(
+                child: CircularProgressIndicator(color: AppColors.accent),
               ),
             ),
+            error: (error, stackTrace) => HomePostersErrorView(
+              message: error is CatalogException ? error.message : null,
+              // `retry()`, not `refresh()`: this path has no data underneath
+              // to preserve, so it shows a spinner instead of leaving the
+              // error view looking untouched.
+              onRetry: () => ref.read(homePostersProvider.notifier).retry(),
+            ),
+            data: (posters) => posters.total == 0
+                ? const HomePostersEmptyView()
+                : _Grid(
+                    posters: posters,
+                    onLoadMore: () =>
+                        ref.read(homePostersProvider.notifier).loadMore(),
+                  ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _Grid extends StatelessWidget {
+  const _Grid({required this.posters, required this.onLoadMore});
+
+  final HomePostersState posters;
+  final VoidCallback onLoadMore;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: posters.items.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: AppSpacing.lg,
+            mainAxisSpacing: AppSpacing.lg,
+            mainAxisExtent: HomeAllPostersSection._cellExtent,
+          ),
+          // Rendered in the order the backend sent them (`created_at DESC`).
+          // Never sort by price here — BR-05 (see
+          // `PosterRepository.listPosters`).
+          itemBuilder: (context, index) {
+            final poster = posters.items[index];
+            return HomePosterCard(
+              poster: poster,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  // The real backend UUID — never a synthesized id. Wiring
+                  // this to placeholder ids 404'd on every tap once already
+                  // (`lib/features/poster/CLAUDE.md`). No `go_router`: there
+                  // is no route table yet, and adding one is SCR-06's call.
+                  builder: (_) => PosterDetailScreen(posterId: poster.id),
+                ),
+              ),
+            );
+          },
+        ),
+        HomeLoadMoreFooter(state: posters, onLoadMore: onLoadMore),
+      ],
     );
   }
 }

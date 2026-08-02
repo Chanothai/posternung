@@ -77,7 +77,7 @@ Until these exist, SIT/UAT builds simply show the default (production) icon.
 
 ## 6. Backend API base URL
 
-`lib/core/config/api_base_url_resolver.dart`'s `apiBaseUrlFor(Environment)` holds the base URL per environment. **Production** resolves to the stable domain `https://api.posternung.com` by default — no override needed. **SIT** defaults to `http://192.168.68.102:8000` — a developer's LAN IP running `posternung-backend` locally (Docker on port 8000), since SIT has no deployed backend of its own. **UAT** has no backend deployed yet (empty default); wire it here once it does.
+`lib/core/config/api_base_url_resolver.dart`'s `apiBaseUrlFor(Environment)` holds the base URL per environment. **Production** resolves to the stable domain `https://api.posternung.com` by default — no override needed. **SIT** defaults to `http://172.20.10.12:8000` — a developer's LAN IP running `posternung-backend` locally (the `posternung-sit-app` container publishing port 8000), since SIT has no deployed backend of its own. **UAT** has no backend deployed yet (empty default); wire it here once it does.
 
 **The SIT default is one developer's machine, not a shared value** — a real device can't use `127.0.0.1` (that resolves to the device itself, not your Mac), and the IP changes with the network. Override it for your own setup instead of editing the hardcoded default:
 

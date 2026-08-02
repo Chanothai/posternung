@@ -118,19 +118,53 @@ abstract final class AppStrings {
       'อีเมลนี้เคยสมัครไว้ด้วยวิธีอื่นแล้ว กรุณาเข้าสู่ระบบด้วยวิธีเดิม';
 
   // --- Home ---
-  static const String homeSectionFeaturedCollections = 'Featured Collections';
-  static const String homeSectionEndingSoon = 'Ending Soon';
-  static const String homeSectionAllPosters = 'All Posters';
-  static const String homeViewAllLink = 'View all ';
-  static const String homeLoadMoreButton = 'Load More Titles';
-  static const String homeNavHome = 'Home';
-  static const String homeNavSearch = 'Search';
-  static const String homeNavWishlist = 'Wishlist';
-  static const String homeNavCart = 'Cart';
-  static const String homeNavProfile = 'Profile';
-  static const String homeBrandTitle = 'Cinevault 2';
+  static const String homeSectionAllPosters = 'โปสเตอร์ทั้งหมด';
+  static const String homeNavHome = 'หน้าหลัก';
+  static const String homeNavSearch = 'ค้นหา';
+  static const String homeNavWishlist = 'รายการที่ชอบ';
+  static const String homeNavCart = 'ตะกร้าสินค้า';
+  static const String homeNavProfile = 'โปรไฟล์';
+  static const String homeBrandTitle = 'หน้าหลัก';
   static const String homeSearchPlaceholder =
       'Search movies, directors, years...';
+
+  // --- Home / Discover catalog list (SCR-03, GET /posters) ---
+  /// AC-4 — a poster that is no longer for sale must say so on the card
+  /// itself, rather than looking buyable until the user taps into it.
+  static const String homePosterSoldBadge = 'ขายแล้ว';
+
+  /// Covers `reserved` **and** a status this client doesn't recognize —
+  /// both mean "we can't tell the user this is buyable", and neither is
+  /// worth a distinct word here.
+  static const String homePosterUnavailableBadge = 'ไม่พร้อมขาย';
+  static const String homePostersEmptyTitle = 'ยังไม่มีโปสเตอร์ให้ชมตอนนี้';
+  static const String homePostersEmptyBody =
+      'เรากำลังคัดโปสเตอร์ต้นฉบับชิ้นใหม่เข้าร้าน กลับมาดูอีกครั้งเร็ว ๆ นี้';
+  static const String homePostersErrorTitle = 'โหลดรายการโปสเตอร์ไม่สำเร็จ';
+  static const String homePostersErrorBody =
+      'กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่อีกครั้ง';
+  static const String homePostersRetryCta = 'ลองใหม่อีกครั้ง';
+  static const String homeWishlistButtonTooltip = 'เพิ่มลงรายการที่อยากได้';
+
+  /// Shown above the pager while the catalog has more rows than the grid is
+  /// holding, so the button says how much more there is rather than just
+  /// "more". `{shown}`/`{total}` are substituted at the call site. Hidden
+  /// once everything is loaded — "แสดง 7 จาก 7" states the obvious.
+  static const String homeCatalogShownOfTotal =
+      'แสดง {shown} จาก {total} รายการ';
+
+  /// The pager itself. An earlier round of SCR-03 had this button raise a
+  /// coming-soon snackbar with no pagination behind it; it now appends a
+  /// real page (`GET /posters?offset=`), and must never go back to being
+  /// decorative — a control that loads nothing reads as broken.
+  static const String homeLoadMoreButton = 'โหลดเพิ่มเติม';
+  static const String homeLoadMoreLoading = 'กำลังโหลด...';
+
+  /// A page *after* the first failed. Deliberately its own copy rather than
+  /// [homePostersErrorTitle]: nothing on screen is broken, the grid the user
+  /// is reading is intact, and only the extra rows are missing.
+  static const String homeLoadMoreErrorBody =
+      'โหลดรายการเพิ่มเติมไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
 
   // --- Condition grade guide (shared bottom sheet — ADR-0003, used from
   // ConditionGradeIndicator in core/widgets/) ---

@@ -26,24 +26,41 @@ import 'condition_grade_guide_sheet.dart';
 /// status label instead — not a fake grade (ADR-0003 forbids fabricating
 /// one), and not tappable (there's no scale-guide content to open for a
 /// grade that doesn't exist).
+///
+/// [compact] is for dense call sites — the SCR-03 catalog grid card is only
+/// ~140–165 logical px wide, where the default padding plus the trailing
+/// info icon overflows the row. Compact tightens the padding and drops the
+/// icon; **the text is identical either way** (`"Very Good (5/8)"`), and it
+/// stays tappable. Shrinking the badge must never become an excuse to show
+/// a bare label — that's precisely what ADR-0003 forbids, which is also why
+/// there is one widget with a variant here rather than a second, smaller
+/// widget somewhere else that would have to be kept honest separately.
 class ConditionGradeIndicator extends StatelessWidget {
-  const ConditionGradeIndicator({super.key, required this.grade});
+  const ConditionGradeIndicator({
+    super.key,
+    required this.grade,
+    this.compact = false,
+  });
 
   final PosterConditionGrade? grade;
+  final bool compact;
+
+  EdgeInsets get _padding => compact
+      ? const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        )
+      : const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        );
 
   @override
   Widget build(BuildContext context) {
     final grade = this.grade;
     if (grade == null) {
-      return Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
-        ),
-        decoration: BoxDecoration(
-          border: Border.all(color: AppColors.borderMuted),
-          borderRadius: BorderRadius.circular(AppRadius.full),
-        ),
+      return _Pill(
+        padding: _padding,
         child: Text(
           AppStrings.conditionGradeUnspecifiedLabel,
           style: AppTextStyles.homeConditionTag.copyWith(
@@ -58,34 +75,59 @@ class ConditionGradeIndicator extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadius.full),
         onTap: () => showConditionGradeGuideSheet(context, current: grade),
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.sm,
-          ),
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.borderMuted),
-            borderRadius: BorderRadius.circular(AppRadius.full),
-          ),
+        child: _Pill(
+          padding: _padding,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                '${grade.label} (${grade.scalePosition}/${grade.scaleLength})',
-                style: AppTextStyles.homeConditionTag.copyWith(
-                  color: AppColors.textPrimary,
+              Flexible(
+                child: Text(
+                  '${grade.label} (${grade.scalePosition}/${grade.scaleLength})',
+                  style: AppTextStyles.homeConditionTag.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                  maxLines: 1,
+                  // No ellipsis: truncating this string could turn
+                  // "Very Good (5/8)" into "Very Good…", i.e. the bare label
+                  // ADR-0003 forbids. Fading keeps the scale fragment
+                  // partially visible instead of silently deleting it, and
+                  // the compact variant is sized so it doesn't come up in
+                  // practice.
+                  overflow: TextOverflow.fade,
+                  softWrap: false,
                 ),
               ),
-              const SizedBox(width: AppSpacing.xs),
-              const Icon(
-                Icons.info_outline,
-                size: 14,
-                color: AppColors.textSecondary,
-              ),
+              if (!compact) ...[
+                const SizedBox(width: AppSpacing.xs),
+                const Icon(
+                  Icons.info_outline,
+                  size: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ],
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill({required this.padding, required this.child});
+
+  final EdgeInsets padding;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.borderMuted),
+        borderRadius: BorderRadius.circular(AppRadius.full),
+      ),
+      child: child,
     );
   }
 }

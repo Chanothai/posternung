@@ -6,6 +6,7 @@ import '../../data/repositories/poster_repository_impl.dart';
 import '../../domain/entities/poster_detail.dart';
 import '../../domain/repositories/poster_repository.dart';
 import '../../domain/usecases/get_poster_detail.dart';
+import '../../domain/usecases/get_posters.dart';
 
 final posterRemoteDataSourceProvider = Provider<PosterRemoteDataSource>(
   (ref) => PosterRemoteDataSourceImpl(ref.watch(dioProvider)),
@@ -17,6 +18,16 @@ final posterRepositoryProvider = Provider<PosterRepository>(
 
 final getPosterDetailProvider = Provider(
   (ref) => GetPosterDetail(ref.watch(posterRepositoryProvider)),
+);
+
+/// Catalog list usecase. Lives here (not in `features/home/`) because every
+/// catalog screen — SCR-03 Home, SCR-04 search/filter, SCR-11 — reads the
+/// same `GET /posters` through it, and the root `CLAUDE.md`'s feature-first
+/// rule puts code shared across features outside any one of them. The
+/// screen-specific ViewModel on top of it belongs to whichever feature owns
+/// that screen.
+final getPostersProvider = Provider(
+  (ref) => GetPosters(ref.watch(posterRepositoryProvider)),
 );
 
 /// Drives `PosterDetailScreen` — one instance per `posterId` (family).

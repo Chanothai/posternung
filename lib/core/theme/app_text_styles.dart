@@ -162,21 +162,6 @@ abstract final class AppTextStyles {
     color: AppColors.textPrimary,
   );
 
-  static final TextStyle homeCollectionEyebrow = GoogleFonts.kanit(
-    fontSize: 10,
-    height: 15 / 10,
-    fontWeight: FontWeight.bold,
-    letterSpacing: 1,
-    color: AppColors.accent,
-  );
-
-  static final TextStyle homeCollectionTitle = GoogleFonts.kanit(
-    fontSize: 18,
-    height: 22.5 / 18,
-    fontWeight: FontWeight.bold,
-    color: AppColors.textPrimary,
-  );
-
   static final TextStyle homeSearchPlaceholder = GoogleFonts.kanit(
     fontSize: 14,
     fontWeight: FontWeight.normal,
@@ -230,6 +215,35 @@ abstract final class AppTextStyles {
     height: 15 / 10,
     fontWeight: FontWeight.normal,
     letterSpacing: 0.25,
+    color: AppColors.textPrimary,
+  );
+
+  // --- Status views (error / empty / not found) ---
+  // Used by core/widgets/app_status_view.dart, i.e. by every screen-level
+  // failure/empty state. Deliberately its own scale rather than reusing
+  // `authCardHeading` (24 — a page title, oversized for a state that sits
+  // inside a section) and `cardSubtitle` (20/14 line-height, too tight for
+  // a two-line Thai explanation).
+
+  static final TextStyle statusTitle = GoogleFonts.kanit(
+    fontSize: 18,
+    height: 26 / 18,
+    fontWeight: FontWeight.bold,
+    color: AppColors.textPrimary,
+  );
+
+  static final TextStyle statusBody = GoogleFonts.kanit(
+    fontSize: 14,
+    height: 22 / 14,
+    fontWeight: FontWeight.normal,
+    color: AppColors.textSecondary,
+  );
+
+  static final TextStyle statusActionLabel = GoogleFonts.kanit(
+    fontSize: 14,
+    height: 20 / 14,
+    fontWeight: FontWeight.bold,
+    letterSpacing: 0.35,
     color: AppColors.textPrimary,
   );
 }
