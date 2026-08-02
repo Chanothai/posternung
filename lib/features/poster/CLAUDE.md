@@ -1,35 +1,43 @@
 # lib/features/poster/
 
-Catalog feature — full three-layer Clean Architecture slice (real data
-dependency: `GET /posters/{poster_id}`). Named `poster`, not
-`product_detail`, because SCR-03/04/05/11 (all catalog screens) are meant
-to share this feature's DTO/entities rather than each getting their own —
-see ADR-0005's rationale for the naming.
+Catalog feature — full three-layer Clean Architecture slice over both
+catalog endpoints: `GET /posters/{poster_id}` (detail) and `GET /posters`
+(list). Named `poster`, not `product_detail`, because SCR-03/04/05/11 (all
+catalog screens) share this feature's DTO/entities rather than each getting
+their own — the root `CLAUDE.md`'s feature-first rule is what puts shared
+code in one feature slice instead of duplicating it per screen (ADR-0005
+decided the *scope* of SCR-05, not this repo's folder layout). The list line
+is already shared: SCR-03's screen state lives in `features/home/` but reads
+`GetPosters` from here.
 
 ```
 domain/
-  entities/       # PosterDetail, PosterImage, PosterStatus (+
+  entities/       # PosterDetail, PosterSummary, PaginatedPosters,
+                  # PosterImage, PosterStatus (+
                   # posterStatusFromApi). PosterConditionGrade itself is
                   # NOT here — it lives in core/catalog/ so the shared
                   # core/widgets/condition_grade_indicator.dart can be typed
                   # against it without core importing features/ (see
                   # lib/core/CLAUDE.md's catalog/ entry). PosterDetail just
                   # imports that core type directly.
-  repositories/   # PosterRepository — abstract, one method:
-                  # getPosterDetail(posterId)
-  usecases/       # GetPosterDetail — single call()
+  repositories/   # PosterRepository — abstract:
+                  # getPosterDetail(posterId), listPosters(limit, offset)
+  usecases/       # GetPosterDetail, GetPosters — single call() each.
+                  # GetPosters clamps limit to the contract's 1..100 so an
+                  # off-by-one becomes a smaller page, not a 422.
 data/
-  models/         # PosterDetailModel, PosterImageModel — @freezed +
+  models/         # PosterDetailModel, PosterSummaryModel,
+                  # PaginatedPostersModel, PosterImageModel — @freezed +
                   # json_serializable, decode `status`/`condition_grade` as
                   # raw String? and map them in toEntity() via
                   # posterStatusFromApi/posterConditionGradeFromApi rather
                   # than @JsonEnum, so an unrecognized value degrades
-                  # gracefully (condition_grade → null) or throws a
-                  # CatalogException with a code (status — there's no
-                  # legitimate null/unknown status) instead of a bare
-                  # fromJson TypeError.
+                  # gracefully instead of a bare fromJson TypeError. What
+                  # an unrecognized *status* does differs by endpoint on
+                  # purpose — see "detail throws, list degrades" below.
   datasources/    # PosterRemoteDataSource — Dio → GET
-                  # /api/v1/posters/{poster_id}, via the shared dioProvider
+                  # /api/v1/posters/{poster_id} and GET /api/v1/posters
+                  # (limit/offset only), via the shared dioProvider
                   # (core/network/api_client.dart) — no separate Dio
                   # instance. Public endpoint; no skipAuth needed (the
                   # AuthInterceptor attaching a Bearer token when one
@@ -40,7 +48,8 @@ data/
                   # crosses into domain/.
 presentation/
   providers/      # poster_providers.dart — DI chain (datasource →
-                  # repository → usecase) + PosterDetailViewModel, an
+                  # repository → usecases: getPosterDetailProvider,
+                  # getPostersProvider) + PosterDetailViewModel, an
                   # AsyncNotifier<PosterDetail> **family** keyed by
                   # posterId (AsyncNotifierProvider.family — see riverpod
                   # 3.3.2's overrideWith2 for how tests override a specific
@@ -107,21 +116,56 @@ presentation/
   `PosterDetailScreen`'s `AsyncValue.when` is specifically that — a real
   fetch failure, not "unavailable."
 - **`condition_grade` is nullable with no backend guard** — `PosterDetail`
-  reflects that (`PosterConditionGrade?`), and `ConditionGradeIndicator`
-  (core/widgets/) renders a plain "ไม่ระบุสภาพ" status badge for `null`
-  rather than nothing at all — every call site pairs this widget with the
-  price in the same row, and hiding it entirely would leave the price
-  floating with no condition next to it, violating BR-05. Don't add a
-  fallback/*fake* grade here though; ADR-0003 explicitly forbids that.
-- **No real entry point into this screen yet.** `features/home/`'s
-  `HomePosterCard` still shows `showComingSoonSnackBar()` on tap — it does
-  **not** `Navigator.push` here. An earlier attempt wired the card straight
-  to `PosterDetailScreen(posterId: poster.id)` using `HomePoster`'s
-  placeholder mock ids (e.g. `'mock-blade-runner'`), which 404s against the
-  real backend on every tap since Home has no real catalog repository of
-  its own yet — that wiring was reverted (see `docs/screens.yaml` SCR-05's
-  `known_gaps`) until Home is wired to `GET /posters` with real ids in a
-  separate round. This whole feature slice is otherwise complete and has
-  its own tests exercising `PosterDetailScreen` directly
-  (`ProviderScope(overrides: [...])`, no navigation needed) — it just has
-  no caller yet, which is expected, not dead code.
+  and `PosterSummary` both reflect that (`PosterConditionGrade?`), and
+  `ConditionGradeIndicator` (core/widgets/) renders a plain "ไม่ระบุสภาพ"
+  status badge for `null` rather than nothing at all — every call site pairs
+  this widget with the price, and hiding it entirely would leave the price
+  with no condition next to it, violating BR-05. Don't add a fallback/*fake*
+  grade here though; ADR-0003 explicitly forbids that. The widget has a
+  `compact: true` variant for SCR-03's grid cells (tighter padding, no info
+  icon, **same** `"Very Good (5/8)"` text) — if a new dense call site
+  doesn't fit, add a variant there rather than a second badge widget, so
+  ADR-0003 stays enforced in exactly one place.
+- **The list line is a strictly smaller shape than the detail line — don't
+  copy fields across.** `PosterListItem` has exactly
+  `id/title/price/status/condition_grade/era_decade/studio/primary_image_url`.
+  There is **no** `size`, **no** `is_unique`, **no** `images`, and no film
+  year anywhere (the `posters` table has no year column — SCR-03's G8;
+  `era_decade` is a decade, not a release year). `PosterSummary` mirrors
+  that exactly. Adding a field because the detail screen shows it means
+  inventing data.
+- **`price` is a `String` on the wire, on both endpoints.** Pydantic v2
+  serializes `Decimal` to a JSON string (`"450.00"`) and the contract says
+  `type: string, format: decimal`. Typing it `num`/`double` compiles and
+  then fails at runtime on the first real response. It stays a `String`
+  end-to-end; `formatThbPrice` (`core/utils/`) formats it for display.
+- **Detail throws on an unrecognized `status`; list degrades to `null`.**
+  Deliberate asymmetry. On detail, a bad status affects the one poster the
+  user asked for, so failing loudly with a `CatalogException` is right. On
+  a list it would take the whole page down for every other poster — the
+  same blast radius as the backend's own G6, where one internal image key
+  500s all of `GET /posters`. `PosterSummary.status` is therefore
+  `PosterStatus?`, and `null` must be treated exactly like `reserved`:
+  shown as unavailable, never as buyable.
+- **No `sort` param exists, and the client must not compensate.** The
+  backend orders `GET /posters` by `created_at DESC`, which is what
+  satisfies BR-05 ("the default sort must not be cheapest-first"). Sorting
+  by price in `toEntity()`, the repository, or a widget re-introduces the
+  violation the backend already avoids. Pinned by tests in both
+  `poster_summary_model_test.dart` and home's screen test.
+- **`in_stock_only` defaults to `false` server-side**, so a page
+  legitimately contains `reserved`/`sold` rows. That is AC-4's input, not a
+  bug and not something to filter out client-side.
+- **`primary_image_url` is nullable *and* absent-able** — it isn't in the
+  schema's `required` list, and the backend returns `null` when the primary
+  image sits under an internal-only storage key. Every call site needs a
+  deliberate placeholder rather than a broken frame.
+- **This screen now has a real caller.** `features/home/`'s
+  `HomeAllPostersSection` `Navigator.push`es `PosterDetailScreen(posterId:
+  poster.id)` with the **real backend UUID** from `GET /posters`. An earlier
+  attempt used `HomePoster`'s placeholder mock ids (e.g.
+  `'mock-blade-runner'`) and 404'd on every tap; that was reverted and is
+  only safe now because Home reads real ids. Never wire this screen to a
+  synthesized id. Unavailable posters are still pushed here on purpose —
+  the detail endpoint doesn't filter by status (ADR-0005 §D5) and
+  `PosterSoldBanner` is the fuller explanation.

@@ -2,8 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:posternung/core/error/catalog_exception.dart';
 import 'package:posternung/features/poster/data/datasources/poster_remote_data_source.dart';
+import 'package:posternung/features/poster/data/models/paginated_posters_model.dart';
 import 'package:posternung/features/poster/data/models/poster_detail_model.dart';
 import 'package:posternung/features/poster/data/models/poster_image_model.dart';
+import 'package:posternung/features/poster/data/models/poster_summary_model.dart';
 import 'package:posternung/features/poster/data/repositories/poster_repository_impl.dart';
 
 class MockPosterRemoteDataSource extends Mock
@@ -86,4 +88,73 @@ void main() {
       ),
     );
   });
+
+  group('listPosters', () {
+    test('passes limit/offset through and returns the mapped page', () async {
+      when(
+        () => dataSource.listPosters(limit: 20, offset: 40),
+      ).thenAnswer((_) async => _page());
+
+      final page = await repository.listPosters(limit: 20, offset: 40);
+
+      expect(page.total, 3);
+      expect(page.offset, 40);
+      expect(page.items.map((p) => p.id).toList(), ['a', 'b', 'c']);
+      verify(() => dataSource.listPosters(limit: 20, offset: 40)).called(1);
+    });
+
+    test('propagates a CatalogException from the datasource as-is', () async {
+      when(
+        () => dataSource.listPosters(
+          limit: any(named: 'limit'),
+          offset: any(named: 'offset'),
+        ),
+      ).thenThrow(const CatalogException(code: 'server_error', message: 'พัง'));
+
+      expect(
+        () => repository.listPosters(limit: 20, offset: 0),
+        throwsA(
+          isA<CatalogException>().having((e) => e.code, 'code', 'server_error'),
+        ),
+      );
+    });
+
+    test('wraps an unexpected non-CatalogException failure', () async {
+      when(
+        () => dataSource.listPosters(
+          limit: any(named: 'limit'),
+          offset: any(named: 'offset'),
+        ),
+      ).thenThrow(StateError('boom'));
+
+      expect(
+        () => repository.listPosters(limit: 20, offset: 0),
+        throwsA(
+          isA<CatalogException>().having(
+            (e) => e.code,
+            'code',
+            startsWith('unexpected_'),
+          ),
+        ),
+      );
+    });
+  });
 }
+
+PaginatedPostersModel _page() => PaginatedPostersModel(
+  items: [_summary('a'), _summary('b'), _summary('c')],
+  total: 3,
+  limit: 20,
+  offset: 40,
+);
+
+PosterSummaryModel _summary(String id) => PosterSummaryModel(
+  id: id,
+  title: 'Poster $id',
+  price: '450.00',
+  status: 'available',
+  conditionGrade: 'mint',
+  eraDecade: 1980,
+  studio: 'Warner Bros',
+  primaryImageUrl: null,
+);
