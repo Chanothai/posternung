@@ -1,6 +1,9 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/design_system/app_dimens.dart';
 import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/error/catalog_exception.dart';
 import '../../../../core/strings/app_strings.dart';
@@ -34,6 +37,10 @@ class PosterDetailScreen extends ConsumerStatefulWidget {
 
 class _PosterDetailScreenState extends ConsumerState<PosterDetailScreen>
     with WidgetsBindingObserver {
+  /// Owned here rather than by the body because the app bar reads it, and the
+  /// bar outlives the body across loading/error states.
+  final _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -42,6 +49,7 @@ class _PosterDetailScreenState extends ConsumerState<PosterDetailScreen>
 
   @override
   void dispose() {
+    _scrollController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -66,6 +74,7 @@ class _PosterDetailScreenState extends ConsumerState<PosterDetailScreen>
     final asyncDetail = ref.watch(
       posterDetailViewModelProvider(widget.posterId),
     );
+    final loadedTitle = asyncDetail.value?.title;
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDark,
@@ -77,6 +86,15 @@ class _PosterDetailScreenState extends ConsumerState<PosterDetailScreen>
           tooltip: AppStrings.posterDetailBackButtonTooltip,
           onPressed: () => Navigator.of(context).pop(),
         ),
+        // Nothing to name until the poster has actually loaded — the bar is
+        // deliberately bare over the image, and there is no scrollable at all
+        // in the loading/error states.
+        title: loadedTitle == null
+            ? null
+            : _CollapsingAppBarTitle(
+                controller: _scrollController,
+                title: loadedTitle,
+              ),
       ),
       body: asyncDetail.when(
         loading: () => const Center(
@@ -97,6 +115,7 @@ class _PosterDetailScreenState extends ConsumerState<PosterDetailScreen>
           color: AppColors.accent,
           child: _PosterDetailBody(
             poster: poster,
+            scrollController: _scrollController,
             onBrowseOthers: () => Navigator.of(context).pop(),
           ),
         ),
@@ -105,10 +124,75 @@ class _PosterDetailScreenState extends ConsumerState<PosterDetailScreen>
   }
 }
 
+/// The bar keeps its height and its back button at every offset — only the
+/// title crosses in, once the poster image has cleared the top of the
+/// viewport. Fading a fixed-height bar rather than collapsing an expanded one
+/// is what keeps the gallery inside the list, where the zoom lock in
+/// [PosterDetailImageGallery] still owns the vertical drag; hosting the image
+/// in a `FlexibleSpaceBar` instead would put it back in a scrollable that
+/// moves under the finger mid-zoom.
+class _CollapsingAppBarTitle extends StatelessWidget {
+  const _CollapsingAppBarTitle({required this.controller, required this.title});
+
+  final ScrollController controller;
+  final String title;
+
+  /// 0 while the poster still leads the screen, 1 once it has gone.
+  ///
+  /// Keyed to the image's height — it leads the list and sizes itself off the
+  /// list's own width, so the offset where it clears the top is derivable
+  /// rather than measured — but **capped at `maxScrollExtent`**. Without that
+  /// cap a listing whose text is shorter than its image can never scroll far
+  /// enough to reveal the title at all: a 2:3 image on a phone is ~537pt tall
+  /// against ~500pt of total scroll, so the plain image-height threshold is
+  /// unreachable in exactly the common case.
+  double _fadeProgress(double imageHeight) {
+    if (!controller.hasClients) return 0;
+
+    final position = controller.position;
+    // The bar builds before the list has laid out, and reading either extent
+    // before then throws rather than returning a default.
+    if (!position.hasContentDimensions || !position.hasPixels) return 0;
+    // Nothing scrolls, so the poster never leaves and the title never earns
+    // its place in the bar.
+    if (position.maxScrollExtent <= 0) return 0;
+
+    final end = math.min(imageHeight, position.maxScrollExtent);
+    final start = math.max(0.0, end - kToolbarHeight);
+    if (end <= start) return position.pixels >= end ? 1 : 0;
+    return ((position.pixels - start) / (end - start)).clamp(0.0, 1.0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final contentWidth = MediaQuery.sizeOf(context).width - AppSpacing.lg * 2;
+    final imageHeight = contentWidth / AppDimens.posterCardAspectRatio;
+
+    return AnimatedBuilder(
+      animation: controller,
+      // Built once and handed to the builder — only the opacity changes as
+      // the list scrolls, so the text itself must not be rebuilt per frame.
+      child: Text(
+        title,
+        style: AppTextStyles.appBarTitle,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      builder: (context, child) =>
+          Opacity(opacity: _fadeProgress(imageHeight), child: child),
+    );
+  }
+}
+
 class _PosterDetailBody extends StatefulWidget {
-  const _PosterDetailBody({required this.poster, required this.onBrowseOthers});
+  const _PosterDetailBody({
+    required this.poster,
+    required this.scrollController,
+    required this.onBrowseOthers,
+  });
 
   final PosterDetail poster;
+  final ScrollController scrollController;
   final VoidCallback onBrowseOthers;
 
   @override
@@ -127,6 +211,7 @@ class _PosterDetailBodyState extends State<_PosterDetailBody> {
     final poster = widget.poster;
 
     return ListView(
+      controller: widget.scrollController,
       // Always scrollable, even when content is shorter than the viewport
       // — RefreshIndicator requires a scrollable child to trigger from.
       // Except while the gallery is zoomed: this list's vertical drag

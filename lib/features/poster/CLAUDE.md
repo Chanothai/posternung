@@ -132,6 +132,18 @@ presentation/
   `InteractiveViewer`'s boundary clamp — it only enforces bounds inside its
   own gesture handlers — so `_zoomedInMatrix` clamps the translation itself.
   Skip that and a double tap near an edge parks blank space in frame.
+- **The app bar's title fades in; it does not collapse a header.** The bar
+  keeps its height and its back button at every offset, and
+  `_CollapsingAppBarTitle` only crosses the poster title in as the image
+  scrolls away. Hosting the gallery in a `FlexibleSpaceBar` instead would put
+  it back inside a scrollable that moves under the finger mid-zoom, undoing
+  the gesture work above — that's why this shape, not that one.
+  The fade is keyed to the image's height **capped at `maxScrollExtent`**.
+  Uncapped it is unreachable in the ordinary case: a 2:3 image on a phone is
+  ~537pt tall against ~500pt of total scroll, so the title would simply never
+  appear. Also note `maxScrollExtent`/`pixels` *throw* before the list has
+  laid out — the bar builds first, so both need a `hasContentDimensions` /
+  `hasPixels` guard rather than a default.
 - **`PosterErrorView` and `PosterNotFoundView` render through
   `AppStatusView`** (core/widgets/) — the same block SCR-03's error/empty
   states use. They keep their own identities (different copy, different
