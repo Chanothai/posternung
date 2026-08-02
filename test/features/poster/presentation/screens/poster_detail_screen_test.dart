@@ -323,6 +323,36 @@ void main() {
       expect(find.byType(PageView), findsOneWidget);
       expect(dotFinder(), findsNothing);
     });
+
+    // A zoomed image must keep the one-finger pan for itself, so the outer
+    // list has to stand down too — not just the PageView (see
+    // PosterDetailImageGallery's gesture-arena note). This pins the wiring
+    // only; it cannot prove the arena outcome on a real touch stream.
+    testWidgets('zooming an image stops the page from scrolling under it', (
+      tester,
+    ) async {
+      await useTallSurface(tester);
+      await tester.pumpWidget(wrap(detail: _fullPoster(images: images)));
+      await tester.pump();
+
+      ScrollPhysics? listPhysics() =>
+          tester.widget<ListView>(find.byType(ListView)).physics;
+
+      expect(listPhysics(), isA<AlwaysScrollableScrollPhysics>());
+
+      final centre = tester.getCenter(find.byType(PageView));
+      final left = await tester.startGesture(centre - const Offset(20, 0));
+      final right = await tester.startGesture(centre + const Offset(20, 0));
+      await tester.pump();
+      await left.moveTo(centre - const Offset(100, 0));
+      await right.moveTo(centre + const Offset(100, 0));
+      await tester.pump();
+      await left.up();
+      await right.up();
+      await tester.pumpAndSettle();
+
+      expect(listPhysics(), isA<NeverScrollableScrollPhysics>());
+    });
   });
 
   group('AC-5 — refresh on foreground resume (Medium #5)', () {

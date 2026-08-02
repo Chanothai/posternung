@@ -91,6 +91,23 @@ presentation/
 
 ## Things worth knowing before touching this feature
 
+- **Zoom in the gallery disables *two* scrollables, and both are load-bearing.**
+  `InteractiveViewer` drives a single `ScaleGestureRecognizer`, which only
+  claims the gesture arena once the focal point travels `kPanSlop` (36lp) — a
+  `Scrollable`'s drag recognizer claims at `kTouchSlop` (18lp) and therefore
+  always wins first, at every zoom level. So while zoomed,
+  `PosterDetailImageGallery` puts its `PageView` on
+  `NeverScrollableScrollPhysics` **and** reports up through `onZoomChanged` so
+  `_PosterDetailBody` does the same to the outer `ListView` (vertical pan, same
+  root cause). Drop either half and a one-finger drag on a zoomed image goes
+  back to flipping the page / scrolling the screen away. Pinch was never
+  affected — a second pointer makes the mono-drag recognizer reject itself.
+  `minScale: 1` is deliberate too: the framework default of 0.8 lets "zoomed
+  all the way out" settle *below* identity, which would leave the swipe locked.
+  **No widget test can catch a regression here** — the tests pin the state
+  machine (flag flips, physics follows), not the arena outcome against a real
+  touch stream. That needs a device. Found on-device *after* `code-critic` had
+  already passed SCR-05.
 - **This round is read-only (ADR-0005 §D1).** No Add to Cart, no quantity
   selector — `POST /cart/reserve/{poster_id}` is still `x-status: DRAFT` in
   the contract. Don't add a purchase CTA here without checking whether that

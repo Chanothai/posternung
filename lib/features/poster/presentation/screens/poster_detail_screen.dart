@@ -105,18 +105,38 @@ class _PosterDetailScreenState extends ConsumerState<PosterDetailScreen>
   }
 }
 
-class _PosterDetailBody extends StatelessWidget {
+class _PosterDetailBody extends StatefulWidget {
   const _PosterDetailBody({required this.poster, required this.onBrowseOthers});
 
   final PosterDetail poster;
   final VoidCallback onBrowseOthers;
 
   @override
+  State<_PosterDetailBody> createState() => _PosterDetailBodyState();
+}
+
+class _PosterDetailBodyState extends State<_PosterDetailBody> {
+  /// Set while the gallery's current image is zoomed in. The flag lives here
+  /// rather than on the screen so it is discarded together with the gallery
+  /// whenever the screen leaves its data state — a flag that outlived the
+  /// gallery would leave this list permanently unscrollable.
+  bool _imageZoomed = false;
+
+  @override
   Widget build(BuildContext context) {
+    final poster = widget.poster;
+
     return ListView(
       // Always scrollable, even when content is shorter than the viewport
       // — RefreshIndicator requires a scrollable child to trigger from.
-      physics: const AlwaysScrollableScrollPhysics(),
+      // Except while the gallery is zoomed: this list's vertical drag
+      // recognizer would otherwise take the one-finger pan away from the
+      // zoomed image (kTouchSlop 18lp beats kPanSlop 36lp — see
+      // PosterDetailImageGallery) and scroll the page instead of moving
+      // inside the image.
+      physics: _imageZoomed
+          ? const NeverScrollableScrollPhysics()
+          : const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.lg,
         0,
@@ -126,11 +146,14 @@ class _PosterDetailBody extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: PosterDetailImageGallery(poster: poster),
+          child: PosterDetailImageGallery(
+            poster: poster,
+            onZoomChanged: (zoomed) => setState(() => _imageZoomed = zoomed),
+          ),
         ),
         const SizedBox(height: AppSpacing.lg),
         if (poster.status == PosterStatus.sold)
-          PosterSoldBanner(onBrowseOthers: onBrowseOthers),
+          PosterSoldBanner(onBrowseOthers: widget.onBrowseOthers),
         Text(poster.title, style: AppTextStyles.authCardHeading),
         if (_subtitle != null) ...[
           const SizedBox(height: AppSpacing.xs),
@@ -168,11 +191,11 @@ class _PosterDetailBody extends StatelessWidget {
 
   String? get _subtitle {
     final parts = [
-      if (poster.eraDecade != null) '${poster.eraDecade}s',
-      if (poster.studio != null) poster.studio!,
+      if (widget.poster.eraDecade != null) '${widget.poster.eraDecade}s',
+      if (widget.poster.studio != null) widget.poster.studio!,
     ];
     return parts.isEmpty ? null : parts.join(' • ');
   }
 
-  String get _formattedPrice => formatThbPrice(poster.price);
+  String get _formattedPrice => formatThbPrice(widget.poster.price);
 }
