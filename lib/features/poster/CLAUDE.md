@@ -100,6 +100,64 @@ presentation/
 
 ## Things worth knowing before touching this feature
 
+- **Zoom in the gallery disables *two* scrollables, and both are load-bearing.**
+  `InteractiveViewer` drives a single `ScaleGestureRecognizer`, which only
+  claims the gesture arena once the focal point travels `kPanSlop` (36lp) — a
+  `Scrollable`'s drag recognizer claims at `kTouchSlop` (18lp) and therefore
+  always wins first, at every zoom level. So while zoomed,
+  `PosterDetailImageGallery` puts its `PageView` on
+  `NeverScrollableScrollPhysics` **and** reports up through `onZoomChanged` so
+  `_PosterDetailBody` does the same to the outer `ListView` (vertical pan, same
+  root cause). Drop either half and a one-finger drag on a zoomed image goes
+  back to flipping the page / scrolling the screen away. Pinch was never
+  affected — a second pointer makes the mono-drag recognizer reject itself.
+  `minScale: 1` is deliberate too: the framework default of 0.8 lets "zoomed
+  all the way out" settle *below* identity, which would leave the swipe locked.
+  **No widget test can catch a regression here** — the tests pin the state
+  machine (flag flips, physics follows), not the arena outcome against a real
+  touch stream. That needs a device. Found on-device *after* `code-critic` had
+  already passed SCR-05.
+- **The zoom button belongs in the app bar, not on the image.** It was on the
+  image first and device verification killed that: `BoxFit.contain` letterboxes
+  any poster whose ratio isn't 2:3, and a control pinned to the frame's corner
+  then floats in the empty band — measured at ~100pt clear of the artwork,
+  reading as a control for the whole screen. Anchoring it to the *painted*
+  image would mean resolving each image's intrinsic size first, which is why
+  it moved into `actions:` instead: always present, never letterboxed, and
+  sharing the bar with the fading title rather than swapping with it.
+  `PosterGalleryZoomController` is what lets it live outside the gallery — the
+  gallery attaches on init and **detaches on dispose**, so the screen can't be
+  left holding a zoom flag whose image is gone (that flag drives the list's
+  physics; stranded `true` means a permanently unscrollable screen).
+- **Zoom has four entry points on purpose, and they share one code path.**
+  Pinch, double tap, the app bar button and the hint text all end at
+  `_toggleZoom`, so
+  they cannot disagree about what "zoomed" means — and zooming out always
+  targets identity, which is what re-arms the swipe. Device verification found
+  buyers never discovering pinch at all; that matters more here than on a
+  normal gallery, because zooming *is* how condition gets inspected before
+  buying (BR-05, ADR-0003), hence the hint saying **why** to zoom rather
+  than how. The hint sits *above* the page dots and below the image on
+  purpose: under the dots it read as a caption describing them. The double tap is safe to add precisely because it needs no
+  travel: it resolves on tap count, never entering the slop race the fix above
+  turns on. Anything new that *does* drag (a dismiss-on-swipe-down, say) has
+  to re-check that race.
+  Also: assigning `_transformationController.value` directly bypasses
+  `InteractiveViewer`'s boundary clamp — it only enforces bounds inside its
+  own gesture handlers — so `_zoomedInMatrix` clamps the translation itself.
+  Skip that and a double tap near an edge parks blank space in frame.
+- **The app bar's title fades in; it does not collapse a header.** The bar
+  keeps its height and its back button at every offset, and
+  `_CollapsingAppBarTitle` only crosses the poster title in as the image
+  scrolls away. Hosting the gallery in a `FlexibleSpaceBar` instead would put
+  it back inside a scrollable that moves under the finger mid-zoom, undoing
+  the gesture work above — that's why this shape, not that one.
+  The fade is keyed to the image's height **capped at `maxScrollExtent`**.
+  Uncapped it is unreachable in the ordinary case: a 2:3 image on a phone is
+  ~537pt tall against ~500pt of total scroll, so the title would simply never
+  appear. Also note `maxScrollExtent`/`pixels` *throw* before the list has
+  laid out — the bar builds first, so both need a `hasContentDimensions` /
+  `hasPixels` guard rather than a default.
 - **`PosterErrorView` and `PosterNotFoundView` render through
   `AppStatusView`** (core/widgets/) — the same block SCR-03's error/empty
   states use. They keep their own identities (different copy, different

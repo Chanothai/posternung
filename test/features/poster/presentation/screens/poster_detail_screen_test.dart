@@ -49,6 +49,7 @@ PosterDetail _fullPoster({
   // condition) was never exercised by any test at all.
   PosterConditionGrade? conditionGrade = PosterConditionGrade.veryGood,
   List<PosterImage> images = const [],
+  String? studio = 'Warner Bros',
 }) => PosterDetail(
   id: 'p1',
   title: 'Blade Runner',
@@ -56,7 +57,7 @@ PosterDetail _fullPoster({
   status: status,
   conditionGrade: conditionGrade,
   eraDecade: 1982,
-  studio: 'Warner Bros',
+  studio: studio,
   primaryImageUrl: null,
   tmdbId: 78,
   size: '27x41 in',
@@ -98,6 +99,13 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
   }
 
+  /// The poster's title renders twice on the data state — as the listing
+  /// heading in the list, and again in the app bar, where it stays fully
+  /// transparent until the image scrolls past. Assertions about the heading
+  /// have to say which one they mean.
+  Finder listingTitle(String title) =>
+      find.descendant(of: find.byType(ListView), matching: find.text(title));
+
   Widget wrap({PosterDetail? detail, Object? error}) {
     return ProviderScope(
       overrides: [
@@ -125,7 +133,7 @@ void main() {
     await tester.pumpWidget(wrap(detail: _fullPoster()));
     await tester.pump();
 
-    expect(find.text('Blade Runner'), findsOneWidget);
+    expect(listingTitle('Blade Runner'), findsOneWidget);
     expect(find.textContaining('1982'), findsOneWidget);
     expect(find.textContaining('Warner Bros'), findsOneWidget);
     // High #1 — Thai Baht, never a dollar sign.
@@ -150,7 +158,7 @@ void main() {
     await tester.pump();
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Untitled Import'), findsOneWidget);
+    expect(listingTitle('Untitled Import'), findsOneWidget);
     // No era/studio → no subtitle line.
     expect(find.textContaining('•'), findsNothing);
     // is_authenticated: false → the "unverified" label, not "verified".
@@ -177,7 +185,7 @@ void main() {
       expect(find.text('โปสเตอร์ชิ้นนี้ถูกซื้อไปแล้ว'), findsOneWidget);
       expect(find.text('เลือกดูโปสเตอร์ชิ้นอื่น'), findsOneWidget);
       // Rest of the listing still renders below the banner.
-      expect(find.text('Blade Runner'), findsOneWidget);
+      expect(listingTitle('Blade Runner'), findsOneWidget);
     },
   );
 
@@ -323,6 +331,176 @@ void main() {
       expect(find.byType(PageView), findsOneWidget);
       expect(dotFinder(), findsNothing);
     });
+
+    // A zoomed image must keep the one-finger pan for itself, so the outer
+    // list has to stand down too — not just the PageView (see
+    // PosterDetailImageGallery's gesture-arena note). This pins the wiring
+    // only; it cannot prove the arena outcome on a real touch stream.
+    testWidgets('zooming an image stops the page from scrolling under it', (
+      tester,
+    ) async {
+      await useTallSurface(tester);
+      await tester.pumpWidget(wrap(detail: _fullPoster(images: images)));
+      await tester.pump();
+
+      ScrollPhysics? listPhysics() =>
+          tester.widget<ListView>(find.byType(ListView)).physics;
+
+      expect(listPhysics(), isA<AlwaysScrollableScrollPhysics>());
+
+      final centre = tester.getCenter(find.byType(PageView));
+      final left = await tester.startGesture(centre - const Offset(20, 0));
+      final right = await tester.startGesture(centre + const Offset(20, 0));
+      await tester.pump();
+      await left.moveTo(centre - const Offset(100, 0));
+      await right.moveTo(centre + const Offset(100, 0));
+      await tester.pump();
+      await left.up();
+      await right.up();
+      await tester.pumpAndSettle();
+
+      expect(listPhysics(), isA<NeverScrollableScrollPhysics>());
+    });
+  });
+
+  group('app bar zoom action', () {
+    const images = [
+      PosterImage(
+        id: 'img-1',
+        url: 'https://example.invalid/1.jpg',
+        isPrimary: true,
+        sortOrder: 0,
+      ),
+    ];
+
+    Finder inBar(Finder finder) =>
+        find.descendant(of: find.byType(AppBar), matching: finder);
+
+    testWidgets('shares the bar with the title rather than replacing it', (
+      tester,
+    ) async {
+      await useTallSurface(tester);
+      await tester.pumpWidget(wrap(detail: _fullPoster(images: images)));
+      await tester.pump();
+
+      expect(inBar(find.byIcon(Icons.zoom_in)), findsOneWidget);
+      expect(inBar(find.text('Blade Runner')), findsOneWidget);
+      expect(inBar(find.byIcon(Icons.arrow_back)), findsOneWidget);
+    });
+
+    testWidgets('zooms the gallery and locks the list behind it', (
+      tester,
+    ) async {
+      await useTallSurface(tester);
+      await tester.pumpWidget(wrap(detail: _fullPoster(images: images)));
+      await tester.pump();
+
+      await tester.tap(inBar(find.byIcon(Icons.zoom_in)));
+      await tester.pumpAndSettle();
+
+      // The glyph reports the state, so it has to follow it.
+      expect(inBar(find.byIcon(Icons.zoom_out)), findsOneWidget);
+      expect(
+        tester.widget<ListView>(find.byType(ListView)).physics,
+        isA<NeverScrollableScrollPhysics>(),
+      );
+    });
+
+    testWidgets('absent when the poster has no image to zoom', (tester) async {
+      await useTallSurface(tester);
+      await tester.pumpWidget(wrap(detail: _allNullFieldsPoster()));
+      await tester.pump();
+
+      expect(find.byIcon(Icons.zoom_in), findsNothing);
+    });
+  });
+
+  testWidgets(
+    'a blank studio shows the era alone, with no stranded separator',
+    (tester) async {
+      await useTallSurface(tester);
+      // Blank, not null — that is what the wire actually returns for some rows,
+      // and it used to render as "1982s •".
+      await tester.pumpWidget(wrap(detail: _fullPoster(studio: '')));
+      await tester.pump();
+
+      expect(find.text('1982s'), findsOneWidget);
+      expect(find.textContaining('•'), findsNothing);
+    },
+  );
+
+  group('collapsing app bar title', () {
+    /// The bar's copy of the title — the one outside the list.
+    double barTitleOpacity(WidgetTester tester) {
+      final opacity = tester.widget<Opacity>(
+        find.ancestor(
+          of: find.descendant(
+            of: find.byType(AppBar),
+            matching: find.text('Blade Runner'),
+          ),
+          matching: find.byType(Opacity),
+        ),
+      );
+      return opacity.opacity;
+    }
+
+    testWidgets('starts fully transparent so the poster leads on its own', (
+      tester,
+    ) async {
+      await useTallSurface(tester);
+      await tester.pumpWidget(wrap(detail: _fullPoster()));
+      await tester.pump();
+
+      expect(barTitleOpacity(tester), 0);
+      // The back button is there the whole time, faded title or not.
+      expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+    });
+
+    // Deliberately the *default* surface, not `useTallSurface`: a 2400pt-tall
+    // viewport leaves this listing with nothing to scroll at all, and the
+    // interesting case is the ordinary one where the image is taller than the
+    // scroll the content affords (see `_fadeProgress`'s maxScrollExtent cap).
+    testWidgets('fades in as the poster scrolls away', (tester) async {
+      await tester.pumpWidget(wrap(detail: _fullPoster()));
+      await tester.pump();
+
+      expect(barTitleOpacity(tester), 0);
+
+      await tester.drag(find.byType(ListView), const Offset(0, -2000));
+      await tester.pumpAndSettle();
+
+      expect(barTitleOpacity(tester), 1);
+    });
+
+    testWidgets('stays hidden when the listing does not scroll at all', (
+      tester,
+    ) async {
+      // Tall enough that everything fits — the poster never leaves, so the
+      // bar has no reason to name it.
+      await useTallSurface(tester);
+      await tester.pumpWidget(wrap(detail: _fullPoster()));
+      await tester.pumpAndSettle();
+
+      expect(barTitleOpacity(tester), 0);
+    });
+
+    testWidgets('no title at all while loading or failed', (tester) async {
+      await tester.pumpWidget(
+        wrap(
+          error: const CatalogException(
+            code: 'network_error',
+            message: 'ต่อเน็ตไม่ได้',
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        find.descendant(of: find.byType(AppBar), matching: find.byType(Text)),
+        findsNothing,
+      );
+      expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+    });
   });
 
   group('AC-5 — refresh on foreground resume (Medium #5)', () {
@@ -406,7 +584,11 @@ void main() {
       // 300px offset that's plenty on a normal-sized screen silently
       // undershoots here and the indicator just cancels instead of
       // refreshing. 900px clears that threshold with margin.
-      await tester.fling(find.text('Blade Runner'), const Offset(0, 900), 1000);
+      await tester.fling(
+        listingTitle('Blade Runner'),
+        const Offset(0, 900),
+        1000,
+      );
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
       await tester.pump(const Duration(seconds: 1));

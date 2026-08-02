@@ -218,6 +218,16 @@ abstract final class AppTextStyles {
     color: AppColors.textPrimary,
   );
 
+  /// Caption under the poster-detail gallery. Muted on purpose — it explains
+  /// why zooming is worth doing, so it must not compete with the title/price
+  /// underneath it.
+  static final TextStyle imageHintLabel = GoogleFonts.kanit(
+    fontSize: 12,
+    height: 16 / 12,
+    fontWeight: FontWeight.normal,
+    color: AppColors.textSecondary,
+  );
+
   // --- Status views (error / empty / not found) ---
   // Used by core/widgets/app_status_view.dart, i.e. by every screen-level
   // failure/empty state. Deliberately its own scale rather than reusing

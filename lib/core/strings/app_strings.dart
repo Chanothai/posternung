@@ -175,6 +175,12 @@ abstract final class AppStrings {
   static const String conditionGradeUnspecifiedLabel = 'ไม่ระบุสภาพ';
 
   // --- Poster Detail (SCR-05) ---
+  // Says *why* to zoom, not how — inspecting condition before buying is the
+  // job (BR-05/ADR-0003), and a gesture instruction would go stale the
+  // moment the affordance changes.
+  static const String posterDetailZoomHint = 'ดูรายละเอียดสภาพ';
+  static const String posterDetailZoomInTooltip = 'ขยายดูรายละเอียดสภาพ';
+  static const String posterDetailZoomOutTooltip = 'ย่อกลับ';
   static const String posterDetailSingleStockNotice =
       'มีชิ้นเดียว ของหายากที่เมื่อขายแล้วจะไม่กลับมาอีก';
   static const String posterDetailReservedNotice =
