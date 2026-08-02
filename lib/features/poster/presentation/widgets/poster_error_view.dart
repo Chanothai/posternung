@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/strings/app_strings.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/app_status_view.dart';
 
 /// Generic failure state — network/server errors and any other
 /// `CatalogException` that isn't `POSTER_NOT_FOUND` (see
 /// `PosterNotFoundView` for that specific case). Unlike the not-found view,
 /// this one offers retry since the same request can plausibly succeed on a
 /// second try.
+///
+/// Rendered by the shared `AppStatusView` (core/widgets/) — same block Home
+/// uses for its error/empty states.
 class PosterErrorView extends StatelessWidget {
   const PosterErrorView({super.key, this.message, required this.onRetry});
 
@@ -26,37 +28,16 @@ class PosterErrorView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.error_outline,
-              size: 48,
-              color: AppColors.accentRed,
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              AppStrings.posterDetailErrorTitle,
-              style: AppTextStyles.authCardHeading,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              message ?? AppStrings.posterDetailErrorBody,
-              style: AppTextStyles.cardSubtitle,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            OutlinedButton(
-              onPressed: onRetry,
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.borderMuted),
-              ),
-              child: Text(AppStrings.posterDetailErrorRetryCta),
-            ),
-          ],
+        child: AppStatusView(
+          icon: Icons.wifi_off_rounded,
+          tone: AppStatusTone.error,
+          title: AppStrings.posterDetailErrorTitle,
+          body: message ?? AppStrings.posterDetailErrorBody,
+          actionLabel: AppStrings.posterDetailErrorRetryCta,
+          actionIcon: Icons.refresh_rounded,
+          onAction: onRetry,
         ),
       ),
     );

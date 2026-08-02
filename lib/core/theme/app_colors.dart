@@ -15,4 +15,11 @@ abstract final class AppColors {
   // --- Home ---
   static const Color accentRed = Color(0xFFB54A35);
   static const Color posterPlaceholderFill = Color(0x80000000);
+
+  // --- Status views (error / empty / not found) ---
+  // Low-alpha washes of the two accents, used as the halo behind a status
+  // icon. Alpha rather than a flat blend so they sit correctly on both the
+  // gradient background and the glass card fill.
+  static const Color accentRedSoft = Color(0x24B54A35);
+  static const Color accentSoft = Color(0x24A67C52);
 }

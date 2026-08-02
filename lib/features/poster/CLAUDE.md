@@ -100,6 +100,11 @@ presentation/
 
 ## Things worth knowing before touching this feature
 
+- **`PosterErrorView` and `PosterNotFoundView` render through
+  `AppStatusView`** (core/widgets/) — the same block SCR-03's error/empty
+  states use. They keep their own identities (different copy, different
+  tone, retry vs. go-back) but no longer own any layout or styling; adjust
+  the shared widget rather than restyling one of them in place.
 - **This round is read-only (ADR-0005 §D1).** No Add to Cart, no quantity
   selector — `POST /cart/reserve/{poster_id}` is still `x-status: DRAFT` in
   the contract. Don't add a purchase CTA here without checking whether that
