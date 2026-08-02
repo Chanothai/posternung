@@ -118,10 +118,7 @@ abstract final class AppStrings {
       'อีเมลนี้เคยสมัครไว้ด้วยวิธีอื่นแล้ว กรุณาเข้าสู่ระบบด้วยวิธีเดิม';
 
   // --- Home ---
-  static const String homeSectionFeaturedCollections = 'Featured Collections';
-  static const String homeSectionEndingSoon = 'Ending Soon';
   static const String homeSectionAllPosters = 'All Posters';
-  static const String homeViewAllLink = 'View all ';
   static const String homeLoadMoreButton = 'Load More Titles';
   static const String homeNavHome = 'Home';
   static const String homeNavSearch = 'Search';
@@ -131,6 +128,24 @@ abstract final class AppStrings {
   static const String homeBrandTitle = 'Cinevault 2';
   static const String homeSearchPlaceholder =
       'Search movies, directors, years...';
+
+  // --- Home / Discover catalog list (SCR-03, GET /posters) ---
+  /// AC-4 — a poster that is no longer for sale must say so on the card
+  /// itself, rather than looking buyable until the user taps into it.
+  static const String homePosterSoldBadge = 'ขายแล้ว';
+
+  /// Covers `reserved` **and** a status this client doesn't recognize —
+  /// both mean "we can't tell the user this is buyable", and neither is
+  /// worth a distinct word here.
+  static const String homePosterUnavailableBadge = 'ไม่พร้อมขาย';
+  static const String homePostersEmptyTitle = 'ยังไม่มีโปสเตอร์ให้ชมตอนนี้';
+  static const String homePostersEmptyBody =
+      'เรากำลังคัดโปสเตอร์ต้นฉบับชิ้นใหม่เข้าร้าน กลับมาดูอีกครั้งเร็ว ๆ นี้';
+  static const String homePostersErrorTitle = 'โหลดรายการโปสเตอร์ไม่สำเร็จ';
+  static const String homePostersErrorBody =
+      'กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่อีกครั้ง';
+  static const String homePostersRetryCta = 'ลองใหม่อีกครั้ง';
+  static const String homeWishlistButtonTooltip = 'เพิ่มลงรายการที่อยากได้';
 
   // --- Condition grade guide (shared bottom sheet — ADR-0003, used from
   // ConditionGradeIndicator in core/widgets/) ---

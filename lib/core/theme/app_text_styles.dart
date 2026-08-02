@@ -162,21 +162,6 @@ abstract final class AppTextStyles {
     color: AppColors.textPrimary,
   );
 
-  static final TextStyle homeCollectionEyebrow = GoogleFonts.kanit(
-    fontSize: 10,
-    height: 15 / 10,
-    fontWeight: FontWeight.bold,
-    letterSpacing: 1,
-    color: AppColors.accent,
-  );
-
-  static final TextStyle homeCollectionTitle = GoogleFonts.kanit(
-    fontSize: 18,
-    height: 22.5 / 18,
-    fontWeight: FontWeight.bold,
-    color: AppColors.textPrimary,
-  );
-
   static final TextStyle homeSearchPlaceholder = GoogleFonts.kanit(
     fontSize: 14,
     fontWeight: FontWeight.normal,
