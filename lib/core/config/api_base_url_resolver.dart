@@ -26,7 +26,7 @@ String apiBaseUrlFor(Environment environment) {
     // `flutter run --flavor sit --dart-define=API_BASE_URL=http://<your-ip>:8000`
     // Different target, different address: Android Emulator → `10.0.2.2`,
     // iOS Simulator → `127.0.0.1` (both reach the host machine directly).
-    Environment.sit => 'http://192.168.68.102:8000',
+    Environment.sit => 'http://172.20.10.12:8000',
     Environment.uat => '', // no backend deployed for UAT yet
     Environment.production => 'https://api.posternung.com',
   };

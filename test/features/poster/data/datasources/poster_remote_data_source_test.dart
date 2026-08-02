@@ -139,4 +139,112 @@ void main() {
       );
     });
   });
+
+  group('listPosters', () {
+    Map<String, dynamic> pageJson() => {
+      'items': [
+        {
+          'id': 'p1',
+          'title': 'Blade Runner',
+          'price': '450.00',
+          'status': 'available',
+          'condition_grade': 'mint',
+          'era_decade': 1980,
+          'studio': 'Warner Bros',
+          'primary_image_url': null,
+        },
+      ],
+      'total': 1,
+      'limit': 20,
+      'offset': 0,
+    };
+
+    test('GETs /api/v1/posters with limit/offset as query params and no '
+        'others', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer((_) async => _resp(pageJson()));
+
+      final result = await dataSource.listPosters(limit: 20, offset: 40);
+
+      expect(result.items.single.id, 'p1');
+      expect(result.total, 1);
+      final captured = verify(
+        () => dio.get<Map<String, dynamic>>(
+          captureAny(),
+          queryParameters: captureAny(named: 'queryParameters'),
+        ),
+      ).captured;
+      expect(captured[0], '/api/v1/posters');
+      // No `sort` param exists in the contract; anything extra here would be
+      // silently ignored by the backend and mislead the next reader.
+      expect(captured[1], {'limit': 20, 'offset': 40});
+    });
+
+    test('maps a no-response failure to code network_error', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenThrow(_dioNoResponse());
+
+      expect(
+        () => dataSource.listPosters(limit: 20, offset: 0),
+        throwsA(
+          isA<CatalogException>().having(
+            (e) => e.code,
+            'code',
+            'network_error',
+          ),
+        ),
+      );
+    });
+
+    test('maps a 5xx to code server_error — the backend 500s the whole list '
+        'when any one row has an internal-only image key', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenThrow(_dioError(500));
+
+      expect(
+        () => dataSource.listPosters(limit: 20, offset: 0),
+        throwsA(
+          isA<CatalogException>().having((e) => e.code, 'code', 'server_error'),
+        ),
+      );
+    });
+
+    test('a malformed body reaches the caller as a CatalogException, not a '
+        'bare TypeError', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          any(),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          data: null,
+          requestOptions: RequestOptions(path: '/'),
+        ),
+      );
+
+      expect(
+        () => dataSource.listPosters(limit: 20, offset: 0),
+        throwsA(
+          isA<CatalogException>().having(
+            (e) => e.code,
+            'code',
+            startsWith('unexpected_'),
+          ),
+        ),
+      );
+    });
+  });
 }

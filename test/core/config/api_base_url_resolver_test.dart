@@ -10,7 +10,7 @@ void main() {
     // runtime — verified manually via
     // `flutter run --dart-define=API_BASE_URL=...` instead.
     test('sit points at the local backend over the developer LAN', () {
-      expect(apiBaseUrlFor(Environment.sit), 'http://192.168.68.102:8000');
+      expect(apiBaseUrlFor(Environment.sit), 'http://172.20.10.12:8000');
     });
 
     test('uat has no backend deployed yet', () {
