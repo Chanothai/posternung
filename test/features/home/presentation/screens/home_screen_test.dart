@@ -8,8 +8,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:posternung/core/catalog/poster_condition_grade.dart';
 import 'package:posternung/core/error/catalog_exception.dart';
+import 'package:posternung/core/strings/app_strings.dart';
 import 'package:posternung/features/auth/presentation/providers/auth_providers.dart';
 import 'package:posternung/features/home/presentation/screens/home_screen.dart';
+import 'package:posternung/features/home/presentation/widgets/home_top_bar.dart';
 import 'package:posternung/features/poster/domain/entities/paginated_posters.dart';
 import 'package:posternung/features/poster/domain/entities/poster_status.dart';
 import 'package:posternung/features/poster/domain/entities/poster_summary.dart';
@@ -76,6 +78,35 @@ void main() {
       ),
     ).thenAnswer((_) async => page);
   }
+
+  /// Slices [catalog] the way the backend does, but never hands back more
+  /// than [pageSize] rows per request — so a paging test needs four cards
+  /// rather than forty and still lays out on a test surface.
+  void stubCatalog(List<PosterSummary> catalog, {int pageSize = 2}) {
+    when(
+      () => repository.listPosters(
+        limit: any(named: 'limit'),
+        offset: any(named: 'offset'),
+      ),
+    ).thenAnswer((invocation) async {
+      final limit = invocation.namedArguments[#limit] as int;
+      final offset = invocation.namedArguments[#offset] as int;
+      return PaginatedPosters(
+        items: catalog
+            .skip(offset)
+            .take(limit < pageSize ? limit : pageSize)
+            .toList(),
+        total: catalog.length,
+        limit: limit,
+        offset: offset,
+      );
+    });
+  }
+
+  List<PosterSummary> catalogOf(int count) => List.generate(
+    count,
+    (i) => _summary(id: 'poster-$i', title: 'Poster $i'),
+  );
 
   void stubListError([
     Object error = const CatalogException(
@@ -150,7 +181,7 @@ void main() {
         findsOneWidget,
       );
       // Nothing to page through when the catalog itself is empty.
-      expect(find.text('Load More Titles'), findsNothing);
+      expect(find.textContaining('แสดง'), findsNothing);
     });
   });
 
@@ -434,6 +465,169 @@ void main() {
     });
   });
 
+  group('load more (pagination)', () {
+    testWidgets('a catalog bigger than what is loaded says how much is shown '
+        'and pages the rest in', (tester) async {
+      await useTallSurface(tester);
+      stubCatalog(catalogOf(4));
+
+      await tester.pumpWidget(wrap());
+      await tester.pumpAndSettle();
+
+      expect(find.text('แสดง 2 จาก 4 รายการ'), findsOneWidget);
+      expect(find.text('Poster 2'), findsNothing);
+
+      await tester.tap(find.text(AppStrings.homeLoadMoreButton));
+      await tester.pumpAndSettle();
+
+      // The first page is still there — this appends, it does not replace.
+      expect(find.text('Poster 0'), findsOneWidget);
+      expect(find.text('Poster 2'), findsOneWidget);
+      expect(find.text('Poster 3'), findsOneWidget);
+      verify(() => repository.listPosters(limit: 20, offset: 2)).called(1);
+    });
+
+    testWidgets('the pager disappears once the whole catalog is loaded — no '
+        'button that would fetch an empty page', (tester) async {
+      await useTallSurface(tester);
+      stubCatalog(catalogOf(4));
+
+      await tester.pumpWidget(wrap());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.homeLoadMoreButton));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.homeLoadMoreButton), findsNothing);
+      expect(find.textContaining('แสดง'), findsNothing);
+    });
+
+    testWidgets('a catalog that fits in one page never shows a pager at all', (
+      tester,
+    ) async {
+      await useTallSurface(tester);
+      stubList(_page([_summary()]));
+
+      await tester.pumpWidget(wrap());
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('แสดง'), findsNothing);
+      expect(find.byType(OutlinedButton), findsNothing);
+    });
+
+    testWidgets('while the next page is in flight the button says so and the '
+        'grid stays on screen', (tester) async {
+      await useTallSurface(tester);
+      stubCatalog(catalogOf(4));
+
+      await tester.pumpWidget(wrap());
+      await tester.pumpAndSettle();
+
+      final completer = Completer<PaginatedPosters>();
+      when(
+        () => repository.listPosters(
+          limit: any(named: 'limit'),
+          offset: any(named: 'offset'),
+        ),
+      ).thenAnswer((_) => completer.future);
+
+      await tester.tap(find.text(AppStrings.homeLoadMoreButton));
+      await tester.pump();
+
+      expect(find.text(AppStrings.homeLoadMoreLoading), findsOneWidget);
+      // The grid the user is reading must not be swapped for a spinner.
+      expect(find.text('Poster 0'), findsOneWidget);
+      // Disabled, so the button cannot be hammered into a queue.
+      final button = tester.widget<OutlinedButton>(find.byType(OutlinedButton));
+      expect(button.onPressed, isNull);
+
+      completer.complete(
+        PaginatedPosters(items: const [], total: 4, limit: 20, offset: 2),
+      );
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('a failed page reports itself under the grid and offers a '
+        'retry — it never replaces the posters already on screen', (
+      tester,
+    ) async {
+      await useTallSurface(tester);
+      stubCatalog(catalogOf(4));
+
+      await tester.pumpWidget(wrap());
+      await tester.pumpAndSettle();
+
+      stubListError(
+        const CatalogException(
+          code: 'network_error',
+          message: 'โหลดหน้าถัดไปไม่ได้',
+        ),
+      );
+      await tester.tap(find.text(AppStrings.homeLoadMoreButton));
+      await tester.pumpAndSettle();
+
+      expect(find.text('โหลดหน้าถัดไปไม่ได้'), findsOneWidget);
+      expect(find.text('Poster 0'), findsOneWidget);
+      // The screen-level error state belongs to a *first* page that failed;
+      // an optional extra page must never escalate to it.
+      expect(find.text('โหลดรายการโปสเตอร์ไม่สำเร็จ'), findsNothing);
+
+      stubCatalog(catalogOf(4));
+      await tester.tap(find.text(AppStrings.homePostersRetryCta));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Poster 3'), findsOneWidget);
+      expect(find.text('โหลดหน้าถัดไปไม่ได้'), findsNothing);
+    });
+  });
+
+  group('when Home talks to the backend', () {
+    testWidgets('coming back from the background does not re-fetch — the '
+        'catalog is read on demand, not on every foreground switch', (
+      tester,
+    ) async {
+      await useTallSurface(tester);
+      stubCatalog(catalogOf(4));
+
+      await tester.pumpWidget(wrap());
+      await tester.pumpAndSettle();
+      clearInteractions(repository);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      verifyNever(
+        () => repository.listPosters(
+          limit: any(named: 'limit'),
+          offset: any(named: 'offset'),
+        ),
+      );
+    });
+
+    testWidgets('pull-to-refresh does re-fetch — it is the user-triggered '
+        'path that replaced the app-resume one', (tester) async {
+      await useTallSurface(tester);
+      stubCatalog(catalogOf(4));
+
+      await tester.pumpWidget(wrap());
+      await tester.pumpAndSettle();
+      clearInteractions(repository);
+
+      // Same pattern (and same 900px) as `poster_detail_screen_test.dart`'s
+      // pull-to-refresh test: `RefreshIndicator` only arms once the drag
+      // covers ~25% of the viewport, which is ~600px on the 2400px test
+      // surface, and `pumpAndSettle()` doesn't reliably resolve all three of
+      // the indicator's animation phases.
+      await tester.fling(find.text('Poster 0'), const Offset(0, 900), 1000);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+
+      verify(() => repository.listPosters(limit: 20, offset: 0)).called(1);
+    });
+  });
+
   group('surrounding chrome (unchanged by SCR-03)', () {
     testWidgets('renders the brand title and the catalog section heading', (
       tester,
@@ -444,8 +638,19 @@ void main() {
       await tester.pumpWidget(wrap());
       await tester.pumpAndSettle();
 
-      expect(find.text('Cinevault 2'), findsOneWidget);
-      expect(find.text('All Posters'), findsOneWidget);
+      // The brand title is matched inside the top bar rather than by a bare
+      // `find.text`: Home's copy is Thai now and `homeBrandTitle` currently
+      // reads the same as the "หน้าหลัก" nav tab, so a global text finder
+      // would match two widgets and fail for a reason that has nothing to
+      // do with the top bar rendering.
+      expect(
+        find.descendant(
+          of: find.byType(HomeTopBar),
+          matching: find.text(AppStrings.homeBrandTitle),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('โปสเตอร์ทั้งหมด'), findsOneWidget);
       // Cut this round — no curation table, no expiry field behind them.
       expect(find.text('Featured Collections'), findsNothing);
       expect(find.text('Ending Soon'), findsNothing);
@@ -458,21 +663,7 @@ void main() {
       await tester.pumpWidget(wrap());
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Search'));
-      await tester.pump();
-
-      expect(find.text('ฟีเจอร์นี้กำลังจะมาเร็ว ๆ นี้'), findsOneWidget);
-    });
-
-    testWidgets('"Load More Titles" is still coming-soon — nothing paginates '
-        'yet', (tester) async {
-      await useTallSurface(tester);
-      stubList(_page([_summary()]));
-
-      await tester.pumpWidget(wrap());
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Load More Titles'));
+      await tester.tap(find.text('ค้นหา'));
       await tester.pump();
 
       expect(find.text('ฟีเจอร์นี้กำลังจะมาเร็ว ๆ นี้'), findsOneWidget);
@@ -498,7 +689,7 @@ void main() {
       await tester.pumpWidget(wrap());
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Profile'));
+      await tester.tap(find.text('โปรไฟล์'));
       await tester.pump();
 
       expect(authViewModel.signOutCalled, isTrue);

@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/error/catalog_exception.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../poster/domain/entities/paginated_posters.dart';
 import '../../../poster/presentation/screens/poster_detail_screen.dart';
 import '../providers/home_posters_provider.dart';
-import 'home_coming_soon.dart';
+import '../state/home_posters_state.dart';
+import 'home_load_more_footer.dart';
 import 'home_poster_card.dart';
 import 'home_posters_empty_view.dart';
 import 'home_posters_error_view.dart';
@@ -61,9 +60,13 @@ class HomeAllPostersSection extends ConsumerWidget {
               // error view looking untouched.
               onRetry: () => ref.read(homePostersProvider.notifier).retry(),
             ),
-            data: (page) => page.total == 0
+            data: (posters) => posters.total == 0
                 ? const HomePostersEmptyView()
-                : _Grid(page: page),
+                : _Grid(
+                    posters: posters,
+                    onLoadMore: () =>
+                        ref.read(homePostersProvider.notifier).loadMore(),
+                  ),
           ),
         ],
       ),
@@ -72,9 +75,10 @@ class HomeAllPostersSection extends ConsumerWidget {
 }
 
 class _Grid extends StatelessWidget {
-  const _Grid({required this.page});
+  const _Grid({required this.posters, required this.onLoadMore});
 
-  final PaginatedPosters page;
+  final HomePostersState posters;
+  final VoidCallback onLoadMore;
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +87,7 @@ class _Grid extends StatelessWidget {
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: page.items.length,
+          itemCount: posters.items.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             crossAxisSpacing: AppSpacing.lg,
@@ -94,7 +98,7 @@ class _Grid extends StatelessWidget {
           // Never sort by price here — BR-05 (see
           // `PosterRepository.listPosters`).
           itemBuilder: (context, index) {
-            final poster = page.items[index];
+            final poster = posters.items[index];
             return HomePosterCard(
               poster: poster,
               onTap: () => Navigator.of(context).push(
@@ -109,32 +113,7 @@ class _Grid extends StatelessWidget {
             );
           },
         ),
-        Padding(
-          padding: const EdgeInsets.only(top: AppSpacing.lg),
-          child: Center(
-            child: OutlinedButton(
-              // Still coming-soon: `listPosters` takes `offset`, but nothing
-              // paginates yet — Home shows the first page only, and browsing
-              // deeper is SCR-04's job. Left honest rather than wired to a
-              // half-built pager.
-              onPressed: () => showComingSoonSnackBar(context),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.borderMuted),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xl,
-                  vertical: AppSpacing.md,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.full),
-                ),
-              ),
-              child: Text(
-                AppStrings.homeLoadMoreButton,
-                style: AppTextStyles.homeLoadMoreLabel,
-              ),
-            ),
-          ),
-        ),
+        HomeLoadMoreFooter(state: posters, onLoadMore: onLoadMore),
       ],
     );
   }

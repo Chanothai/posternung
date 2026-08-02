@@ -118,14 +118,13 @@ abstract final class AppStrings {
       'อีเมลนี้เคยสมัครไว้ด้วยวิธีอื่นแล้ว กรุณาเข้าสู่ระบบด้วยวิธีเดิม';
 
   // --- Home ---
-  static const String homeSectionAllPosters = 'All Posters';
-  static const String homeLoadMoreButton = 'Load More Titles';
-  static const String homeNavHome = 'Home';
-  static const String homeNavSearch = 'Search';
-  static const String homeNavWishlist = 'Wishlist';
-  static const String homeNavCart = 'Cart';
-  static const String homeNavProfile = 'Profile';
-  static const String homeBrandTitle = 'Cinevault 2';
+  static const String homeSectionAllPosters = 'โปสเตอร์ทั้งหมด';
+  static const String homeNavHome = 'หน้าหลัก';
+  static const String homeNavSearch = 'ค้นหา';
+  static const String homeNavWishlist = 'รายการที่ชอบ';
+  static const String homeNavCart = 'ตะกร้าสินค้า';
+  static const String homeNavProfile = 'โปรไฟล์';
+  static const String homeBrandTitle = 'หน้าหลัก';
   static const String homeSearchPlaceholder =
       'Search movies, directors, years...';
 
@@ -146,6 +145,26 @@ abstract final class AppStrings {
       'กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่อีกครั้ง';
   static const String homePostersRetryCta = 'ลองใหม่อีกครั้ง';
   static const String homeWishlistButtonTooltip = 'เพิ่มลงรายการที่อยากได้';
+
+  /// Shown above the pager while the catalog has more rows than the grid is
+  /// holding, so the button says how much more there is rather than just
+  /// "more". `{shown}`/`{total}` are substituted at the call site. Hidden
+  /// once everything is loaded — "แสดง 7 จาก 7" states the obvious.
+  static const String homeCatalogShownOfTotal =
+      'แสดง {shown} จาก {total} รายการ';
+
+  /// The pager itself. An earlier round of SCR-03 had this button raise a
+  /// coming-soon snackbar with no pagination behind it; it now appends a
+  /// real page (`GET /posters?offset=`), and must never go back to being
+  /// decorative — a control that loads nothing reads as broken.
+  static const String homeLoadMoreButton = 'โหลดเพิ่มเติม';
+  static const String homeLoadMoreLoading = 'กำลังโหลด...';
+
+  /// A page *after* the first failed. Deliberately its own copy rather than
+  /// [homePostersErrorTitle]: nothing on screen is broken, the grid the user
+  /// is reading is intact, and only the extra rows are missing.
+  static const String homeLoadMoreErrorBody =
+      'โหลดรายการเพิ่มเติมไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
 
   // --- Condition grade guide (shared bottom sheet — ADR-0003, used from
   // ConditionGradeIndicator in core/widgets/) ---

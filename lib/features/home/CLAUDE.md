@@ -11,15 +11,18 @@ state — the ViewModel — and its widgets.
 ```
 presentation/
   providers/  # home_posters_provider.dart — HomePostersViewModel,
-              # AsyncNotifier<PaginatedPosters> over features/poster/'s
+              # AsyncNotifier<HomePostersState> over features/poster/'s
               # GetPosters usecase. Auto-retry is switched OFF (see below).
-  screens/    # HomeScreen — top bar + catalog grid + bottom nav, wrapped in a
-              # RefreshIndicator, and a WidgetsBindingObserver that refreshes
-              # on app resume.
+  state/      # home_posters_state.dart — the accumulated grid plus
+              # isLoadingMore/loadMoreError, i.e. the two paging facts an
+              # AsyncValue cannot hold without discarding the grid.
+  screens/    # HomeScreen — top bar + catalog grid + bottom nav, wrapped in
+              # a RefreshIndicator. No lifecycle observer: this screen calls
+              # the backend only when the user asks (see below).
   widgets/    # HomeTopBar, HomeTopBarHeaderDelegate, HomeBottomNavBar,
               # HomeAllPostersSection (owns all four required states),
-              # HomePosterCard, HomePostersEmptyView, HomePostersErrorView,
-              # home_coming_soon.dart
+              # HomePosterCard, HomeLoadMoreFooter, HomePostersEmptyView,
+              # HomePostersErrorView, home_coming_soon.dart
 ```
 
 ## Things worth knowing before touching this feature
@@ -61,11 +64,16 @@ presentation/
   `go_router`: there's no route table yet and adding one is SCR-06's call. The
   id must come from the API — an earlier attempt used placeholder ids and
   404'd on every tap (`lib/features/poster/CLAUDE.md`).
-- **A poster can sell while the grid is on screen.** Handled by re-fetching on
-  pull-to-refresh and on `AppLifecycleState.resumed`, not by polling — the
-  affected card flips to its unavailable state in place. This is the
-  `stock-integrity` skill's mobile requirement; don't remove either trigger
-  without replacing it with something better.
+- **Home calls the backend only when the user asks it to** — pull-to-refresh,
+  the load-more pager, retry. There is **no** `WidgetsBindingObserver`
+  re-fetching on `AppLifecycleState.resumed` (removed deliberately: every
+  foreground switch re-read the whole loaded span, up to N requests once the
+  user had paged down). Don't add polling or a lifecycle trigger back without
+  saying explicitly what changed. A poster that sells while the app is
+  backgrounded therefore keeps its old badge on the grid until the user pulls
+  to refresh — `stock-integrity`'s mobile requirement is still met at the
+  point it matters, because `PosterDetailScreen` **does** re-fetch on resume
+  and shows `PosterSoldBanner`, so nothing can be bought off a stale card.
 - **`HomePosterCard`'s layout constraints are load-bearing.** The image is
   `Expanded` so the card absorbs the grid's fixed `mainAxisExtent` there
   rather than overflowing when the text block grows; price and condition are
@@ -74,11 +82,42 @@ presentation/
   `ConditionGradeIndicator(compact: true)` from `core/widgets/` — **never** a
   bare `Text(grade)`, which is what this screen did before and what ADR-0003
   forbids ("Fine" outranks "Very Good", so a lone label misleads).
+- **The error and empty states are `AppStatusView` (core/widgets/), not their
+  own layouts.** `HomePostersErrorView`/`HomePostersEmptyView` are now thin
+  wrappers that pick the icon, tone, copy and CTA; the card, typography and
+  pill button come from the shared widget SCR-05's error/not-found views also
+  use. Change the look there, not here, or the two screens drift apart again.
 - Affordances still not backed by anything real — search, wishlist heart,
-  cart, "Load More Titles" — go through `showComingSoonSnackBar()` in
-  `home_coming_soon.dart`. Reuse that helper rather than another ad hoc
-  `SnackBar`. `listPosters` does accept `offset`, but nothing paginates yet;
-  Home shows the first page only and deeper browsing is SCR-04's job.
+  cart — go through `showComingSoonSnackBar()` in `home_coming_soon.dart`.
+  Reuse that helper rather than another ad hoc `SnackBar`.
+- **The grid pages, and paging is what shapes the state class.**
+  `HomeLoadMoreFooter` appends the next 20 rows (`GET /posters?offset=`) and
+  renders only while `items.length < total`, so a fully-loaded catalog shows
+  neither a count line nor a button that would fetch an empty page. The two
+  facts a paging screen needs — *loading more* and *this page failed* — both
+  happen while data is on screen, so they live on `HomePostersState`
+  (`presentation/state/`), **not** on the `AsyncValue`: flipping the
+  provider to `AsyncLoading`/`AsyncError` for an optional extra page would
+  throw away the grid the user is reading. Keep it that way. The
+  `AsyncValue` union still covers the *first* page only.
+- **`refresh()` re-reads the whole loaded span, not page one.** Once the user
+  has paged to 60 rows, refreshing only the first 20 would leave 40 stale
+  rows — and staleness is the entire reason this screen refreshes
+  (`stock-integrity`). `_fetchSpan` asks for `items.length` rows, split into
+  consecutive chunks of at most `GetPosters.maxLimit` (100) because the
+  contract 422s above that. Never collapse it back to a single-page fetch.
+- **Rows are deduped by id on every append and every multi-chunk refresh.**
+  Offset pagination over `created_at DESC` re-sends the boundary row
+  whenever a poster is listed between two requests; without
+  `HomePostersState._mergeById` the grid would show it twice.
+- **All three entry points (`refresh`/`retry`/`loadMore`) share one
+  `_inFlight` slot** — a load-more tap landing mid-refresh joins it rather
+  than appending to a list being rewritten underneath it. The slot is
+  cleared via `whenComplete` on the tracked future, *not* a `finally` inside
+  the async body: a data source that throws synchronously never reaches its
+  first `await`, so a `finally` would run before `_inFlight` was assigned
+  and wedge the slot permanently. This was a real bug, caught by the
+  load-more retry test.
 - The bottom nav's Profile tab calls
   `ref.read(authViewModelProvider.notifier).signOut()` directly (from
   `features/auth/`) — the one place `home/` reaches into `auth/`'s
