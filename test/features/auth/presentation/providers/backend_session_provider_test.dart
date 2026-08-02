@@ -205,6 +205,37 @@ void main() {
         ).called(1);
       },
     );
+
+    test('deletes the Firebase account again if the exchange fails, and '
+        'still surfaces the original error', () async {
+      when(() => storage.readAccessToken()).thenAnswer((_) async => null);
+      when(
+        () => emailPassword.register(email: 'new@b.com', password: 'pw'),
+      ).thenAnswer((_) async => 'id-tok');
+      when(() => backend.firebaseLogin('id-tok')).thenThrow(
+        const AuthException(code: 'network_error', message: 'ผิดพลาด'),
+      );
+      when(() => emailPassword.deleteCurrentUser()).thenAnswer((_) async {});
+
+      final container = makeContainer();
+      await container.read(backendSessionProvider.future);
+
+      await expectLater(
+        container
+            .read(backendSessionProvider.notifier)
+            .registerWithEmailPassword(email: 'new@b.com', password: 'pw'),
+        throwsA(isA<AuthException>()),
+      );
+
+      verify(() => emailPassword.deleteCurrentUser()).called(1);
+      // No half-registered session — the app must not read as logged in.
+      verifyNever(
+        () => storage.save(
+          accessToken: any(named: 'accessToken'),
+          refreshToken: any(named: 'refreshToken'),
+        ),
+      );
+    });
   });
 
   group('signOut', () {
