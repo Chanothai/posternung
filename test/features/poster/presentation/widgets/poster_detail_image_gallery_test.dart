@@ -41,8 +41,17 @@ void main() {
     createdAt: DateTime.utc(2024),
   );
 
-  Future<List<bool>> pumpGallery(WidgetTester tester, {int imageCount = 2}) {
+  /// Records every zoom-state change the controller publishes, which is what
+  /// the app bar button and the screen's scroll physics both read.
+  Future<List<bool>> pumpGallery(
+    WidgetTester tester, {
+    int imageCount = 2,
+    PosterGalleryZoomController? controller,
+  }) {
+    final zoomController = controller ?? PosterGalleryZoomController();
     final events = <bool>[];
+    zoomController.addListener(() => events.add(zoomController.isZoomed));
+    addTearDown(zoomController.dispose);
     return tester
         .pumpWidget(
           MaterialApp(
@@ -56,7 +65,7 @@ void main() {
                   width: 300,
                   child: PosterDetailImageGallery(
                     poster: poster(imageCount: imageCount),
-                    onZoomChanged: events.add,
+                    zoomController: zoomController,
                   ),
                 ),
               ),
@@ -159,24 +168,56 @@ void main() {
     expect(pageViewPhysics(tester), isNull);
   });
 
-  testWidgets('the zoom button zooms in, then back out', (tester) async {
+  testWidgets('the controller drives the same zoom the gestures do', (
+    tester,
+  ) async {
+    final controller = PosterGalleryZoomController();
+    final events = await pumpGallery(tester, controller: controller);
+
+    controller.toggle();
+    await tester.pumpAndSettle();
+
+    expect(events, [true]);
+    expect(controller.isZoomed, isTrue);
+    expect(pageViewPhysics(tester), isA<NeverScrollableScrollPhysics>());
+
+    controller.toggle();
+    await tester.pumpAndSettle();
+
+    expect(events, [true, false]);
+    expect(controller.isZoomed, isFalse);
+    expect(pageViewPhysics(tester), isNull);
+  });
+
+  testWidgets('tapping the hint zooms — it is a control, not a caption', (
+    tester,
+  ) async {
     final events = await pumpGallery(tester);
 
-    expect(find.byIcon(Icons.zoom_in), findsOneWidget);
-
-    await tester.tap(find.byIcon(Icons.zoom_in));
+    await tester.tap(find.text(AppStrings.posterDetailZoomHint));
     await tester.pumpAndSettle();
 
     expect(events, [true]);
     expect(pageViewPhysics(tester), isA<NeverScrollableScrollPhysics>());
-    // The glyph reports the state, so it must follow it.
-    expect(find.byIcon(Icons.zoom_out), findsOneWidget);
+  });
 
-    await tester.tap(find.byIcon(Icons.zoom_out));
-    await tester.pumpAndSettle();
+  testWidgets('the hint sits above the page dots, not below them', (
+    tester,
+  ) async {
+    await pumpGallery(tester);
 
-    expect(events, [true, false]);
-    expect(pageViewPhysics(tester), isNull);
+    final hint = tester.getCenter(find.text(AppStrings.posterDetailZoomHint));
+    // The dots are the only circular Containers in the tree.
+    final dots = tester.getCenter(
+      find.byWidgetPredicate((widget) {
+        if (widget is! Container) return false;
+        final decoration = widget.decoration;
+        return decoration is BoxDecoration &&
+            decoration.shape == BoxShape.circle;
+      }).first,
+    );
+
+    expect(hint.dy, lessThan(dots.dy));
   });
 
   testWidgets('the hint says why to zoom, and rides along with the images', (

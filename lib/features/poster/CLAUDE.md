@@ -117,14 +117,28 @@ presentation/
   machine (flag flips, physics follows), not the arena outcome against a real
   touch stream. That needs a device. Found on-device *after* `code-critic` had
   already passed SCR-05.
-- **Zoom has three entry points on purpose, and they share one code path.**
-  Pinch, double tap, and the button on the image all end at `_toggleZoom`, so
+- **The zoom button belongs in the app bar, not on the image.** It was on the
+  image first and device verification killed that: `BoxFit.contain` letterboxes
+  any poster whose ratio isn't 2:3, and a control pinned to the frame's corner
+  then floats in the empty band — measured at ~100pt clear of the artwork,
+  reading as a control for the whole screen. Anchoring it to the *painted*
+  image would mean resolving each image's intrinsic size first, which is why
+  it moved into `actions:` instead: always present, never letterboxed, and
+  sharing the bar with the fading title rather than swapping with it.
+  `PosterGalleryZoomController` is what lets it live outside the gallery — the
+  gallery attaches on init and **detaches on dispose**, so the screen can't be
+  left holding a zoom flag whose image is gone (that flag drives the list's
+  physics; stranded `true` means a permanently unscrollable screen).
+- **Zoom has four entry points on purpose, and they share one code path.**
+  Pinch, double tap, the app bar button and the hint text all end at
+  `_toggleZoom`, so
   they cannot disagree about what "zoomed" means — and zooming out always
   targets identity, which is what re-arms the swipe. Device verification found
   buyers never discovering pinch at all; that matters more here than on a
   normal gallery, because zooming *is* how condition gets inspected before
-  buying (BR-05, ADR-0003), hence the caption saying **why** to zoom rather
-  than how. The double tap is safe to add precisely because it needs no
+  buying (BR-05, ADR-0003), hence the hint saying **why** to zoom rather
+  than how. The hint sits *above* the page dots and below the image on
+  purpose: under the dots it read as a caption describing them. The double tap is safe to add precisely because it needs no
   travel: it resolves on tap count, never entering the slop race the fix above
   turns on. Anything new that *does* drag (a dismiss-on-swipe-down, say) has
   to re-check that race.

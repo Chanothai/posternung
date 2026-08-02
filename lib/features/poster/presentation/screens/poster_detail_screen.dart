@@ -37,9 +37,12 @@ class PosterDetailScreen extends ConsumerStatefulWidget {
 
 class _PosterDetailScreenState extends ConsumerState<PosterDetailScreen>
     with WidgetsBindingObserver {
-  /// Owned here rather than by the body because the app bar reads it, and the
-  /// bar outlives the body across loading/error states.
+  /// Both owned here rather than by the body, because the app bar reads them
+  /// and it outlives the body across loading/error states. The gallery
+  /// detaches from the zoom controller on dispose, so neither can be left
+  /// holding state whose widget is gone.
   final _scrollController = ScrollController();
+  final _zoomController = PosterGalleryZoomController();
 
   @override
   void initState() {
@@ -49,6 +52,7 @@ class _PosterDetailScreenState extends ConsumerState<PosterDetailScreen>
 
   @override
   void dispose() {
+    _zoomController.dispose();
     _scrollController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -74,7 +78,12 @@ class _PosterDetailScreenState extends ConsumerState<PosterDetailScreen>
     final asyncDetail = ref.watch(
       posterDetailViewModelProvider(widget.posterId),
     );
-    final loadedTitle = asyncDetail.value?.title;
+    final loaded = asyncDetail.value;
+    final loadedTitle = loaded?.title;
+    // The zoom control only makes sense when there is an image to zoom.
+    final hasImage =
+        loaded != null &&
+        (loaded.images.isNotEmpty || loaded.primaryImageUrl != null);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDark,
@@ -95,6 +104,12 @@ class _PosterDetailScreenState extends ConsumerState<PosterDetailScreen>
                 controller: _scrollController,
                 title: loadedTitle,
               ),
+        // In the bar rather than on the image: `BoxFit.contain` letterboxes a
+        // poster whose ratio isn't 2:3, and a button pinned to the frame's
+        // corner then floats in that empty band, reading as a control for the
+        // whole screen instead of for the image. Here it is always present,
+        // and shares the bar with the title rather than replacing it.
+        actions: [if (hasImage) _ZoomAction(controller: _zoomController)],
       ),
       body: asyncDetail.when(
         loading: () => const Center(
@@ -116,6 +131,7 @@ class _PosterDetailScreenState extends ConsumerState<PosterDetailScreen>
           child: _PosterDetailBody(
             poster: poster,
             scrollController: _scrollController,
+            zoomController: _zoomController,
             onBrowseOthers: () => Navigator.of(context).pop(),
           ),
         ),
@@ -184,15 +200,49 @@ class _CollapsingAppBarTitle extends StatelessWidget {
   }
 }
 
+/// The bar's zoom button. Mirrors the gallery's state rather than owning it,
+/// so pinching, double-tapping, tapping the hint and pressing this all report
+/// the same thing.
+class _ZoomAction extends StatelessWidget {
+  const _ZoomAction({required this.controller});
+
+  final PosterGalleryZoomController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        final zoomedIn = controller.isZoomed;
+        return IconButton(
+          onPressed: controller.toggle,
+          // An icon-only control has no other source for an accessible name;
+          // `IconButton` reuses the tooltip as one.
+          tooltip: zoomedIn
+              ? AppStrings.posterDetailZoomOutTooltip
+              : AppStrings.posterDetailZoomInTooltip,
+          icon: Icon(
+            zoomedIn ? Icons.zoom_out : Icons.zoom_in,
+            size: AppDimens.iconMd,
+            color: AppColors.textPrimary,
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _PosterDetailBody extends StatefulWidget {
   const _PosterDetailBody({
     required this.poster,
     required this.scrollController,
+    required this.zoomController,
     required this.onBrowseOthers,
   });
 
   final PosterDetail poster;
   final ScrollController scrollController;
+  final PosterGalleryZoomController zoomController;
   final VoidCallback onBrowseOthers;
 
   @override
@@ -200,14 +250,15 @@ class _PosterDetailBody extends StatefulWidget {
 }
 
 class _PosterDetailBodyState extends State<_PosterDetailBody> {
-  /// Set while the gallery's current image is zoomed in. The flag lives here
-  /// rather than on the screen so it is discarded together with the gallery
-  /// whenever the screen leaves its data state — a flag that outlived the
-  /// gallery would leave this list permanently unscrollable.
-  bool _imageZoomed = false;
-
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: widget.zoomController,
+      builder: (context, _) => _buildList(widget.zoomController.isZoomed),
+    );
+  }
+
+  Widget _buildList(bool imageZoomed) {
     final poster = widget.poster;
 
     return ListView(
@@ -219,7 +270,7 @@ class _PosterDetailBodyState extends State<_PosterDetailBody> {
       // zoomed image (kTouchSlop 18lp beats kPanSlop 36lp — see
       // PosterDetailImageGallery) and scroll the page instead of moving
       // inside the image.
-      physics: _imageZoomed
+      physics: imageZoomed
           ? const NeverScrollableScrollPhysics()
           : const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(
@@ -233,7 +284,7 @@ class _PosterDetailBodyState extends State<_PosterDetailBody> {
         // caption that must not be rounded along with the image.
         PosterDetailImageGallery(
           poster: poster,
-          onZoomChanged: (zoomed) => setState(() => _imageZoomed = zoomed),
+          zoomController: widget.zoomController,
         ),
         const SizedBox(height: AppSpacing.lg),
         if (poster.status == PosterStatus.sold)
@@ -273,10 +324,14 @@ class _PosterDetailBodyState extends State<_PosterDetailBody> {
     );
   }
 
+  /// Blank is not the same as absent on the wire: `studio` comes back as `""`
+  /// on some rows, and a null-only check left the separator stranded ("2010s
+  /// •"). Anything that trims to nothing is treated as missing.
   String? get _subtitle {
+    final studio = widget.poster.studio?.trim();
     final parts = [
       if (widget.poster.eraDecade != null) '${widget.poster.eraDecade}s',
-      if (widget.poster.studio != null) widget.poster.studio!,
+      if (studio != null && studio.isNotEmpty) studio,
     ];
     return parts.isEmpty ? null : parts.join(' • ');
   }

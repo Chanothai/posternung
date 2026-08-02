@@ -49,6 +49,7 @@ PosterDetail _fullPoster({
   // condition) was never exercised by any test at all.
   PosterConditionGrade? conditionGrade = PosterConditionGrade.veryGood,
   List<PosterImage> images = const [],
+  String? studio = 'Warner Bros',
 }) => PosterDetail(
   id: 'p1',
   title: 'Blade Runner',
@@ -56,7 +57,7 @@ PosterDetail _fullPoster({
   status: status,
   conditionGrade: conditionGrade,
   eraDecade: 1982,
-  studio: 'Warner Bros',
+  studio: studio,
   primaryImageUrl: null,
   tmdbId: 78,
   size: '27x41 in',
@@ -361,6 +362,72 @@ void main() {
       expect(listPhysics(), isA<NeverScrollableScrollPhysics>());
     });
   });
+
+  group('app bar zoom action', () {
+    const images = [
+      PosterImage(
+        id: 'img-1',
+        url: 'https://example.invalid/1.jpg',
+        isPrimary: true,
+        sortOrder: 0,
+      ),
+    ];
+
+    Finder inBar(Finder finder) =>
+        find.descendant(of: find.byType(AppBar), matching: finder);
+
+    testWidgets('shares the bar with the title rather than replacing it', (
+      tester,
+    ) async {
+      await useTallSurface(tester);
+      await tester.pumpWidget(wrap(detail: _fullPoster(images: images)));
+      await tester.pump();
+
+      expect(inBar(find.byIcon(Icons.zoom_in)), findsOneWidget);
+      expect(inBar(find.text('Blade Runner')), findsOneWidget);
+      expect(inBar(find.byIcon(Icons.arrow_back)), findsOneWidget);
+    });
+
+    testWidgets('zooms the gallery and locks the list behind it', (
+      tester,
+    ) async {
+      await useTallSurface(tester);
+      await tester.pumpWidget(wrap(detail: _fullPoster(images: images)));
+      await tester.pump();
+
+      await tester.tap(inBar(find.byIcon(Icons.zoom_in)));
+      await tester.pumpAndSettle();
+
+      // The glyph reports the state, so it has to follow it.
+      expect(inBar(find.byIcon(Icons.zoom_out)), findsOneWidget);
+      expect(
+        tester.widget<ListView>(find.byType(ListView)).physics,
+        isA<NeverScrollableScrollPhysics>(),
+      );
+    });
+
+    testWidgets('absent when the poster has no image to zoom', (tester) async {
+      await useTallSurface(tester);
+      await tester.pumpWidget(wrap(detail: _allNullFieldsPoster()));
+      await tester.pump();
+
+      expect(find.byIcon(Icons.zoom_in), findsNothing);
+    });
+  });
+
+  testWidgets(
+    'a blank studio shows the era alone, with no stranded separator',
+    (tester) async {
+      await useTallSurface(tester);
+      // Blank, not null — that is what the wire actually returns for some rows,
+      // and it used to render as "1982s •".
+      await tester.pumpWidget(wrap(detail: _fullPoster(studio: '')));
+      await tester.pump();
+
+      expect(find.text('1982s'), findsOneWidget);
+      expect(find.textContaining('•'), findsNothing);
+    },
+  );
 
   group('collapsing app bar title', () {
     /// The bar's copy of the title — the one outside the list.

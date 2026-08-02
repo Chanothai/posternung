@@ -22,19 +22,56 @@ import '../../domain/entities/poster_detail.dart';
 /// verification of SCR-05 found buyers never discovering it at all, which
 /// matters more here than on a normal gallery — zooming *is* how a buyer
 /// inspects condition before committing (BR-05, ADR-0003).
+/// Lets the screen drive and observe the gallery's zoom from outside it — the
+/// app bar's zoom button and the list's scroll physics both need this, and
+/// neither can reach into the gallery's own state.
+///
+/// The gallery attaches itself while mounted and clears out on dispose, so a
+/// screen that leaves its data state cannot be left holding a zoom flag whose
+/// image is gone — that stale flag would make its list permanently
+/// unscrollable.
+class PosterGalleryZoomController extends ChangeNotifier {
+  bool _isZoomed = false;
+  VoidCallback? _toggle;
+
+  bool get isZoomed => _isZoomed;
+
+  /// Whether a gallery is currently listening. False between screen states.
+  bool get isAttached => _toggle != null;
+
+  /// Zooms in on the image's centre, or all the way back out.
+  void toggle() => _toggle?.call();
+
+  void _attach(VoidCallback toggle) => _toggle = toggle;
+
+  /// Deliberately silent: this runs from the gallery's `dispose()`, i.e.
+  /// during an unmount, where notifying would rebuild widgets mid-teardown.
+  /// Whatever removed the gallery is already rebuilding the screen.
+  void _detach() {
+    _toggle = null;
+    _isZoomed = false;
+  }
+
+  void _setZoomed(bool value) {
+    if (value == _isZoomed) return;
+    _isZoomed = value;
+    notifyListeners();
+  }
+}
+
 class PosterDetailImageGallery extends StatefulWidget {
   const PosterDetailImageGallery({
     super.key,
     required this.poster,
-    this.onZoomChanged,
+    required this.zoomController,
   });
 
   final PosterDetail poster;
 
-  /// Fires when the current image crosses in or out of a zoomed state. The
-  /// caller is expected to stop its own vertical scrollable while this is
-  /// `true` — see the gesture-arena note on [_PosterDetailImageGalleryState].
-  final ValueChanged<bool>? onZoomChanged;
+  /// Published so the app bar can offer a zoom button that never scrolls away,
+  /// and so the screen's list can stop scrolling while zoomed — see the
+  /// gesture-arena note on [_PosterDetailImageGalleryState].
+  final PosterGalleryZoomController zoomController;
 
   @override
   State<PosterDetailImageGallery> createState() =>
@@ -86,6 +123,7 @@ class _PosterDetailImageGalleryState extends State<PosterDetailImageGallery>
     super.initState();
     _transformationController.addListener(_handleTransformationChange);
     _zoomAnimation.addListener(_applyZoomAnimation);
+    widget.zoomController._attach(() => _toggleZoom());
   }
 
   /// Only rebuilds when the *boolean* flips, not on every frame of a pinch.
@@ -94,7 +132,7 @@ class _PosterDetailImageGalleryState extends State<PosterDetailImageGallery>
         _transformationController.value.getMaxScaleOnAxis() > _zoomedAboveScale;
     if (zoomed == _zoomed) return;
     setState(() => _zoomed = zoomed);
-    widget.onZoomChanged?.call(zoomed);
+    widget.zoomController._setZoomed(zoomed);
   }
 
   void _applyZoomAnimation() {
@@ -170,6 +208,7 @@ class _PosterDetailImageGalleryState extends State<PosterDetailImageGallery>
 
   @override
   void dispose() {
+    widget.zoomController._detach();
     _zoomAnimation.removeListener(_applyZoomAnimation);
     _zoomAnimation.dispose();
     _transformationController.removeListener(_handleTransformationChange);
@@ -193,13 +232,9 @@ class _PosterDetailImageGalleryState extends State<PosterDetailImageGallery>
           child: AspectRatio(
             key: _viewportKey,
             aspectRatio: AppDimens.posterCardAspectRatio,
-            child: Stack(
-              alignment: Alignment.bottomCenter,
-              children: [
-                if (urls.isEmpty)
-                  const _ImagePlaceholder()
-                else
-                  PageView.builder(
+            child: urls.isEmpty
+                ? const _ImagePlaceholder()
+                : PageView.builder(
                     controller: _pageController,
                     physics: _zoomed
                         ? const NeverScrollableScrollPhysics()
@@ -249,91 +284,57 @@ class _PosterDetailImageGalleryState extends State<PosterDetailImageGallery>
                       ),
                     ),
                   ),
-                if (urls.isNotEmpty)
-                  Positioned(
-                    top: AppSpacing.sm,
-                    right: AppSpacing.sm,
-                    child: _ZoomButton(
-                      zoomedIn: _zoomed,
-                      onPressed: _toggleZoom,
-                    ),
-                  ),
-                if (urls.length > 1)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: List.generate(
-                        urls.length,
-                        (index) => Container(
-                          margin: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.xs / 2,
-                          ),
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: index == _page
-                                ? AppColors.accent
-                                : AppColors.white.withValues(alpha: 0.4),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
           ),
         ),
+        // Order matters: the hint sits directly under the image so it reads as
+        // being about the image, and *above* the page dots so it can't be
+        // mistaken for a label describing them.
         if (urls.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.sm),
-          // Text only — the glyph already sits on the image, and repeating it
-          // here would read as a second, separate control.
-          Text(
-            AppStrings.posterDetailZoomHint,
-            style: AppTextStyles.imageHintLabel,
-            textAlign: TextAlign.center,
+          Center(
+            child: InkWell(
+              // Tappable for the same reason the app bar button exists: the
+              // pinch is invisible, and a hint you can't act on only tells
+              // half the story.
+              onTap: () => _toggleZoom(),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: AppSpacing.xs,
+                  horizontal: AppSpacing.sm,
+                ),
+                child: Text(
+                  AppStrings.posterDetailZoomHint,
+                  style: AppTextStyles.imageHintLabel,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          ),
+        ],
+        if (urls.length > 1) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+              urls.length,
+              (index) => Container(
+                margin: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.xs / 2,
+                ),
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: index == _page
+                      ? AppColors.accent
+                      : AppColors.white.withValues(alpha: 0.4),
+                ),
+              ),
+            ),
           ),
         ],
       ],
-    );
-  }
-}
-
-/// The visible half of the zoom affordance. Sits on the image rather than
-/// beside it so the thing it acts on is unambiguous, over a scrim light
-/// enough to leave the artwork legible underneath.
-class _ZoomButton extends StatelessWidget {
-  const _ZoomButton({required this.zoomedIn, required this.onPressed});
-
-  final bool zoomedIn;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    // `IconButton` rather than a hand-rolled `InkWell`: it already announces
-    // itself as a button and reuses `tooltip` as the accessible label, which
-    // an icon-only control has no other source for.
-    return IconButton(
-      onPressed: onPressed,
-      tooltip: zoomedIn
-          ? AppStrings.posterDetailZoomOutTooltip
-          : AppStrings.posterDetailZoomInTooltip,
-      icon: Icon(
-        zoomedIn ? Icons.zoom_out : Icons.zoom_in,
-        size: AppDimens.iconMd,
-        color: AppColors.white,
-      ),
-      style: IconButton.styleFrom(
-        backgroundColor: AppColors.imageControlScrim,
-        minimumSize: const Size(
-          AppDimens.minTouchTarget,
-          AppDimens.minTouchTarget,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-        ),
-      ),
     );
   }
 }
