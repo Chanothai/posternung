@@ -117,6 +117,21 @@ presentation/
   machine (flag flips, physics follows), not the arena outcome against a real
   touch stream. That needs a device. Found on-device *after* `code-critic` had
   already passed SCR-05.
+- **Zoom has three entry points on purpose, and they share one code path.**
+  Pinch, double tap, and the button on the image all end at `_toggleZoom`, so
+  they cannot disagree about what "zoomed" means — and zooming out always
+  targets identity, which is what re-arms the swipe. Device verification found
+  buyers never discovering pinch at all; that matters more here than on a
+  normal gallery, because zooming *is* how condition gets inspected before
+  buying (BR-05, ADR-0003), hence the caption saying **why** to zoom rather
+  than how. The double tap is safe to add precisely because it needs no
+  travel: it resolves on tap count, never entering the slop race the fix above
+  turns on. Anything new that *does* drag (a dismiss-on-swipe-down, say) has
+  to re-check that race.
+  Also: assigning `_transformationController.value` directly bypasses
+  `InteractiveViewer`'s boundary clamp — it only enforces bounds inside its
+  own gesture handlers — so `_zoomedInMatrix` clamps the translation itself.
+  Skip that and a double tap near an edge parks blank space in frame.
 - **`PosterErrorView` and `PosterNotFoundView` render through
   `AppStatusView`** (core/widgets/) — the same block SCR-03's error/empty
   states use. They keep their own identities (different copy, different

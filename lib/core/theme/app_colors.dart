@@ -16,6 +16,14 @@ abstract final class AppColors {
   static const Color accentRed = Color(0xFFB54A35);
   static const Color posterPlaceholderFill = Color(0x80000000);
 
+  // --- Poster detail ---
+  // Scrim behind a control that floats on top of a poster image (the
+  // gallery's zoom affordance). Kept light so the artwork stays readable
+  // through it, but dark enough that a white icon clears contrast on a pale
+  // poster — the two constraints are why this is its own token rather than
+  // `posterPlaceholderFill`, which sits over nothing and can be far darker.
+  static const Color imageControlScrim = Color(0x59000000);
+
   // --- Status views (error / empty / not found) ---
   // Low-alpha washes of the two accents, used as the halo behind a status
   // icon. Alpha rather than a flat blend so they sit correctly on both the

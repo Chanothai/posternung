@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posternung/core/catalog/poster_condition_grade.dart';
+import 'package:posternung/core/strings/app_strings.dart';
 import 'package:posternung/features/poster/domain/entities/poster_detail.dart';
 import 'package:posternung/features/poster/domain/entities/poster_image.dart';
 import 'package:posternung/features/poster/domain/entities/poster_status.dart';
@@ -46,9 +47,18 @@ void main() {
         .pumpWidget(
           MaterialApp(
             home: Scaffold(
-              body: PosterDetailImageGallery(
-                poster: poster(imageCount: imageCount),
-                onZoomChanged: events.add,
+              // Width-constrained and vertically unbounded, the way the
+              // screen's ListView presents it — the gallery sizes its image
+              // off the width, so an 800px-wide test surface would make a
+              // 1200px-tall image and overflow.
+              body: Center(
+                child: SizedBox(
+                  width: 300,
+                  child: PosterDetailImageGallery(
+                    poster: poster(imageCount: imageCount),
+                    onZoomChanged: events.add,
+                  ),
+                ),
               ),
             ),
           ),
@@ -108,18 +118,79 @@ void main() {
     expect(pageViewPhysics(tester), isNull);
   });
 
-  testWidgets('a double tap leaves the zoom state untouched', (tester) async {
+  /// Two taps spaced between kDoubleTapMinTime (40ms) and kDoubleTapTimeout
+  /// (300ms), so the pair really registers as a double tap rather than two
+  /// separate ones.
+  Future<void> doubleTap(WidgetTester tester) async {
+    await tester.tap(find.byType(PageView));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.byType(PageView));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('a double tap zooms in and locks the carousel', (tester) async {
     final events = await pumpGallery(tester);
 
-    await tester.tap(find.byType(PageView));
-    // Between kDoubleTapMinTime (40ms) and kDoubleTapTimeout (300ms), so the
-    // pair really is a double tap rather than two separate ones.
-    await tester.pump(const Duration(milliseconds: 50));
+    await doubleTap(tester);
+
+    expect(events, [true]);
+    expect(pageViewPhysics(tester), isA<NeverScrollableScrollPhysics>());
+  });
+
+  testWidgets('a second double tap zooms back out and re-arms the swipe', (
+    tester,
+  ) async {
+    final events = await pumpGallery(tester);
+
+    await doubleTap(tester);
+    await doubleTap(tester);
+
+    expect(events, [true, false]);
+    expect(pageViewPhysics(tester), isNull);
+  });
+
+  testWidgets('a single tap does not zoom', (tester) async {
+    final events = await pumpGallery(tester);
+
     await tester.tap(find.byType(PageView));
     await tester.pumpAndSettle();
 
     expect(events, isEmpty);
     expect(pageViewPhysics(tester), isNull);
+  });
+
+  testWidgets('the zoom button zooms in, then back out', (tester) async {
+    final events = await pumpGallery(tester);
+
+    expect(find.byIcon(Icons.zoom_in), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.zoom_in));
+    await tester.pumpAndSettle();
+
+    expect(events, [true]);
+    expect(pageViewPhysics(tester), isA<NeverScrollableScrollPhysics>());
+    // The glyph reports the state, so it must follow it.
+    expect(find.byIcon(Icons.zoom_out), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.zoom_out));
+    await tester.pumpAndSettle();
+
+    expect(events, [true, false]);
+    expect(pageViewPhysics(tester), isNull);
+  });
+
+  testWidgets('the hint says why to zoom, and rides along with the images', (
+    tester,
+  ) async {
+    await pumpGallery(tester);
+    expect(find.text(AppStrings.posterDetailZoomHint), findsOneWidget);
+  });
+
+  testWidgets('no images means no zoom affordance at all', (tester) async {
+    await pumpGallery(tester, imageCount: 0);
+
+    expect(find.byIcon(Icons.zoom_in), findsNothing);
+    expect(find.text(AppStrings.posterDetailZoomHint), findsNothing);
   });
 
   testWidgets('an unzoomed swipe still changes page', (tester) async {

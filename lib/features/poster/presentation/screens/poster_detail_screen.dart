@@ -144,12 +144,11 @@ class _PosterDetailBodyState extends State<_PosterDetailBody> {
         AppSpacing.xxxl,
       ),
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: PosterDetailImageGallery(
-            poster: poster,
-            onZoomChanged: (zoomed) => setState(() => _imageZoomed = zoomed),
-          ),
+        // The rounded clip moved inside the gallery — it now ends with a
+        // caption that must not be rounded along with the image.
+        PosterDetailImageGallery(
+          poster: poster,
+          onZoomChanged: (zoomed) => setState(() => _imageZoomed = zoomed),
         ),
         const SizedBox(height: AppSpacing.lg),
         if (poster.status == PosterStatus.sold)
