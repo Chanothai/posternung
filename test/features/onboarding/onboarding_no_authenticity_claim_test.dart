@@ -22,10 +22,18 @@ import 'package:posternung/features/onboarding/presentation/screens/onboarding_p
 /// ไทยสามตัวแรกคือถ้อยคำที่ onboarding เคยใช้จริงจนถึง 2026-08-05
 /// ส่วนภาษาอังกฤษมาจาก D9 ข้อ 7 — ดีไซน์ต้นทาง (uxpilot) ยังเขียนไว้อยู่
 /// จึงกันไว้ก่อนที่จะมีคนหยิบกลับมาใส่
+///
+/// `ยืนยันแล้ว` คือ label ใต้ไอคอนกลางหน้า 2 ที่ถูกถอดออกเมื่อ 2026-08-05
+/// (เดิมคือ `AppStrings.onboardingVerifiedBadge` — ลบทิ้งแล้ว) · อยู่ในลิสต์นี้เพราะ
+/// ตราคำว่า "ยืนยันแล้ว" ใต้ไอคอนวงกลมคือรูปแบบไทยของ "Verified Original" ตรง ๆ
+/// ที่ D1 ห้าม · ต้องเขียนเป็น literal เพราะค่าคงที่ไม่มีอยู่แล้ว — ข้อยกเว้นที่ยอมได้
+/// ของกฎ "ห้ามพิมพ์ copy ลงเทส" ด้านบน เพราะนี่คือการตรึง *ถ้อยคำที่ถูกถอดไปแล้ว*
+/// ไม่ให้กลับมา ไม่ใช่การทายว่า copy ปัจจุบันเขียนว่าอะไร
 const _bannedClaims = <String>[
   'รับรอง',
   'ความแท้',
   'ผู้เชี่ยวชาญ',
+  'ยืนยันแล้ว',
   'Verified Original',
   'Guaranteed Authentic',
   'Certificate of Authenticity',
@@ -41,7 +49,6 @@ const _onboardingCopy = <String>[
   AppStrings.onboardingHeroTitlePage1Prefix,
   AppStrings.onboardingHeroTitlePage1Emphasis,
   AppStrings.onboardingBodyPage1,
-  AppStrings.onboardingVerifiedBadge,
   AppStrings.onboardingHeroTitlePage2Prefix,
   AppStrings.onboardingHeroTitlePage2Emphasis,
   AppStrings.onboardingBodyPage2,

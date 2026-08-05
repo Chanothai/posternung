@@ -12,13 +12,11 @@ abstract final class AppStrings {
   static const String onboardingBodyPage1 =
       'ค้นพบและสะสมโปสเตอร์ภาพยนตร์ต้นฉบับหายาก '
       'จากยุคที่คุณชื่นชอบ';
-  static const String onboardingVerifiedBadge = 'ยืนยันแล้ว';
   static const String onboardingHeroTitlePage2Prefix =
-      'บอกทุกอย่างที่เราตรวจ\n';
-  static const String onboardingHeroTitlePage2Emphasis = 'ให้คุณตัดสินเอง';
+      'ดูรายละเอียดได้เต็มที่\n';
+  static const String onboardingHeroTitlePage2Emphasis = 'ก่อนตัดสินใจ';
   static const String onboardingBodyPage2 =
-      'เราเทียบลักษณะที่สังเกตได้กับแบบที่บันทึกไว้ '
-      'แล้วบอกให้ครบว่าตรวจอะไรและพบอะไร รวมถึงจุดที่ต่างจากฉบับอ้างอิง';
+      'ซูมดูรูปได้ทุกใบ และดูข้อมูลที่เรามีทั้งหมดของโปสเตอร์ชิ้นนั้น';
   static const String onboardingHeroTitlePage3Prefix = 'สินค้ามีจำนวนจำกัด\n';
   static const String onboardingHeroTitlePage3Emphasis = '— ชิ้นเดียวในโลก';
   static const String onboardingStockBadge = 'เหลือ 1\nชิ้นสุดท้าย';
