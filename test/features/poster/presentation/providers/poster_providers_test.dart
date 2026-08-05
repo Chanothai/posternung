@@ -27,6 +27,15 @@ PosterDetail _poster({PosterStatus status = PosterStatus.available}) =>
       provenance: null,
       images: const [],
       createdAt: DateTime.utc(2024),
+      posterType: null,
+      releaseRegion: null,
+      releaseDateText: null,
+      releaseDate: null,
+      copyrightYear: null,
+      sizeFormat: null,
+      year: null,
+      restorationStatus: null,
+      restorationNote: null,
     );
 
 void main() {

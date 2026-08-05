@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/catalog/release_region.dart';
+import '../../../../core/catalog/size_format.dart';
 import '../../../../core/design_system/app_dimens.dart';
 import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/error/catalog_exception.dart';
@@ -20,6 +22,7 @@ import '../widgets/poster_details_accordion.dart';
 import '../widgets/poster_detail_image_gallery.dart';
 import '../widgets/poster_error_view.dart';
 import '../widgets/poster_not_found_view.dart';
+import '../widgets/poster_restoration_badge.dart';
 import '../widgets/poster_sold_banner.dart';
 
 /// SCR-05 — Product Detail. Read-only this round (ADR-0005 §D1): no Add to
@@ -307,6 +310,18 @@ class _PosterDetailBodyState extends State<_PosterDetailBody> {
             ConditionGradeIndicator(grade: poster.conditionGrade),
           ],
         ),
+        // OD-1 (ข) / ADR-0011 §D2′ (GATE 3) — the restoration fact lives on
+        // its own line under the price/grade row, not crammed into that
+        // row's `spaceBetween` Row as a third item (overflow risk on
+        // narrow screens). Renders only for RESTORED/LINEN_BACKED; NONE,
+        // UNKNOWN, and null all render nothing (see
+        // `PosterRestorationBadge.showsFor`). The spacing above it is only
+        // added when it will actually show something, so there is no stray
+        // gap otherwise.
+        if (_showsRestorationBadge) ...[
+          const SizedBox(height: AppSpacing.sm),
+          PosterRestorationBadge(status: poster.restorationStatus),
+        ],
         const SizedBox(height: AppSpacing.md),
         PosterAvailabilityStatus(status: poster.status),
         const SizedBox(height: AppSpacing.xl),
@@ -316,21 +331,65 @@ class _PosterDetailBodyState extends State<_PosterDetailBody> {
         ),
         const SizedBox(height: AppSpacing.lg),
         PosterDetailsAccordion(
-          provenance: poster.provenance,
+          posterType: poster.posterType,
           size: poster.size,
+          releaseDateText: poster.releaseDateText,
+          copyrightYear: poster.copyrightYear,
+          provenance: poster.provenance,
+          restorationNote: poster.restorationNote,
           description: poster.description,
+          releaseRegion: poster.releaseRegion,
         ),
       ],
     );
   }
 
+  // Asks PosterRestorationBadge itself, rather than repeating the
+  // RESTORED/LINEN_BACKED condition here — code-critic round 1 (M1) found
+  // the two copies could silently drift.
+  bool get _showsRestorationBadge =>
+      PosterRestorationBadge.showsFor(widget.poster.restorationStatus);
+
+  /// ADR-0011 §D4′ (amends §D4) — `year • [region ]size_format • studio`.
+  ///
+  /// - `year` replaces `era_decade` the moment it has a value (`"1982"` not
+  ///   `"1980s"`); falls back to the original `era_decade` behaviour when
+  ///   `year` is `null` (§D4's original mandate, unchanged).
+  /// - `size_format` is prefixed with `release_region`'s short code when the
+  ///   region is a *real* value (`"US One-Sheet"`) — but never when it's
+  ///   [ReleaseRegion.unknown] (`"UNKNOWN One-Sheet"` would read as broken;
+  ///   §D9 routes that case to an accordion row instead) or `null` (no
+  ///   prefix at all).
+  /// - `studio` still shows, even though the linked Figma frame drops it —
+  ///   removing content the user already sees today is out of scope for
+  ///   this round (§D4′).
+  ///
   /// Blank is not the same as absent on the wire: `studio` comes back as `""`
   /// on some rows, and a null-only check left the separator stranded ("2010s
-  /// •"). Anything that trims to nothing is treated as missing.
+  /// •"). Anything that trims to nothing is treated as missing — same rule,
+  /// now applied to every part, not just `studio`.
   String? get _subtitle {
-    final studio = widget.poster.studio?.trim();
+    final poster = widget.poster;
+    final studio = poster.studio?.trim();
+
+    final yearPart = poster.year != null
+        ? '${poster.year}'
+        : (poster.eraDecade != null ? '${poster.eraDecade}s' : null);
+
+    final sizeFormat = poster.sizeFormat;
+    String? formatPart;
+    if (sizeFormat != null) {
+      final region = poster.releaseRegion;
+      final showsRegionPrefix =
+          region != null && region != ReleaseRegion.unknown;
+      formatPart = showsRegionPrefix
+          ? '${region.label} ${sizeFormat.label}'
+          : sizeFormat.label;
+    }
+
     final parts = [
-      if (widget.poster.eraDecade != null) '${widget.poster.eraDecade}s',
+      ?yearPart,
+      ?formatPart,
       if (studio != null && studio.isNotEmpty) studio,
     ];
     return parts.isEmpty ? null : parts.join(' • ');

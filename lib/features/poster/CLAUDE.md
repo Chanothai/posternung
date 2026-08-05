@@ -19,7 +19,14 @@ domain/
                   # core/widgets/condition_grade_indicator.dart can be typed
                   # against it without core importing features/ (see
                   # lib/core/CLAUDE.md's catalog/ entry). PosterDetail just
-                  # imports that core type directly.
+                  # imports that core type directly — same for the 4 newer
+                  # core/catalog/ enums (PosterType, ReleaseRegion,
+                  # SizeFormat, RestorationStatus) that back PosterDetail's
+                  # 9 ADR-0011 fields (poster_type, release_region,
+                  # release_date_text, release_date, copyright_year,
+                  # size_format, year, restoration_status,
+                  # restoration_note) — release_date is parsed but never
+                  # rendered (§D3); the other 8 all reach the screen.
   repositories/   # PosterRepository — abstract:
                   # getPosterDetail(posterId), listPosters(limit, offset)
   usecases/       # GetPosterDetail, GetPosters — single call() each.
@@ -89,13 +96,25 @@ presentation/
                   # PosterAuthenticitySection (ADR-0005 §D2 — only
                   # is_authenticated + authenticity_note; provenance lives
                   # in the accordion instead, not duplicated),
-                  # PosterDetailsAccordion (AC-2/§D3 — provenance, size,
-                  # description; any null field's row is omitted, not
-                  # shown as "-"; the whole accordion is omitted if every
-                  # field is null), PosterNotFoundView (AC-6, 404 — no
-                  # retry, the id genuinely doesn't exist),
-                  # PosterErrorView (generic network/server failure — has
-                  # retry).
+                  # PosterDetailsAccordion (AC-2/§D3, flattened by
+                  # ADR-0011 §D1′ — poster_type, size, release_date_text,
+                  # copyright_year, provenance, restoration_note,
+                  # description, plus release_region *only* when it's
+                  # ReleaseRegion.unknown; any null/blank field's row is
+                  # omitted, never shown as "-", and the whole accordion is
+                  # omitted if every field is null/blank),
+                  # PosterRestorationBadge (ADR-0011 §D2′, added SCR-05
+                  # "แสดงฟิลด์ใหม่" — fact-only label next to price/grade for
+                  # RESTORED/LINEN_BACKED only; NONE/UNKNOWN/null all render
+                  # nothing — UNKNOWN was shown in round 1 of this feature,
+                  # then reverted at GATE 3 as an explicit, narrow exception
+                  # to §D7 scoped to this one badge, not a §D7 reversal.
+                  # Owns the single `showsFor()` rule PosterDetailScreen
+                  # also reads — never duplicate that condition at the call
+                  # site),
+                  # PosterNotFoundView (AC-6, 404 — no retry, the id
+                  # genuinely doesn't exist), PosterErrorView (generic
+                  # network/server failure — has retry).
 ```
 
 ## Things worth knowing before touching this feature
@@ -193,10 +212,20 @@ presentation/
   copy fields across.** `PosterListItem` has exactly
   `id/title/price/status/condition_grade/era_decade/studio/primary_image_url`.
   There is **no** `size`, **no** `is_unique`, **no** `images`, and no film
-  year anywhere (the `posters` table has no year column — SCR-03's G8;
-  `era_decade` is a decade, not a release year). `PosterSummary` mirrors
-  that exactly. Adding a field because the detail screen shows it means
-  inventing data.
+  `year` — `posters.year` exists as a column (ADR-0009, added by INF-06)
+  and reaches the app through `PosterDetail.year`/`PosterDetailModel`, but
+  **the column has 0 rows of actual data on SIT today** (`year` column
+  existing ≠ `year` data existing — don't build anything on this feature
+  that assumes real values are there yet) and
+  `PosterListItem`/`PosterSummary` were never extended to carry it anyway
+  (ADR-0009 §D11 — detail-only, no `PosterListItem` change this round).
+  `era_decade` stays a decade, not a release year, on both shapes.
+  `PosterSummary` mirrors `PosterListItem` exactly. Adding a field because
+  the detail screen shows it means inventing data on the list line — the
+  9 fields ADR-0011 ("แสดงฟิลด์ใหม่") added (`poster_type` ·
+  `release_region` · `release_date_text` · `release_date` ·
+  `copyright_year` · `size_format` · `year` · `restoration_status` ·
+  `restoration_note`) all landed on `PosterDetail` only, same rule.
 - **`price` is a `String` on the wire, on both endpoints.** Pydantic v2
   serializes `Decimal` to a JSON string (`"450.00"`) and the contract says
   `type: string, format: decimal`. Typing it `num`/`double` compiles and

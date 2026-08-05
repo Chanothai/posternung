@@ -39,6 +39,15 @@ void main() {
         ),
     ],
     createdAt: DateTime.utc(2024),
+    posterType: null,
+    releaseRegion: null,
+    releaseDateText: null,
+    releaseDate: null,
+    copyrightYear: null,
+    sizeFormat: null,
+    year: null,
+    restorationStatus: null,
+    restorationNote: null,
   );
 
   /// Records every zoom-state change the controller publishes, which is what

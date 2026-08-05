@@ -199,6 +199,21 @@ abstract final class AppStrings {
   static const String posterDetailProvenanceLabel = 'ที่มา (Provenance)';
   static const String posterDetailSizeLabel = 'ขนาด';
   static const String posterDetailDescriptionLabel = 'คำอธิบายเพิ่มเติม';
+
+  // --- Poster Detail (SCR-05, ADR-0011) — accordion row labels (left-hand
+  // header) for the 9 new attribute fields. Only 4 of the 9 fields land a
+  // row here (`poster_type` · `release_date_text` · `copyright_year` ·
+  // `restoration_note`) plus `release_region` when it is specifically
+  // `UNKNOWN` (ADR-0011 §D1′/§D9) — `year`/`size_format` moved to the
+  // subtitle (§D4′) and `release_date` is never shown on screen (§D3). The
+  // row *values* for enum fields come from the enum's own `label` (e.g.
+  // `PosterTypeX.label`), per §D5 — only the header text belongs here.
+  static const String posterDetailPosterTypeLabel = 'ชนิดของใบ (Poster Type)';
+  static const String posterDetailReleaseDateTextLabel =
+      'วันฉายตามที่พิมพ์บนใบ';
+  static const String posterDetailCopyrightYearLabel = 'ปีลิขสิทธิ์บนใบ';
+  static const String posterDetailRestorationNoteLabel = 'รายละเอียดการบูรณะ';
+  static const String posterDetailReleaseRegionLabel = 'ภูมิภาคที่ฉาย';
   static const String posterDetailNotFoundTitle = 'ไม่พบโปสเตอร์นี้';
   static const String posterDetailNotFoundBody =
       'โปสเตอร์นี้อาจถูกลบออกไปแล้ว หรือลิงก์ไม่ถูกต้อง';

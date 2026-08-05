@@ -25,6 +25,15 @@ PosterDetail _poster({String id = 'p1'}) => PosterDetail(
   provenance: null,
   images: const [],
   createdAt: DateTime(2024),
+  posterType: null,
+  releaseRegion: null,
+  releaseDateText: null,
+  releaseDate: null,
+  copyrightYear: null,
+  sizeFormat: null,
+  year: null,
+  restorationStatus: null,
+  restorationNote: null,
 );
 
 void main() {

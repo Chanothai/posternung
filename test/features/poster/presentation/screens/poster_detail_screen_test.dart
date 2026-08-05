@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posternung/core/catalog/poster_condition_grade.dart';
+import 'package:posternung/core/catalog/release_region.dart';
+import 'package:posternung/core/catalog/restoration_status.dart';
+import 'package:posternung/core/catalog/size_format.dart';
 import 'package:posternung/core/error/catalog_exception.dart';
 import 'package:posternung/core/theme/app_colors.dart';
 import 'package:posternung/features/poster/domain/entities/poster_detail.dart';
@@ -50,6 +53,14 @@ PosterDetail _fullPoster({
   PosterConditionGrade? conditionGrade = PosterConditionGrade.veryGood,
   List<PosterImage> images = const [],
   String? studio = 'Warner Bros',
+  // ADR-0011 (SCR-05 "แสดงฟิลด์ใหม่") — all default null so the pre-existing
+  // fixture's subtitle/accordion behaviour (era_decade fallback, no
+  // restoration badge) is unchanged unless a test opts in.
+  int? year,
+  ReleaseRegion? releaseRegion,
+  SizeFormat? sizeFormat,
+  RestorationStatus? restorationStatus,
+  DateTime? releaseDate,
 }) => PosterDetail(
   id: 'p1',
   title: 'Blade Runner',
@@ -67,6 +78,15 @@ PosterDetail _fullPoster({
   provenance: 'Estate collection, Los Angeles.',
   images: images,
   createdAt: DateTime.utc(2024),
+  posterType: null,
+  releaseRegion: releaseRegion,
+  releaseDateText: null,
+  releaseDate: releaseDate,
+  copyrightYear: null,
+  sizeFormat: sizeFormat,
+  year: year,
+  restorationStatus: restorationStatus,
+  restorationNote: null,
 );
 
 PosterDetail _allNullFieldsPoster() => PosterDetail(
@@ -86,6 +106,15 @@ PosterDetail _allNullFieldsPoster() => PosterDetail(
   provenance: null,
   images: const [],
   createdAt: DateTime.utc(2024),
+  posterType: null,
+  releaseRegion: null,
+  releaseDateText: null,
+  releaseDate: null,
+  copyrightYear: null,
+  sizeFormat: null,
+  year: null,
+  restorationStatus: null,
+  restorationNote: null,
 );
 
 void main() {
@@ -428,6 +457,206 @@ void main() {
       expect(find.textContaining('•'), findsNothing);
     },
   );
+
+  group('ADR-0011 §D4′/§D9 — subtitle with the 9 new fields', () {
+    testWidgets('year replaces era_decade in the subtitle when present', (
+      tester,
+    ) async {
+      await useTallSurface(tester);
+      await tester.pumpWidget(wrap(detail: _fullPoster(year: 1941)));
+      await tester.pump();
+
+      // Full-line match, not textContaining — the whole point is that
+      // "1982s" is gone, not merely that "1941" showed up somewhere else
+      // on the page.
+      expect(find.text('1941 • Warner Bros'), findsOneWidget);
+      expect(find.textContaining('1982s'), findsNothing);
+    });
+
+    testWidgets('no year — falls back to the original era_decade behaviour', (
+      tester,
+    ) async {
+      await useTallSurface(tester);
+      await tester.pumpWidget(wrap(detail: _fullPoster()));
+      await tester.pump();
+
+      expect(find.text('1982s • Warner Bros'), findsOneWidget);
+    });
+
+    // code-critic round 1 H2 — the previous version of these two tests used
+    // `find.textContaining(...)`, which stayed green even after removing
+    // the `region != ReleaseRegion.unknown` guard from `_subtitle` (proven
+    // by mutation). Both assertions below are now exact full-line matches
+    // built from the enums' own `.label` — never the wire value — so a
+    // leaked prefix changes the string and the match fails.
+    testWidgets(
+      'a real release_region prefixes size_format in the subtitle exactly '
+      'once',
+      (tester) async {
+        await useTallSurface(tester);
+        await tester.pumpWidget(
+          wrap(
+            detail: _fullPoster(
+              year: 1941,
+              releaseRegion: ReleaseRegion.us,
+              sizeFormat: SizeFormat.oneSheet,
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(
+          find.text(
+            '1941 • ${ReleaseRegion.us.label} ${SizeFormat.oneSheet.label} '
+            '• Warner Bros',
+          ),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'ADR-0011 §D9 — release_region UNKNOWN never reaches the subtitle: '
+      'size_format shows plain, with no region prefix and no leaked '
+      '"checked, couldn\'t tell" text at all',
+      (tester) async {
+        await useTallSurface(tester);
+        await tester.pumpWidget(
+          wrap(
+            detail: _fullPoster(
+              year: 1941,
+              releaseRegion: ReleaseRegion.unknown,
+              sizeFormat: SizeFormat.oneSheet,
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // Exact full-line match: catches a leaked prefix in *any* form,
+        // not just the literal wire value "UNKNOWN" (which the UI was
+        // never going to render as-is — it renders the enum's Thai label).
+        expect(
+          find.text('1941 • ${SizeFormat.oneSheet.label} • Warner Bros'),
+          findsOneWidget,
+        );
+        expect(find.textContaining(ReleaseRegion.unknown.label), findsNothing);
+      },
+    );
+
+    testWidgets('size_format null — no format segment in the subtitle at '
+        'all, region or not', (tester) async {
+      await useTallSurface(tester);
+      await tester.pumpWidget(
+        wrap(detail: _fullPoster(year: 1941, releaseRegion: ReleaseRegion.us)),
+      );
+      await tester.pump();
+
+      // Exact full-line match — no stray "US" or "•" left behind either.
+      expect(find.text('1941 • Warner Bros'), findsOneWidget);
+    });
+
+    // 🔴 GATE 3 open question, pinned not endorsed (per the coordinator's
+    // "ห้ามแก้รอบนี้" note) — D4′ puts `size_format` in the subtitle, D7
+    // says `UNKNOWN` must be visible, and D9 only resolves the
+    // region↔size_format interaction for `release_region`'s own UNKNOWN,
+    // not `size_format`'s. Today that combination produces a plain Thai
+    // label in the subtitle. This test exists only to catch an
+    // *accidental* change to that output before GATE 3 decides the real
+    // answer — passing it is not a design endorsement.
+    testWidgets('size_format UNKNOWN today renders its own label plain in the '
+        'subtitle (current behaviour only — not a design decision, see '
+        'GATE 3)', (tester) async {
+      await useTallSurface(tester);
+      await tester.pumpWidget(
+        wrap(detail: _fullPoster(year: 1941, sizeFormat: SizeFormat.unknown)),
+      );
+      await tester.pump();
+
+      expect(
+        find.text('1941 • ${SizeFormat.unknown.label} • Warner Bros'),
+        findsOneWidget,
+      );
+    });
+  });
+
+  group('ADR-0011 §D2′ (GATE 3) — restoration badge placement', () {
+    testWidgets(
+      'RESTORED shows the fact badge on its own line under price/grade',
+      (tester) async {
+        await useTallSurface(tester);
+        await tester.pumpWidget(
+          wrap(
+            detail: _fullPoster(restorationStatus: RestorationStatus.restored),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.text('ผ่านการบูรณะ'), findsOneWidget);
+      },
+    );
+
+    testWidgets('LINEN_BACKED shows its own fact badge', (tester) async {
+      await useTallSurface(tester);
+      await tester.pumpWidget(
+        wrap(
+          detail: _fullPoster(restorationStatus: RestorationStatus.linenBacked),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('ติดผ้าใบ (linen-backed)'), findsOneWidget);
+    });
+
+    // §Amendment (2)/D2′, decided at GATE 3 — NONE, UNKNOWN, and null must
+    // **all three** stay silent here, covered together on purpose. This is
+    // a **negative** assertion left in place, not a deleted test: round 1
+    // of this feature had UNKNOWN render its own fact badge (on the theory
+    // that ADR-0011 §D7's `NULL`≠`UNKNOWN` rule applied to this badge too);
+    // GATE 3 overturned that and made `restoration_status` an explicit,
+    // narrow exception to §D7 (revised AC-10: "RESTORED หรือ LINEN_BACKED
+    // เท่านั้น"). Keeping the assertion inverted — rather than just removing
+    // the old "UNKNOWN shows" test — is what would catch anyone re-adding
+    // `unknown` to `PosterRestorationBadge.showsFor` later.
+    for (final silent in [
+      RestorationStatus.none,
+      RestorationStatus.unknown,
+      null,
+    ]) {
+      testWidgets('$silent shows no badge at all and does not crash '
+          "(today's real state for all 117 SIT rows is null)", (tester) async {
+        await useTallSurface(tester);
+        await tester.pumpWidget(
+          wrap(detail: _fullPoster(restorationStatus: silent)),
+        );
+        await tester.pump();
+
+        expect(tester.takeException(), isNull);
+        expect(find.text('ผ่านการบูรณะ'), findsNothing);
+        expect(find.text('ติดผ้าใบ (linen-backed)'), findsNothing);
+        expect(find.text('ตรวจแล้วระบุไม่ได้'), findsNothing);
+      });
+    }
+  });
+
+  group('ADR-0011 §D3 / AC-8 — release_date is parsed but never shown', () {
+    testWidgets(
+      'release_date has a value — still never rendered anywhere on screen, '
+      'even though release_date_text is the field actually shown',
+      (tester) async {
+        await useTallSurface(tester);
+        await tester.pumpWidget(
+          wrap(detail: _fullPoster(releaseDate: DateTime.utc(2021, 6, 15))),
+        );
+        await tester.pump();
+
+        expect(tester.takeException(), isNull);
+        expect(find.textContaining('2021-06-15'), findsNothing);
+        expect(find.textContaining('15/6/2021'), findsNothing);
+        expect(find.textContaining('June 15'), findsNothing);
+        expect(find.textContaining('2021-06-15 00:00:00'), findsNothing);
+      },
+    );
+  });
 
   group('collapsing app bar title', () {
     /// The bar's copy of the title — the one outside the list.
