@@ -18,7 +18,6 @@ import '../../../../core/widgets/gradient_background.dart';
 import '../../domain/entities/poster_detail.dart';
 import '../../domain/entities/poster_status.dart';
 import '../providers/poster_providers.dart';
-import '../widgets/poster_authenticity_section.dart';
 import '../widgets/poster_availability_status.dart';
 import '../widgets/poster_details_accordion.dart';
 import '../widgets/poster_detail_image_gallery.dart';
