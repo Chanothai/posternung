@@ -197,15 +197,17 @@ class _DetailRow extends StatelessWidget {
     // bounds it to its share of the row (matching `Expanded` on the value
     // side) and lets it wrap onto a second line instead.
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Flexible(child: Text(label, style: AppTextStyles.inputLabel)),
+        Flexible(
+          child: Center(child: Text(label, style: AppTextStyles.inputLabel)),
+        ),
         const SizedBox(width: AppSpacing.md),
         Expanded(
           child: Text(
             value,
             style: AppTextStyles.bodyDescription,
-            textAlign: TextAlign.right,
+            textAlign: TextAlign.end,
           ),
         ),
       ],

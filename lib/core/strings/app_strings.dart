@@ -181,8 +181,7 @@ abstract final class AppStrings {
   static const String posterDetailZoomHint = 'ดูรายละเอียดสภาพ';
   static const String posterDetailZoomInTooltip = 'ขยายดูรายละเอียดสภาพ';
   static const String posterDetailZoomOutTooltip = 'ย่อกลับ';
-  static const String posterDetailSingleStockNotice =
-      'มีชิ้นเดียว ของหายากที่เมื่อขายแล้วจะไม่กลับมาอีก';
+  static const String posterDetailSingleStockNotice = 'มีชิ้นเดียว';
   static const String posterDetailReservedNotice =
       'ขณะนี้มีผู้อื่นกำลังจองโปสเตอร์ชิ้นนี้อยู่';
   static const String posterDetailSoldTitle = 'โปสเตอร์ชิ้นนี้ถูกซื้อไปแล้ว';

@@ -487,10 +487,6 @@ class _PosterDetailBodyState extends State<_PosterDetailBody> {
               ],
               const SizedBox(height: AppSpacing.md),
               PosterAvailabilityStatus(status: poster.status),
-              PosterAuthenticitySection(
-                isAuthenticated: poster.isAuthenticated,
-                authenticityNote: poster.authenticityNote,
-              ),
               const SizedBox(height: AppSpacing.lg),
               PosterDetailsAccordion(
                 posterType: poster.posterType,
