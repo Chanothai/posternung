@@ -1,6 +1,10 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../../../core/catalog/poster_condition_grade.dart';
+import '../../../../core/catalog/poster_type.dart';
+import '../../../../core/catalog/release_region.dart';
+import '../../../../core/catalog/restoration_status.dart';
+import '../../../../core/catalog/size_format.dart';
 import '../../../../core/error/catalog_exception.dart';
 import '../../domain/entities/poster_detail.dart';
 import '../../domain/entities/poster_status.dart';
@@ -45,6 +49,21 @@ abstract class PosterDetailModel with _$PosterDetailModel {
     String? provenance,
     required List<PosterImageModel> images,
     @JsonKey(name: 'created_at') required DateTime createdAt,
+    // --- ADR-0009 / ADR-0011 — decoded as raw String?/int? here, same
+    // reasoning as `status`/`condition_grade` above: `toEntity()` maps the
+    // 4 new enum fields via `<x>FromApi()` so an unrecognized/future
+    // backend value degrades to `null` (row hidden) instead of crashing
+    // `fromJson` — ADR-0011 §D6, deliberately different from `status`'s
+    // `throw` because none of these 9 fields affect money or stock. ---
+    @JsonKey(name: 'poster_type') String? posterType,
+    @JsonKey(name: 'release_region') String? releaseRegion,
+    @JsonKey(name: 'release_date_text') String? releaseDateText,
+    @JsonKey(name: 'release_date') DateTime? releaseDate,
+    @JsonKey(name: 'copyright_year') int? copyrightYear,
+    @JsonKey(name: 'size_format') String? sizeFormat,
+    int? year,
+    @JsonKey(name: 'restoration_status') String? restorationStatus,
+    @JsonKey(name: 'restoration_note') String? restorationNote,
   }) = _PosterDetailModel;
 
   factory PosterDetailModel.fromJson(Map<String, dynamic> json) =>
@@ -75,6 +94,15 @@ abstract class PosterDetailModel with _$PosterDetailModel {
       provenance: provenance,
       images: images.map((image) => image.toEntity()).toList(),
       createdAt: createdAt,
+      posterType: posterTypeFromApi(posterType),
+      releaseRegion: releaseRegionFromApi(releaseRegion),
+      releaseDateText: releaseDateText,
+      releaseDate: releaseDate,
+      copyrightYear: copyrightYear,
+      sizeFormat: sizeFormatFromApi(sizeFormat),
+      year: year,
+      restorationStatus: restorationStatusFromApi(restorationStatus),
+      restorationNote: restorationNote,
     );
   }
 }
