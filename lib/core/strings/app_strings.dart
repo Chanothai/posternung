@@ -16,7 +16,7 @@ abstract final class AppStrings {
       'ดูรายละเอียดได้เต็มที่\n';
   static const String onboardingHeroTitlePage2Emphasis = 'ก่อนตัดสินใจ';
   static const String onboardingBodyPage2 =
-      'ซูมดูรูปได้ทุกใบ และดูข้อมูลที่เรามีทั้งหมดของโปสเตอร์ชิ้นนั้น';
+      'ซูมดูรูปได้ทุกใบ และดูข้อมูลที่เรามีของโปสเตอร์ชิ้นนั้น';
   static const String onboardingHeroTitlePage3Prefix = 'สินค้ามีจำนวนจำกัด\n';
   static const String onboardingHeroTitlePage3Emphasis = '— ชิ้นเดียวในโลก';
   static const String onboardingStockBadge = 'เหลือ 1\nชิ้นสุดท้าย';

@@ -55,13 +55,6 @@ abstract final class AppTextStyles {
     color: AppColors.accent,
   );
 
-  static final TextStyle badgeLabel = GoogleFonts.kanit(
-    fontSize: 10.4,
-    fontWeight: FontWeight.w600,
-    letterSpacing: 1.04,
-    color: AppColors.textSecondary,
-  );
-
   static final TextStyle stockBadgeLabel = GoogleFonts.kanit(
     fontSize: 8,
     height: 12 / 8,
