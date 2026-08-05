@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:posternung/core/strings/app_strings.dart';
 import 'package:posternung/features/onboarding/presentation/widgets/onboarding_first_page_content.dart';
 
 void main() {
@@ -13,17 +14,12 @@ void main() {
 
     expect(
       find.text(
-        'เป็นเจ้าของชิ้นส่วนหนึ่งของ\nประวัติศาสตร์ภาพยนตร์',
+        AppStrings.onboardingHeroTitlePage1Prefix +
+            AppStrings.onboardingHeroTitlePage1Emphasis,
         findRichText: true,
       ),
       findsOneWidget,
     );
-    expect(
-      find.text(
-        'ค้นพบและสะสมโปสเตอร์ภาพยนตร์ต้นฉบับหายากที่ผ่านการรับรอง '
-        'จากยุคที่คุณชื่นชอบ',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text(AppStrings.onboardingBodyPage1), findsOneWidget);
   });
 }
