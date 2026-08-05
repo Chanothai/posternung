@@ -29,14 +29,24 @@ import 'package:posternung/features/onboarding/presentation/screens/onboarding_p
 /// ที่ D1 ห้าม · ต้องเขียนเป็น literal เพราะค่าคงที่ไม่มีอยู่แล้ว — ข้อยกเว้นที่ยอมได้
 /// ของกฎ "ห้ามพิมพ์ copy ลงเทส" ด้านบน เพราะนี่คือการตรึง *ถ้อยคำที่ถูกถอดไปแล้ว*
 /// ไม่ให้กลับมา ไม่ใช่การทายว่า copy ปัจจุบันเขียนว่าอะไร
+/// 🔴 **คัดคำจาก ADR-0014 D9 ข้อ 7 บรรทัดต่อบรรทัด ห้ามคัดจากความจำ** — รอบแรกของ
+/// ลิสต์นี้ขาดคำว่า `ของแท้` ซึ่งเป็น *คำแรก* ของ D9 ข้อ 7 และเป็นคำที่ภาษาไทยจะใช้
+/// ก่อนเพื่อน · `code-critic` พิสูจน์ว่าด่านรั่วด้วยการเปลี่ยน copy เป็น
+/// "โปสเตอร์ของแท้ทุกชิ้น ผ่านการตรวจพิสูจน์แล้ว" แล้วเทสทั้งสองตัว **เขียว**
+/// (2026-08-05) · เพิ่มคำใหม่เมื่อไหร่ ให้ไล่จากตัว ADR ไม่ใช่จากที่จำได้
 const _bannedClaims = <String>[
+  // — D9 ข้อ 7 ห้าคำตามลำดับในไฟล์ —
+  'ของแท้',
   'รับรอง',
-  'ความแท้',
-  'ผู้เชี่ยวชาญ',
-  'ยืนยันแล้ว',
   'Verified Original',
   'Guaranteed Authentic',
   'Certificate of Authenticity',
+  // — D1 §สิ่งที่ห้ามอ้างในทุกช่องทาง —
+  'ความแท้',
+  'ผู้เชี่ยวชาญ',
+  'certified',
+  // — ถ้อยคำที่เคยอยู่บนจอจริงแล้วถูกถอด (ตรึงไม่ให้กลับมา) —
+  'ยืนยันแล้ว',
 ];
 
 /// ข้อความ onboarding ทุกตัวที่มีอยู่ใน `AppStrings` วันนี้
@@ -74,7 +84,9 @@ List<String> _violations(Iterable<String> lines) {
   final offenders = <String>[];
   for (final line in lines) {
     for (final claim in _bannedClaims) {
-      if (line.contains(claim)) {
+      // เทียบแบบไม่สนตัวพิมพ์ — `Certified` · `CERTIFIED` · `certified` คือคำอ้าง
+      // เดียวกันทั้งหมด · ไม่กระทบคำไทยซึ่ง `toLowerCase()` ไม่เปลี่ยนรูป
+      if (line.toLowerCase().contains(claim.toLowerCase())) {
         offenders.add('"$line" → มีคำว่า "$claim"');
       }
     }

@@ -9,7 +9,9 @@ import '../../../../core/theme/app_text_styles.dart';
 import 'dashed_circle_border.dart';
 
 /// Content for onboarding's second page — what the app lets a buyer inspect
-/// before deciding (zoom every image, read every attribute we hold).
+/// before deciding (zoom every image, read the attributes we publish — not
+/// *every* attribute we hold: `reference_url` is withheld by ADR-0014 D6 and
+/// `needs_review` by ADR-0009 D6, which is why the copy dropped "ทั้งหมด").
 ///
 /// Figma: node 7:2, frame "Onboarding - Authenticate". The frame's original
 /// copy ("100% Authenticated Originals", plus a "ยืนยันแล้ว" label under the

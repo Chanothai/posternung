@@ -32,18 +32,31 @@ const _forbiddenTokens = <String>[
   'verificationNote',
 ];
 
+/// ไฟล์เดียวที่ได้รับยกเว้น — ตัวเทสนี้เอง ซึ่งต้องเขียนโทเคนออกมาตรง ๆ เพื่อไล่หามัน
+///
+/// เขียนเป็น path เต็มจาก root ไม่ใช่แค่ชื่อไฟล์ เพื่อไม่ให้ไฟล์ชื่อเดียวกันที่อื่น
+/// ได้รับยกเว้นตามไปด้วยโดยไม่ตั้งใจ
+const _selfPath =
+    'test/features/poster/verification_fields_not_wired_test.dart';
+
 void main() {
-  test('lib/ ยังไม่อ้าง verification_* เลย (ADR-0014 D5.1 — R2 ยังไม่ปลดล็อก)', () {
-    final libDir = Directory('lib');
-    expect(
-      libDir.existsSync(),
-      isTrue,
-      reason: 'ต้องรันเทสจาก root ของ package (ที่เดียวกับ pubspec.yaml)',
-    );
+  test('lib/ และ test/ ยังไม่อ้าง verification_* เลย (ADR-0014 D5.1)', () {
+    // 🔴 สแกน `test/` ด้วย ไม่ใช่แค่ `lib/` — มติผู้ใช้ 2026-08-05:
+    // "ถ้ามีคนเขียน test ที่ assert ว่า verification_* แสดงผลได้ นั่นคือสัญญาณว่า
+    //  กำลังจะต่อ UI ก่อน OD-2 ผ่าน" · เทสที่มาก่อนโค้ดคือสัญญาณที่มาเร็วกว่าโค้ด
+    final roots = [Directory('lib'), Directory('test')];
+    for (final dir in roots) {
+      expect(
+        dir.existsSync(),
+        isTrue,
+        reason: 'ต้องรันเทสจาก root ของ package (ที่เดียวกับ pubspec.yaml)',
+      );
+    }
 
     final offenders = <String>[];
-    for (final entity in libDir.listSync(recursive: true)) {
+    for (final entity in roots.expand((dir) => dir.listSync(recursive: true))) {
       if (entity is! File || !entity.path.endsWith('.dart')) continue;
+      if (entity.path.endsWith(_selfPath)) continue;
       final source = entity.readAsStringSync();
       for (final token in _forbiddenTokens) {
         if (source.contains(token)) {
@@ -56,7 +69,7 @@ void main() {
       offenders,
       isEmpty,
       reason:
-          'พบการอ้าง verification_* ใน lib/ — ADR-0014 D5.1 ห้ามแสดงฟิลด์นี้บนจอ\n'
+          'พบการอ้าง verification_* ใน lib/ หรือ test/ — ADR-0014 D5.1 ห้ามแสดงฟิลด์นี้บนจอ\n'
           'จนกว่า OD-2 (ตรวจข้อความทางกฎหมาย) จะถูกปิดว่าผ่านแล้ว\n'
           'ถ้า OD-2 ผ่านแล้วจริง: อัปเดต ADR-0014 ก่อน แล้วลบไฟล์เทสนี้ทิ้งทั้งไฟล์\n'
           'ห้ามแก้ _forbiddenTokens ให้เทสเขียวโดยที่ ADR ยังไม่เปลี่ยน\n'
