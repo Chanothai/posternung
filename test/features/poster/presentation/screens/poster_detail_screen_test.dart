@@ -8,13 +8,16 @@ import 'package:posternung/core/catalog/release_region.dart';
 import 'package:posternung/core/catalog/restoration_status.dart';
 import 'package:posternung/core/catalog/size_format.dart';
 import 'package:posternung/core/error/catalog_exception.dart';
+import 'package:posternung/core/strings/app_strings.dart';
 import 'package:posternung/core/theme/app_colors.dart';
+import 'package:posternung/core/widgets/gradient_background.dart';
 import 'package:posternung/features/poster/domain/entities/poster_detail.dart';
 import 'package:posternung/features/poster/domain/entities/poster_image.dart';
 import 'package:posternung/features/poster/domain/entities/poster_status.dart';
 import 'package:posternung/features/poster/presentation/providers/poster_providers.dart';
 import 'package:posternung/features/poster/presentation/screens/poster_detail_screen.dart';
 import 'package:posternung/features/poster/presentation/widgets/poster_detail_image_gallery.dart';
+import 'package:posternung/features/poster/presentation/widgets/poster_details_accordion.dart';
 
 /// Fake ViewModel that resolves/throws exactly what the test wants —
 /// `build()` throwing is the framework-idiomatic way `AsyncNotifier`
@@ -305,10 +308,16 @@ void main() {
       ),
     ];
 
+    // Narrowed to the dots' own 6px size (ADR-0012 §D1 7:1067) — a plain
+    // `shape == circle` predicate now also matches the Authenticity ring
+    // (48px) and the app bar's two glass buttons (40px), both new this
+    // round.
     Finder dotFinder() => find.byWidgetPredicate((widget) {
       if (widget is! Container) return false;
       final decoration = widget.decoration;
-      return decoration is BoxDecoration && decoration.shape == BoxShape.circle;
+      return decoration is BoxDecoration &&
+          decoration.shape == BoxShape.circle &&
+          widget.constraints?.maxWidth == 6;
     });
 
     Color? dotColorAt(WidgetTester tester, int index) {
@@ -340,14 +349,16 @@ void main() {
       await tester.pumpWidget(wrap(detail: _fullPoster(images: images)));
       await tester.pump();
 
-      expect(dotColorAt(tester, 0), AppColors.accent);
-      expect(dotColorAt(tester, 1), isNot(AppColors.accent));
+      // ADR-0012 §D1 (7:1067) — the active dot is `AppColors.textPrimary`
+      // now, not `AppColors.accent`.
+      expect(dotColorAt(tester, 0), AppColors.textPrimary);
+      expect(dotColorAt(tester, 1), isNot(AppColors.textPrimary));
 
       await tester.drag(find.byType(PageView), const Offset(-800, 0));
       await tester.pumpAndSettle();
 
-      expect(dotColorAt(tester, 0), isNot(AppColors.accent));
-      expect(dotColorAt(tester, 1), AppColors.accent);
+      expect(dotColorAt(tester, 0), isNot(AppColors.textPrimary));
+      expect(dotColorAt(tester, 1), AppColors.textPrimary);
     });
 
     testWidgets('a single image shows no dot indicator at all', (tester) async {
@@ -535,11 +546,23 @@ void main() {
         // Exact full-line match: catches a leaked prefix in *any* form,
         // not just the literal wire value "UNKNOWN" (which the UI was
         // never going to render as-is — it renders the enum's Thai label).
+        // This alone already proves the label never reached the subtitle —
+        // an exact match would fail if it had.
         expect(
           find.text('1941 • ${SizeFormat.oneSheet.label} • Warner Bros'),
           findsOneWidget,
         );
-        expect(find.textContaining(ReleaseRegion.unknown.label), findsNothing);
+        // A page-wide `textContaining` search stopped being a safe proxy
+        // for "not in the subtitle" once ADR-0012 §D4 made the details
+        // accordion `initiallyExpanded: true`: §D9 also puts a real
+        // release_region UNKNOWN into the accordion *on purpose*
+        // (AC-11 — "release_region = UNKNOWN ลงมาเป็นแถวในกล่องพับแทน"),
+        // and that row now renders unconditionally instead of needing a
+        // tap to expand first, so the same Thai label legitimately shows
+        // up there. Assert its (correct) accordion location explicitly
+        // instead of a page-wide absence, so the two cases stay
+        // distinguishable.
+        expect(find.text(ReleaseRegion.unknown.label), findsOneWidget);
       },
     );
 
@@ -825,5 +848,222 @@ void main() {
 
       expect(viewModel.refreshCalls, 1);
     });
+  });
+
+  group('ADR-0012 / AC-12 — figma visual scope', () {
+    testWidgets('the gradient background is used, matching every other screen '
+        '(§D1 — SCR-05 was the one screen still on a flat ColoredBox)', (
+      tester,
+    ) async {
+      await useTallSurface(tester);
+      await tester.pumpWidget(wrap(detail: _fullPoster()));
+      await tester.pump();
+
+      expect(find.byType(AppGradientBackground), findsOneWidget);
+    });
+
+    testWidgets(
+      'the app bar floats transparent over the body rather than sitting in '
+      'its own opaque strip (§D1 7:981)',
+      (tester) async {
+        await useTallSurface(tester);
+        await tester.pumpWidget(wrap(detail: _fullPoster()));
+        await tester.pump();
+
+        expect(
+          tester.widget<AppBar>(find.byType(AppBar)).backgroundColor,
+          Colors.transparent,
+        );
+        expect(
+          tester.widget<Scaffold>(find.byType(Scaffold)).extendBodyBehindAppBar,
+          isTrue,
+        );
+      },
+    );
+
+    // 🔴 code-critic round 1 (High), mutation 5 + 6b — the first version of
+    // this group searched for *literal English* copy lifted straight from
+    // the figma frame ('Add to Cart', 'Paper Stock', 'Shipping', 'Returns',
+    // 'Certificate of Authenticity', '27"'), but every string this app
+    // actually renders comes from `AppStrings` and is 100% Thai — none of
+    // those literals can *ever* appear on screen, mutated or not, so the
+    // old assertions were unconditionally green (proven: adding real
+    // Paper-Stock/Format rows in Thai, and a full heart-button +
+    // Add-to-Cart-bar mutation, both left every old assertion passing).
+    // `find.byIcon(Icons.favorite/...)` had the same hole one level up —
+    // it never covered the `_rounded`/`_sharp`/`_outlined` variant icon
+    // families. Rewritten below to assert on *structure* (exact counts of
+    // interactive-widget types, an explicit content allowlist) instead of
+    // guessing which language or icon a mutation might use.
+    testWidgets(
+      'the exact set of interactive controls on screen is the audited set '
+      '— nothing else may register a tap, regardless of language or icon',
+      (tester) async {
+        await useTallSurface(tester);
+        await tester.pumpWidget(
+          wrap(
+            detail: _fullPoster(
+              images: const [
+                PosterImage(
+                  id: 'i1',
+                  url: 'https://example.invalid/1.jpg',
+                  isPrimary: true,
+                  sortOrder: 0,
+                ),
+              ],
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // Back + zoom — a wishlist/heart `IconButton` (or any other third
+        // one) fails this no matter which icon glyph it uses.
+        expect(find.byType(IconButton), findsNWidgets(2));
+        // ADR-0005 §D1 — this screen is read-only. No button-shaped widget
+        // of any kind exists here at all; an "Add to Cart" control built as
+        // any of these fails here regardless of its label's language.
+        expect(find.byType(ElevatedButton), findsNothing);
+        expect(find.byType(FilledButton), findsNothing);
+        expect(find.byType(OutlinedButton), findsNothing);
+        expect(find.byType(TextButton), findsNothing);
+        // Exactly five things may register a tap here. Two of them are the
+        // `IconButton`s already counted above — Material 3's `IconButton`
+        // is a `ButtonStyleButton` under the hood, which wraps itself in an
+        // `InkWell` too (confirmed against the Flutter 3.44 SDK source; a
+        // plain `InkResponse` assumption would have under-counted this).
+        // The other three are the zoom hint, the condition-grade badge
+        // (opens the scale guide, ADR-0003), and the details accordion's
+        // own header (collapse/expand) — `ListTile` always wraps itself in
+        // exactly one `InkWell`, which is what `ExpansionTile` uses under
+        // the hood for its header row. A sixth would mean a new tappable
+        // control slipped in somewhere that isn't an `IconButton`/
+        // `*Button` (already ruled out above).
+        final tappableInkWells = tester
+            .widgetList<InkWell>(find.byType(InkWell))
+            .where((w) => w.onTap != null)
+            .length;
+        expect(tappableInkWells, 5);
+        // Every `InkWell` above is itself implemented with an internal
+        // `GestureDetector(onTap: handleTap, ...)` (confirmed against the
+        // SDK source — `ink_well.dart`'s `_InkResponseState.build()`), so
+        // this count tracks the `InkWell` count 1:1 — *unless* something
+        // adds a raw `GestureDetector(onTap: ...)` that isn't backed by an
+        // `InkWell` at all (a plausible way to build a custom "Add to
+        // Cart" control without Material's ripple), which would push this
+        // past 5 without moving the `InkWell` count above. The gallery's
+        // double-tap-to-zoom `GestureDetector` doesn't count here — it
+        // sets `onDoubleTap`, never `onTap`.
+        final tappableGestureDetectors = tester
+            .widgetList<GestureDetector>(find.byType(GestureDetector))
+            .where((w) => w.onTap != null)
+            .length;
+        expect(tappableGestureDetectors, 5);
+        // §D8 — no sticky Add to Cart bar. `bottomNavigationBar` alone
+        // isn't enough (a bar built as a `Positioned` inside the body
+        // `Stack` instead would slip past it), but the button/tap-surface
+        // counts above already account for every interactive element on
+        // screen, and `14:59` — the one piece of the bar's copy that isn't
+        // free-form Thai prose an allowlist could dodge — still has to
+        // literally not exist.
+        expect(
+          tester.widget<Scaffold>(find.byType(Scaffold)).bottomNavigationBar,
+          isNull,
+        );
+        expect(find.text('14:59'), findsNothing);
+        // §D8 — exactly the one Details accordion; not a second, empty
+        // "Shipping & Returns" one.
+        expect(find.byType(ExpansionTile), findsOneWidget);
+        expect(find.byType(PosterDetailsAccordion), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      "the details accordion's content is exactly what this fixture's "
+      'fields produce — a new row (Paper Stock/Format, in any language) '
+      'changes this count, where a literal-text search could not see it',
+      (tester) async {
+        await useTallSurface(tester);
+        await tester.pumpWidget(wrap(detail: _fullPoster()));
+        await tester.pump();
+
+        // `_fullPoster()` only ever populates `size`/`provenance`/
+        // `description` (`posterType`/`releaseDateText`/`copyrightYear`/
+        // `restorationNote` are hardcoded null in this fixture, and
+        // `releaseRegion` isn't UNKNOWN here) — so the accordion holds
+        // exactly 3 rows: the section title plus 3×(label, value) = 7
+        // `Text` nodes total. See `poster_details_accordion_test.dart` for
+        // the exhaustive, all-fields-populated version of this same check.
+        expect(
+          tester.widgetList<Text>(
+            find.descendant(
+              of: find.byType(PosterDetailsAccordion),
+              matching: find.byType(Text),
+            ),
+          ),
+          hasLength(7),
+        );
+      },
+    );
+
+    // 🔴 code-critic round 2, mutations 10a/12 — the round-1 fix covered
+    // *tappable controls* and the accordion's *own* content, but nothing
+    // else in the body: a COA sentence appended to
+    // `PosterAuthenticitySection` and a static-text (no `ExpansionTile`, no
+    // tappable widget at all) "Shipping & Returns" block both slipped
+    // straight past every round-1 assertion — 121/121 green both times
+    // (recorded in skill `project-gotchas`). Neither is a tappable control
+    // and neither is inside `PosterDetailsAccordion`, so nothing from
+    // round 1 was even looking at them. This closes that gap the same way
+    // `poster_details_accordion_test.dart` closed mutation 5: a
+    // closed-world content check, just scoped to the rest of the body
+    // instead of the accordion.
+    testWidgets(
+      "the body's text outside the details accordion is exactly what this "
+      "fixture's fields produce — a new sentence anywhere else in the body "
+      '(COA wording, a static Shipping & Returns block, in any language) '
+      'changes this set, where neither a tappable-control count nor the '
+      'accordion-only check could see it (code-critic round 2, mutations '
+      '10a/12)',
+      (tester) async {
+        await useTallSurface(tester);
+        await tester.pumpWidget(wrap(detail: _fullPoster()));
+        await tester.pump();
+
+        // Every `Text` inside `PosterDetailsAccordion` is already covered
+        // by the check above (and by `poster_details_accordion_test.dart`
+        // exhaustively) — exclude it here so this test owns exactly the
+        // complementary scope, not an overlapping one.
+        final accordionTexts = find
+            .descendant(
+              of: find.byType(PosterDetailsAccordion),
+              matching: find.byType(Text),
+            )
+            .evaluate()
+            .toSet();
+        final outsideAccordionTexts = find
+            .descendant(of: find.byType(ListView), matching: find.byType(Text))
+            .evaluate()
+            .where((element) => !accordionTexts.contains(element))
+            .map((element) => (element.widget as Text).data)
+            .toSet();
+
+        // Built from `AppStrings` constants and the fixture's own data —
+        // never a literal copy-pasted from the design or from what the app
+        // happens to render today (the whole point of a closed-world
+        // check is that it can't be satisfied by accident).
+        const grade = PosterConditionGrade.veryGood;
+        expect(outsideAccordionTexts, {
+          'Blade Runner', // title — _fullPoster()'s own value
+          '1982s • Warner Bros', // subtitle — era_decade + studio fallback
+          '฿450.00', // price — formatThbPrice('450.00')
+          // ConditionGradeIndicator's own mandated format (ADR-0003).
+          '${grade.label} (${grade.scalePosition}/${grade.scaleLength})',
+          AppStrings.posterDetailSingleStockNotice,
+          AppStrings.posterDetailAuthenticitySectionTitle,
+          AppStrings.posterDetailAuthenticVerifiedLabel,
+          'Verified by in-house expert.', // authenticityNote — fixture data
+        });
+      },
+    );
   });
 }

@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +14,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/condition_grade_indicator.dart';
+import '../../../../core/widgets/gradient_background.dart';
 import '../../domain/entities/poster_detail.dart';
 import '../../domain/entities/poster_status.dart';
 import '../providers/poster_providers.dart';
@@ -29,6 +31,17 @@ import '../widgets/poster_sold_banner.dart';
 /// Cart, no quantity selector — `/cart/reserve` is still `x-status: DRAFT`.
 /// Answers US-01 only; US-16 (COA) is deferred (see `docs/screens.yaml`'s
 /// `deferred_stories` for SCR-05 and ADR-0005 §D2).
+///
+/// Visual layer restyled per ADR-0012 (figma `7:959`) — **only** the eight
+/// items in its §D1 table: `AppGradientBackground` behind everything, a
+/// full-bleed image carousel with a translucent header floating on top of
+/// it, an in-frame page indicator, a fit-content urgency badge, a
+/// ringed-icon Authenticity section, and label/value accordion rows opened
+/// by default. Everything ADR-0012 §D2–D8 refuses (heart/share buttons, the
+/// sticky Add to Cart bar, Shipping & Returns, Paper Stock/Format rows,
+/// measured inches, grade-in-accordion, price-on-title-row, an on-image zoom
+/// button) is **not** in this file on purpose — see the ADR before adding
+/// any of it back.
 class PosterDetailScreen extends ConsumerStatefulWidget {
   const PosterDetailScreen({super.key, required this.posterId});
 
@@ -90,13 +103,33 @@ class _PosterDetailScreenState extends ConsumerState<PosterDetailScreen>
 
     return Scaffold(
       backgroundColor: AppColors.surfaceDark,
+      // ADR-0012 §D1 (7:981) — the header floats *on top of* the image
+      // rather than sitting in its own opaque strip above it, so the body
+      // has to paint underneath the app bar's area too.
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: AppColors.surfaceDark,
+        // Transparent by default so the full-bleed image (or the gradient,
+        // in the loading/error states) shows straight through; the bar
+        // solidifies as the list scrolls via `_AppBarBackdrop` below —
+        // that's the "พื้นหลังแถบทึบขึ้นตาม scroll" half of 7:981, driven by
+        // the same scroll-fade math `_CollapsingAppBarTitle` already used
+        // for the title.
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          tooltip: AppStrings.posterDetailBackButtonTooltip,
-          onPressed: () => Navigator.of(context).pop(),
+        flexibleSpace: _AppBarBackdrop(controller: _scrollController),
+        // `AppSpacing.lg` (16) left inset + the button's own 48px tap area
+        // (code-critic round 1, Medium — see `_GlassCircleButton`) —
+        // measured close to figma's `pl-16` rather than the default
+        // `leadingWidth` (56) centering a smaller button with an
+        // uncontrolled, narrower inset.
+        leadingWidth: AppSpacing.lg + _GlassCircleButton.hitArea,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: AppSpacing.lg),
+          child: _GlassCircleButton(
+            icon: Icons.arrow_back,
+            tooltip: AppStrings.posterDetailBackButtonTooltip,
+            onPressed: () => Navigator.of(context).pop(),
+          ),
         ),
         // Nothing to name until the poster has actually loaded — the bar is
         // deliberately bare over the image, and there is no scrollable at all
@@ -111,36 +144,92 @@ class _PosterDetailScreenState extends ConsumerState<PosterDetailScreen>
         // poster whose ratio isn't 2:3, and a button pinned to the frame's
         // corner then floats in that empty band, reading as a control for the
         // whole screen instead of for the image. Here it is always present,
-        // and shares the bar with the title rather than replacing it.
-        actions: [if (hasImage) _ZoomAction(controller: _zoomController)],
+        // and shares the bar with the title rather than replacing it
+        // (ADR-0012 §D5 — this stays exactly where it is, figma's on-image
+        // 32px corner button is not followed).
+        actions: [
+          if (hasImage)
+            Padding(
+              // `AppSpacing.lg` (16) right inset, matching the leading
+              // button — see its comment above.
+              padding: const EdgeInsets.only(right: AppSpacing.lg),
+              child: _ZoomAction(controller: _zoomController),
+            ),
+        ],
       ),
-      body: asyncDetail.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.accent),
-        ),
-        error: (error, stackTrace) =>
-            error is CatalogException && error.code == 'POSTER_NOT_FOUND'
-            ? PosterNotFoundView(
-                message: error.message,
-                onGoBack: () => Navigator.of(context).pop(),
-              )
-            : PosterErrorView(
-                message: error is CatalogException ? error.message : null,
-                onRetry: _notifier.refresh,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // ADR-0012 §D1 — SCR-05 was the one screen still on a flat
+          // `ColoredBox`; every other screen already uses this.
+          const AppGradientBackground(),
+          asyncDetail.when(
+            loading: () => const Center(
+              child: CircularProgressIndicator(color: AppColors.accent),
+            ),
+            error: (error, stackTrace) =>
+                error is CatalogException && error.code == 'POSTER_NOT_FOUND'
+                ? PosterNotFoundView(
+                    message: error.message,
+                    onGoBack: () => Navigator.of(context).pop(),
+                  )
+                : PosterErrorView(
+                    message: error is CatalogException ? error.message : null,
+                    onRetry: _notifier.refresh,
+                  ),
+            data: (poster) => RefreshIndicator(
+              onRefresh: _notifier.refresh,
+              color: AppColors.accent,
+              child: _PosterDetailBody(
+                poster: poster,
+                scrollController: _scrollController,
+                zoomController: _zoomController,
+                onBrowseOthers: () => Navigator.of(context).pop(),
               ),
-        data: (poster) => RefreshIndicator(
-          onRefresh: _notifier.refresh,
-          color: AppColors.accent,
-          child: _PosterDetailBody(
-            poster: poster,
-            scrollController: _scrollController,
-            zoomController: _zoomController,
-            onBrowseOthers: () => Navigator.of(context).pop(),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
+}
+
+/// Shared by [_CollapsingAppBarTitle] and [_AppBarBackdrop] — both fade in
+/// over the same span as the full-bleed gallery scrolls past, so they have
+/// to agree on when "past" is.
+///
+/// 0 while the poster still leads the screen, 1 once it has gone.
+///
+/// Keyed to the image's height — it leads the list and sizes itself off the
+/// list's own width (now the *full* screen width, since the gallery is
+/// full-bleed per ADR-0012 §D1 7:1061 — no more subtracting the list's
+/// horizontal padding) — but **capped at `maxScrollExtent`**. Without that
+/// cap a listing whose text is shorter than its image can never scroll far
+/// enough to reveal the title/backdrop at all: a 2:3 image at full device
+/// width is taller than most single-poster listings' total scroll extent.
+double _headerFadeProgress(ScrollController controller, double imageHeight) {
+  if (!controller.hasClients) return 0;
+
+  final position = controller.position;
+  // The bar builds before the list has laid out, and reading either extent
+  // before then throws rather than returning a default.
+  if (!position.hasContentDimensions || !position.hasPixels) return 0;
+  // Nothing scrolls, so the poster never leaves and neither the title nor
+  // the backdrop earns its place in the bar.
+  if (position.maxScrollExtent <= 0) return 0;
+
+  final end = math.min(imageHeight, position.maxScrollExtent);
+  final start = math.max(0.0, end - kToolbarHeight);
+  if (end <= start) return position.pixels >= end ? 1 : 0;
+  return ((position.pixels - start) / (end - start)).clamp(0.0, 1.0);
+}
+
+/// The full-bleed gallery's height at this device width — see
+/// [_headerFadeProgress]'s doc for why this is the full width now, not the
+/// list's content width.
+double _fullBleedImageHeight(BuildContext context) {
+  final width = MediaQuery.sizeOf(context).width;
+  return width / AppDimens.posterCardAspectRatio;
 }
 
 /// The bar keeps its height and its back button at every offset — only the
@@ -156,36 +245,9 @@ class _CollapsingAppBarTitle extends StatelessWidget {
   final ScrollController controller;
   final String title;
 
-  /// 0 while the poster still leads the screen, 1 once it has gone.
-  ///
-  /// Keyed to the image's height — it leads the list and sizes itself off the
-  /// list's own width, so the offset where it clears the top is derivable
-  /// rather than measured — but **capped at `maxScrollExtent`**. Without that
-  /// cap a listing whose text is shorter than its image can never scroll far
-  /// enough to reveal the title at all: a 2:3 image on a phone is ~537pt tall
-  /// against ~500pt of total scroll, so the plain image-height threshold is
-  /// unreachable in exactly the common case.
-  double _fadeProgress(double imageHeight) {
-    if (!controller.hasClients) return 0;
-
-    final position = controller.position;
-    // The bar builds before the list has laid out, and reading either extent
-    // before then throws rather than returning a default.
-    if (!position.hasContentDimensions || !position.hasPixels) return 0;
-    // Nothing scrolls, so the poster never leaves and the title never earns
-    // its place in the bar.
-    if (position.maxScrollExtent <= 0) return 0;
-
-    final end = math.min(imageHeight, position.maxScrollExtent);
-    final start = math.max(0.0, end - kToolbarHeight);
-    if (end <= start) return position.pixels >= end ? 1 : 0;
-    return ((position.pixels - start) / (end - start)).clamp(0.0, 1.0);
-  }
-
   @override
   Widget build(BuildContext context) {
-    final contentWidth = MediaQuery.sizeOf(context).width - AppSpacing.lg * 2;
-    final imageHeight = contentWidth / AppDimens.posterCardAspectRatio;
+    final imageHeight = _fullBleedImageHeight(context);
 
     return AnimatedBuilder(
       animation: controller,
@@ -197,8 +259,107 @@ class _CollapsingAppBarTitle extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      builder: (context, child) =>
-          Opacity(opacity: _fadeProgress(imageHeight), child: child),
+      builder: (context, child) => Opacity(
+        opacity: _headerFadeProgress(controller, imageHeight),
+        child: child,
+      ),
+    );
+  }
+}
+
+/// ADR-0012 §D1 (7:981) — the app bar's own background, separate from the
+/// glass buttons riding on top of it: starts fully transparent (so the
+/// full-bleed image/gradient shows straight through) and solidifies to
+/// `AppColors.surfaceDark` over the same scroll span
+/// [_CollapsingAppBarTitle] uses for the title, via [flexibleSpace] rather
+/// than `SliverAppBar`/`FlexibleSpaceBar` (forbidden by ADR-0012 A5 — the
+/// gallery has to stay inside the plain `ListView`).
+class _AppBarBackdrop extends StatelessWidget {
+  const _AppBarBackdrop({required this.controller});
+
+  final ScrollController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final imageHeight = _fullBleedImageHeight(context);
+
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) => DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.surfaceDark.withValues(
+            alpha: _headerFadeProgress(controller, imageHeight),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The 40px translucent glass button (ADR-0012 §D1 7:981) both the back
+/// button and [_ZoomAction] render as — `rgba(0,0,0,0.4)` fill, blurred
+/// backdrop, and a faint `rgba(255,255,255,0.1)` ring, floating directly on
+/// the image rather than sitting in an opaque bar. Wraps a real `IconButton`
+/// rather than a bare `GestureDetector` so the tooltip/semantics/ripple
+/// behaviour every call site already relied on keeps working unchanged.
+///
+/// 🔴 code-critic round 1 (Medium) measured the first version of this
+/// widget's actual tap target at 38×38 — the *whole* button (glass circle
+/// **and** its `IconButton`) was sized to the 40px visual diameter, short of
+/// both Material's 48dp and Apple's 44pt minimums, on a control that AC-1
+/// gates inspecting condition before a non-refundable purchase (ADR-0002).
+/// The visual stays exactly 40px (ADR-0012 §D1 is about the glass circle's
+/// look, not the tap target); only `IconButton.constraints` grows to
+/// [hitArea] now, via the `icon:` slot rather than the outer size — the
+/// glass circle becomes the *content* `IconButton` centers inside its own
+/// larger, invisible hit box, instead of being the box.
+class _GlassCircleButton extends StatelessWidget {
+  const _GlassCircleButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  static const _diameter = 40.0;
+
+  /// Material's 48dp / Apple HIG's 44pt minimum touch target — see the
+  /// class doc.
+  static const hitArea = 48.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(
+        width: hitArea,
+        height: hitArea,
+      ),
+      onPressed: onPressed,
+      tooltip: tooltip,
+      icon: ClipOval(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Container(
+            width: _diameter,
+            height: _diameter,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.black.withValues(alpha: 0.4),
+              border: Border.all(color: AppColors.white.withValues(alpha: 0.1)),
+            ),
+            child: Icon(
+              icon,
+              size: AppDimens.iconMd,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -217,18 +378,14 @@ class _ZoomAction extends StatelessWidget {
       listenable: controller,
       builder: (context, _) {
         final zoomedIn = controller.isZoomed;
-        return IconButton(
-          onPressed: controller.toggle,
+        return _GlassCircleButton(
+          icon: zoomedIn ? Icons.zoom_out : Icons.zoom_in,
           // An icon-only control has no other source for an accessible name;
           // `IconButton` reuses the tooltip as one.
           tooltip: zoomedIn
               ? AppStrings.posterDetailZoomOutTooltip
               : AppStrings.posterDetailZoomInTooltip,
-          icon: Icon(
-            zoomedIn ? Icons.zoom_out : Icons.zoom_in,
-            size: AppDimens.iconMd,
-            color: AppColors.textPrimary,
-          ),
+          onPressed: controller.toggle,
         );
       },
     );
@@ -276,69 +433,77 @@ class _PosterDetailBodyState extends State<_PosterDetailBody> {
       physics: imageZoomed
           ? const NeverScrollableScrollPhysics()
           : const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        0,
-        AppSpacing.lg,
-        AppSpacing.xxxl,
-      ),
+      // No horizontal padding at the list level any more — the gallery
+      // below needs to be full-bleed (ADR-0012 §D1 7:1061), so every other
+      // block supplies its own 24px horizontal padding instead of sharing
+      // one list-wide value (§D1's "ระยะขอบบล็อกข้อมูล 16 → 24").
+      padding: const EdgeInsets.only(bottom: AppSpacing.xxxl),
       children: [
-        // The rounded clip moved inside the gallery — it now ends with a
-        // caption that must not be rounded along with the image.
         PosterDetailImageGallery(
           poster: poster,
           zoomController: widget.zoomController,
         ),
-        const SizedBox(height: AppSpacing.lg),
-        if (poster.status == PosterStatus.sold)
-          PosterSoldBanner(onBrowseOthers: widget.onBrowseOthers),
-        Text(poster.title, style: AppTextStyles.authCardHeading),
-        if (_subtitle != null) ...[
-          const SizedBox(height: AppSpacing.xs),
-          Text(_subtitle!, style: AppTextStyles.cardSubtitle),
-        ],
-        const SizedBox(height: AppSpacing.md),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              _formattedPrice,
-              style: AppTextStyles.homeSectionHeading.copyWith(
-                color: AppColors.accent,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.xl,
+            AppSpacing.lg,
+            AppSpacing.xl,
+            0,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (poster.status == PosterStatus.sold)
+                PosterSoldBanner(onBrowseOthers: widget.onBrowseOthers),
+              Text(poster.title, style: AppTextStyles.authCardHeading),
+              if (_subtitle != null) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Text(_subtitle!, style: AppTextStyles.cardSubtitle),
+              ],
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _formattedPrice,
+                    style: AppTextStyles.homeSectionHeading.copyWith(
+                      color: AppColors.accent,
+                    ),
+                  ),
+                  ConditionGradeIndicator(grade: poster.conditionGrade),
+                ],
               ),
-            ),
-            ConditionGradeIndicator(grade: poster.conditionGrade),
-          ],
-        ),
-        // OD-1 (ข) / ADR-0011 §D2′ (GATE 3) — the restoration fact lives on
-        // its own line under the price/grade row, not crammed into that
-        // row's `spaceBetween` Row as a third item (overflow risk on
-        // narrow screens). Renders only for RESTORED/LINEN_BACKED; NONE,
-        // UNKNOWN, and null all render nothing (see
-        // `PosterRestorationBadge.showsFor`). The spacing above it is only
-        // added when it will actually show something, so there is no stray
-        // gap otherwise.
-        if (_showsRestorationBadge) ...[
-          const SizedBox(height: AppSpacing.sm),
-          PosterRestorationBadge(status: poster.restorationStatus),
-        ],
-        const SizedBox(height: AppSpacing.md),
-        PosterAvailabilityStatus(status: poster.status),
-        const SizedBox(height: AppSpacing.xl),
-        PosterAuthenticitySection(
-          isAuthenticated: poster.isAuthenticated,
-          authenticityNote: poster.authenticityNote,
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        PosterDetailsAccordion(
-          posterType: poster.posterType,
-          size: poster.size,
-          releaseDateText: poster.releaseDateText,
-          copyrightYear: poster.copyrightYear,
-          provenance: poster.provenance,
-          restorationNote: poster.restorationNote,
-          description: poster.description,
-          releaseRegion: poster.releaseRegion,
+              // OD-1 (ข) / ADR-0011 §D2′ (GATE 3) — the restoration fact lives
+              // on its own line under the price/grade row, not crammed into
+              // that row's `spaceBetween` Row as a third item (overflow risk
+              // on narrow screens). Renders only for RESTORED/LINEN_BACKED;
+              // NONE, UNKNOWN, and null all render nothing (see
+              // `PosterRestorationBadge.showsFor`). The spacing above it is
+              // only added when it will actually show something, so there is
+              // no stray gap otherwise.
+              if (_showsRestorationBadge) ...[
+                const SizedBox(height: AppSpacing.sm),
+                PosterRestorationBadge(status: poster.restorationStatus),
+              ],
+              const SizedBox(height: AppSpacing.md),
+              PosterAvailabilityStatus(status: poster.status),
+              PosterAuthenticitySection(
+                isAuthenticated: poster.isAuthenticated,
+                authenticityNote: poster.authenticityNote,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              PosterDetailsAccordion(
+                posterType: poster.posterType,
+                size: poster.size,
+                releaseDateText: poster.releaseDateText,
+                copyrightYear: poster.copyrightYear,
+                provenance: poster.provenance,
+                restorationNote: poster.restorationNote,
+                description: poster.description,
+                releaseRegion: poster.releaseRegion,
+              ),
+            ],
+          ),
         ),
       ],
     );

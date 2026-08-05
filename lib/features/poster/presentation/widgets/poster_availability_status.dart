@@ -12,6 +12,13 @@ import '../../domain/entities/poster_status.dart';
 /// flow this round. Also covers `reserved`/`sold` so a status change picked
 /// up by `PosterDetailViewModel.refresh()` (AC-5) renders in place, without
 /// a separate screen swap.
+///
+/// `available` renders as ADR-0012 §D1's urgency badge (figma 7:1002) — a
+/// fit-content, `AppColors.accentRed` box with a 16px icon. `reserved` keeps
+/// its pre-existing full-width notice: the figma frame this round follows
+/// only ever shows the `available` state, so there is nothing to restyle it
+/// against. Both branches keep their own copy from `AppStrings` — the figma
+/// text ("Only 1 Available") is never hardcoded here (ADR-0012 §D1).
 class PosterAvailabilityStatus extends StatelessWidget {
   const PosterAvailabilityStatus({super.key, required this.status});
 
@@ -20,9 +27,8 @@ class PosterAvailabilityStatus extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (status) {
-      PosterStatus.available => _Notice(
+      PosterStatus.available => const _UrgencyBadge(
         text: AppStrings.posterDetailSingleStockNotice,
-        color: AppColors.textSecondary,
       ),
       PosterStatus.reserved => _Notice(
         text: AppStrings.posterDetailReservedNotice,
@@ -30,6 +36,53 @@ class PosterAvailabilityStatus extends StatelessWidget {
       ),
       PosterStatus.sold => const SizedBox.shrink(),
     };
+  }
+}
+
+/// ADR-0012 §D1 (7:1002) — a box sized to its own content (not
+/// `double.infinity` like [_Notice]), radius 4, a 16px icon, and
+/// `AppColors.accentRed` throughout. `Flexible` around the text rather than
+/// an unconstrained `Row` — the Thai copy is a full sentence, not a short
+/// label, and has to wrap onto a second line instead of overflowing when it
+/// doesn't fit on one.
+class _UrgencyBadge extends StatelessWidget {
+  const _UrgencyBadge({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.borderMuted),
+        borderRadius: BorderRadius.circular(AppRadius.xs),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.warning_amber_rounded,
+            size: 16,
+            color: AppColors.accentRed,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Flexible(
+            child: Text(
+              text,
+              style: AppTextStyles.homePosterSubtitle.copyWith(
+                color: AppColors.accentRed,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

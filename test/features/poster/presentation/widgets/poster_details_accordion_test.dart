@@ -10,10 +10,12 @@ void main() {
     home: Scaffold(body: SingleChildScrollView(child: child)),
   );
 
-  /// `ExpansionTile` only builds its `children` into the tree once expanded
-  /// — every assertion about row content has to expand it first.
+  /// ADR-0012 §D4 made the tile `initiallyExpanded: true`, so its `children`
+  /// are already in the tree after the first pump — this used to tap the
+  /// tile to open it, which would now toggle it *closed* instead. Kept as a
+  /// named no-op (rather than deleted at every call site) so a future
+  /// revert of §D4 has one place to restore the tap.
   Future<void> expand(WidgetTester tester) async {
-    await tester.tap(find.byType(ExpansionTile));
     await tester.pumpAndSettle();
   }
 
@@ -322,4 +324,97 @@ void main() {
       },
     );
   });
+
+  // 🔴 code-critic round 1 (High), mutation 5 — added Paper Stock/Format
+  // rows here using real Thai `AppStrings`-style labels, and every
+  // `find.textContaining('Paper Stock'/'Format')` assertion in
+  // `poster_detail_screen_test.dart` stayed green, because that copy is
+  // English and this app's copy never is. A closed-world content check
+  // catches an extra row regardless of what language or text it uses.
+  testWidgets(
+    'with every field populated, the accordion renders exactly the title '
+    'plus one (label, value) pair per field — no more, no less, in any '
+    'language (code-critic mutation 5)',
+    (tester) async {
+      await tester.pumpWidget(
+        wrap(accordion(releaseRegion: ReleaseRegion.unknown)),
+      );
+      await expand(tester);
+
+      final texts = tester
+          .widgetList<Text>(
+            find.descendant(
+              of: find.byType(ExpansionTile),
+              matching: find.byType(Text),
+            ),
+          )
+          .map((t) => t.data)
+          .toList();
+
+      expect(texts.length, 17); // title + 8 fields × (label, value)
+      expect(texts.toSet(), {
+        AppStrings.posterDetailDetailsSectionTitle,
+        AppStrings.posterDetailPosterTypeLabel,
+        fullPosterType.label,
+        AppStrings.posterDetailSizeLabel,
+        fullSize,
+        AppStrings.posterDetailReleaseDateTextLabel,
+        fullReleaseDateText,
+        AppStrings.posterDetailCopyrightYearLabel,
+        '$fullCopyrightYear',
+        AppStrings.posterDetailProvenanceLabel,
+        fullProvenance,
+        AppStrings.posterDetailRestorationNoteLabel,
+        fullRestorationNote,
+        AppStrings.posterDetailDescriptionLabel,
+        fullDescription,
+        AppStrings.posterDetailReleaseRegionLabel,
+        ReleaseRegion.unknown.label,
+      });
+    },
+  );
+
+  // 🔴 code-critic round 1 (Medium) — the bare `Text(label)` in `_inline()`
+  // had no width limit, so it could push past the row on a real phone
+  // width; `useTallSurface`'s 800px-wide binding everywhere else in this
+  // suite never exercises that. A/B proof from code-critic: HEAD (the old
+  // label-above-value `Column` layout) overflowed 0/9 width×textScale
+  // combinations, the un-`Flexible`d `Row` overflowed 6/9. This pins the
+  // fix (`Flexible` around the label) at both a narrow phone width and a
+  // large accessibility text scale — the two axes that actually surfaced
+  // the class.
+  testWidgets(
+    'a long label does not overflow its row on a narrow phone width with a '
+    'large text scale (code-critic A/B: 6/9 combinations overflowed before '
+    '`Flexible`)',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(1.5)),
+            child: child!,
+          ),
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: accordion(
+                // The longest real label in the allowlist — the one most
+                // likely to actually collide with the value column.
+                posterType: fullPosterType,
+                size: fullSize,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

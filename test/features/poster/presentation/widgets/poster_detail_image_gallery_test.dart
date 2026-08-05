@@ -210,24 +210,30 @@ void main() {
     expect(pageViewPhysics(tester), isA<NeverScrollableScrollPhysics>());
   });
 
-  testWidgets('the hint sits above the page dots, not below them', (
-    tester,
-  ) async {
-    await pumpGallery(tester);
+  testWidgets(
+    'the page dots float inside the image frame, above the hint below it '
+    '(ADR-0012 §D1 7:1067 moved them off their own row under the image)',
+    (tester) async {
+      await pumpGallery(tester);
 
-    final hint = tester.getCenter(find.text(AppStrings.posterDetailZoomHint));
-    // The dots are the only circular Containers in the tree.
-    final dots = tester.getCenter(
-      find.byWidgetPredicate((widget) {
-        if (widget is! Container) return false;
-        final decoration = widget.decoration;
-        return decoration is BoxDecoration &&
-            decoration.shape == BoxShape.circle;
-      }).first,
-    );
+      final hint = tester.getCenter(find.text(AppStrings.posterDetailZoomHint));
+      // The dots are the only circular Containers in the tree.
+      final dots = tester.getCenter(
+        find.byWidgetPredicate((widget) {
+          if (widget is! Container) return false;
+          final decoration = widget.decoration;
+          return decoration is BoxDecoration &&
+              decoration.shape == BoxShape.circle;
+        }).first,
+      );
 
-    expect(hint.dy, lessThan(dots.dy));
-  });
+      // Dots now sit inside the image frame (a Positioned overlay near its
+      // bottom edge), which is entirely above the hint text block that
+      // follows the frame — the inverse of the pre-ADR-0012 layout, where
+      // the dots were their own row below the hint.
+      expect(dots.dy, lessThan(hint.dy));
+    },
+  );
 
   testWidgets('the hint says why to zoom, and rides along with the images', (
     tester,

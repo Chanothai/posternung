@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/catalog/poster_type.dart';
 import '../../../../core/catalog/release_region.dart';
+import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -29,6 +30,16 @@ import '../../../../core/theme/app_text_styles.dart';
 /// `restoration_note` · `description` — so a whitespace-only value is
 /// trimmed and treated the same as `null`, both for hiding its own row and
 /// for [_hasAnyRow].
+///
+/// Restyled per ADR-0012 §D1 (figma 7:1019): rows read label-left/value-right
+/// with a bottom divider, and the tile is `initiallyExpanded: true` (§D4) —
+/// AC-7's hide-empty rule still governs which rows exist at all; this only
+/// changes how an existing row is laid out. Three rows are the documented
+/// exception and stay label-above-value instead: `description`,
+/// `provenance`, and `restoration_note` are free-text and can run long
+/// enough that squeezing them onto the label's row would crush the value
+/// column, so `_DetailRow(stacked: true)` keeps them on their own line
+/// underneath the label.
 class PosterDetailsAccordion extends StatelessWidget {
   const PosterDetailsAccordion({
     super.key,
@@ -88,6 +99,11 @@ class PosterDetailsAccordion extends StatelessWidget {
       // itself — this screen already separates sections with spacing.
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
+        // ADR-0012 §D4 — open by default on entry. AC-7's hide-empty rule is
+        // unaffected: `initiallyExpanded` only decides the tile's starting
+        // state, not which rows exist — a row whose field is null still
+        // never renders, expanded or not.
+        initiallyExpanded: true,
         tilePadding: EdgeInsets.zero,
         childrenPadding: const EdgeInsets.only(bottom: 8),
         iconColor: AppColors.textSecondary,
@@ -114,20 +130,25 @@ class PosterDetailsAccordion extends StatelessWidget {
               label: AppStrings.posterDetailCopyrightYearLabel,
               value: '${copyrightYear!}',
             ),
+          // The three free-text fields below stay label-above-value — see
+          // the class doc's ADR-0012 §D1 note.
           if (_provenance != null)
             _DetailRow(
               label: AppStrings.posterDetailProvenanceLabel,
               value: _provenance!,
+              stacked: true,
             ),
           if (_restorationNote != null)
             _DetailRow(
               label: AppStrings.posterDetailRestorationNoteLabel,
               value: _restorationNote!,
+              stacked: true,
             ),
           if (_description != null)
             _DetailRow(
               label: AppStrings.posterDetailDescriptionLabel,
               value: _description!,
+              stacked: true,
             ),
           if (_releaseRegionUnknownRow)
             _DetailRow(
@@ -141,23 +162,64 @@ class PosterDetailsAccordion extends StatelessWidget {
 }
 
 class _DetailRow extends StatelessWidget {
-  const _DetailRow({required this.label, required this.value});
+  const _DetailRow({
+    required this.label,
+    required this.value,
+    this.stacked = false,
+  });
 
   final String label;
   final String value;
 
+  /// `true` for the three free-text fields (`description`, `provenance`,
+  /// `restoration_note`) that can run long enough to crush a value column —
+  /// see the class doc. `false` (default) lays out label-left/value-right,
+  /// per ADR-0012 §D1 7:1019.
+  final bool stacked;
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: AppTextStyles.inputLabel),
-          const SizedBox(height: 2),
-          Text(value, style: AppTextStyles.bodyDescription),
-        ],
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.borderMuted)),
       ),
+      child: stacked ? _stacked() : _inline(),
+    );
+  }
+
+  Widget _inline() {
+    // code-critic (round 1, Medium) — a bare `Text(label)` here is an
+    // unconstrained-width child in a `Row`, so it never wraps; on a narrow
+    // device (or a large `textScaler`) it pushes past the row's edge
+    // instead of giving ground to the value column, an overflow class the
+    // 800px-wide `useTallSurface` test binding never exercises. `Flexible`
+    // bounds it to its share of the row (matching `Expanded` on the value
+    // side) and lets it wrap onto a second line instead.
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Flexible(child: Text(label, style: AppTextStyles.inputLabel)),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Text(
+            value,
+            style: AppTextStyles.bodyDescription,
+            textAlign: TextAlign.right,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _stacked() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: AppTextStyles.inputLabel),
+        const SizedBox(height: AppSpacing.xs),
+        Text(value, style: AppTextStyles.bodyDescription),
+      ],
     );
   }
 }

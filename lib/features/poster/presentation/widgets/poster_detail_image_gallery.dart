@@ -17,6 +17,14 @@ import '../../domain/entities/poster_detail.dart';
 /// all — a poster with neither `images` nor `primary_image_url` is a real,
 /// null-safe case per ADR-0005, not an error.
 ///
+/// ADR-0012 §D1 (figma 7:1061/7:1067) restyled this to full-bleed (the
+/// screen no longer pads its sides) with an `rgba(0,0,0,0.5)` backdrop
+/// behind the frame — which doubles as cover for `BoxFit.contain`'s
+/// letterbox band on a non-2:3 poster — and moved the page-dot indicator to
+/// float inside the image frame instead of sitting below it. The zoom hint
+/// stays exactly where it was (ADR-0012 §D5): directly under the image
+/// block, above nothing now that the dots have moved inside it.
+///
 /// Pinch-to-zoom is invisible on its own, so the same zoom is reachable three
 /// ways: the pinch, a double tap, and a visible button on the image. Device
 /// verification of SCR-05 found buyers never discovering it at all, which
@@ -224,71 +232,96 @@ class _PosterDetailImageGalleryState extends State<PosterDetailImageGallery>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // The clip lives here rather than around the whole widget: the caption
-        // below is part of the gallery, but rounding *it* would leave the
-        // image's own bottom corners square.
-        ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          child: AspectRatio(
-            key: _viewportKey,
-            aspectRatio: AppDimens.posterCardAspectRatio,
-            child: urls.isEmpty
-                ? const _ImagePlaceholder()
-                : PageView.builder(
-                    controller: _pageController,
-                    physics: _zoomed
-                        ? const NeverScrollableScrollPhysics()
-                        : null,
-                    itemCount: urls.length,
-                    onPageChanged: (index) {
-                      // Belt and braces — a page can only change at scale 1 now,
-                      // so the matrix is already identity by the time this runs.
-                      _transformationController.value = Matrix4.identity();
-                      setState(() => _page = index);
-                    },
-                    itemBuilder: (context, index) => GestureDetector(
-                      // A double tap needs no travel at all, so it never
-                      // competes with the pan/scale recognizers that resolve on
-                      // slop — this adds a second way in without touching the
-                      // arena balance the zoom fix depends on.
-                      onDoubleTapDown: (details) =>
-                          _doubleTapPosition = details.localPosition,
-                      onDoubleTap: () => _toggleZoom(focus: _doubleTapPosition),
-                      child: InteractiveViewer(
-                        transformationController: _transformationController,
-                        // The default (0.8) lets the image settle *smaller* than
-                        // its frame, so "zoomed all the way out" would stop short
-                        // of identity and leave the swipe still locked. Exactly 1
-                        // lands zoom-out back on the swipeable state.
-                        minScale: 1,
-                        maxScale: _maxScale,
-                        // A finger beats an in-flight animation — otherwise the
-                        // two fight over the same matrix and the image stutters.
-                        onInteractionStart: (_) => _zoomAnimation.stop(),
-                        child: Image.network(
-                          urls[index],
-                          // AC-1 wants close-up shots of edges/corners readable
-                          // as authenticity evidence — `BoxFit.cover` would crop
-                          // exactly that content to fill the frame, so this uses
-                          // `contain` instead even though it can letterbox
-                          // non-matching aspect ratios.
-                          fit: BoxFit.contain,
-                          width: double.infinity,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const _ImagePlaceholder(),
-                          loadingBuilder: (context, child, progress) {
-                            if (progress == null) return child;
-                            return const _ImagePlaceholder();
-                          },
+        Stack(
+          children: [
+            // ADR-0012 §D1 (7:1061) — full-bleed, no rounding: the frame now
+            // runs edge-to-edge with the screen, so a rounded corner would
+            // just clip against a straight edge. The rgba(0,0,0,0.5) backdrop
+            // reuses `posterPlaceholderFill` (the same value the no-image
+            // placeholder already renders) rather than a new color, and
+            // covers `BoxFit.contain`'s letterbox band on a non-2:3 poster.
+            Container(
+              color: AppColors.posterPlaceholderFill,
+              child: AspectRatio(
+                key: _viewportKey,
+                aspectRatio: AppDimens.posterCardAspectRatio,
+                child: urls.isEmpty
+                    ? const _ImagePlaceholder()
+                    : PageView.builder(
+                        controller: _pageController,
+                        physics: _zoomed
+                            ? const NeverScrollableScrollPhysics()
+                            : null,
+                        itemCount: urls.length,
+                        onPageChanged: (index) {
+                          // Belt and braces — a page can only change at scale
+                          // 1 now, so the matrix is already identity by the
+                          // time this runs.
+                          _transformationController.value = Matrix4.identity();
+                          setState(() => _page = index);
+                        },
+                        itemBuilder: (context, index) => GestureDetector(
+                          // A double tap needs no travel at all, so it never
+                          // competes with the pan/scale recognizers that
+                          // resolve on slop — this adds a second way in
+                          // without touching the arena balance the zoom fix
+                          // depends on.
+                          onDoubleTapDown: (details) =>
+                              _doubleTapPosition = details.localPosition,
+                          onDoubleTap: () =>
+                              _toggleZoom(focus: _doubleTapPosition),
+                          child: InteractiveViewer(
+                            transformationController: _transformationController,
+                            // The default (0.8) lets the image settle
+                            // *smaller* than its frame, so "zoomed all the
+                            // way out" would stop short of identity and
+                            // leave the swipe still locked. Exactly 1 lands
+                            // zoom-out back on the swipeable state.
+                            minScale: 1,
+                            maxScale: _maxScale,
+                            // A finger beats an in-flight animation —
+                            // otherwise the two fight over the same matrix
+                            // and the image stutters.
+                            onInteractionStart: (_) => _zoomAnimation.stop(),
+                            child: Image.network(
+                              urls[index],
+                              // AC-1 wants close-up shots of edges/corners
+                              // readable as authenticity evidence —
+                              // `BoxFit.cover` would crop exactly that
+                              // content to fill the frame, so this uses
+                              // `contain` instead even though it can
+                              // letterbox non-matching aspect ratios.
+                              fit: BoxFit.contain,
+                              width: double.infinity,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const _ImagePlaceholder(),
+                              loadingBuilder: (context, child, progress) {
+                                if (progress == null) return child;
+                                return const _ImagePlaceholder();
+                              },
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-          ),
+              ),
+            ),
+            // ADR-0012 §D1 (7:1067) — an overlay inside the frame now, not a
+            // row below it. Still gated on more than one image: the design
+            // draws a fixed 4 dots, but a single-image poster must not fake
+            // a page count it doesn't have (docs/screens.yaml SCR-05).
+            if (urls.length > 1)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: AppSpacing.lg,
+                child: Center(
+                  child: _PageIndicator(count: urls.length, page: _page),
+                ),
+              ),
+          ],
         ),
-        // Order matters: the hint sits directly under the image so it reads as
-        // being about the image, and *above* the page dots so it can't be
-        // mistaken for a label describing them.
+        // The hint sits directly under the image frame, same as before
+        // (ADR-0012 §D5 — neither its position nor its existence changed).
         if (urls.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.sm),
           Center(
@@ -312,29 +345,47 @@ class _PosterDetailImageGalleryState extends State<PosterDetailImageGallery>
             ),
           ),
         ],
-        if (urls.length > 1) ...[
-          const SizedBox(height: AppSpacing.xs),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(
-              urls.length,
-              (index) => Container(
-                margin: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xs / 2,
-                ),
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: index == _page
-                      ? AppColors.accent
-                      : AppColors.white.withValues(alpha: 0.4),
-                ),
-              ),
+      ],
+    );
+  }
+}
+
+/// The in-frame page-dot pill (ADR-0012 §D1 7:1067) — `rgba(0,0,0,0.4)`
+/// background, 6px dots, active dot in `AppColors.textPrimary`.
+class _PageIndicator extends StatelessWidget {
+  const _PageIndicator({required this.count, required this.page});
+
+  final int count;
+  final int page;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(AppRadius.full),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(
+          count,
+          (index) => Container(
+            margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xs / 2),
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: index == page
+                  ? AppColors.textPrimary
+                  : AppColors.white.withValues(alpha: 0.4),
             ),
           ),
-        ],
-      ],
+        ),
+      ),
     );
   }
 }
