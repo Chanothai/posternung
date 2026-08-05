@@ -8,9 +8,17 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import 'dashed_circle_border.dart';
 
-/// Content for onboarding's second page ("100% Authenticated Originals").
+/// Content for onboarding's second page — what the app lets a buyer inspect
+/// before deciding (zoom every image, read the attributes we publish — not
+/// *every* attribute we hold: `reference_url` is withheld by ADR-0014 D6 and
+/// `needs_review` by ADR-0009 D6, which is why the copy dropped "ทั้งหมด").
 ///
-/// Figma: node 7:2, frame "Onboarding - Authenticate".
+/// Figma: node 7:2, frame "Onboarding - Authenticate". The frame's original
+/// copy ("100% Authenticated Originals", plus a "ยืนยันแล้ว" label under the
+/// centrepiece icon) is deliberately gone: ADR-0014 D1 bans claiming the goods
+/// are certified authentic, on every channel. The icon stays — on its own it
+/// reads as a question mark in a dashed circle, not an external certification
+/// mark. Don't reinstate the label from the design file.
 class OnboardingAuthenticatePageContent extends StatelessWidget {
   const OnboardingAuthenticatePageContent({super.key});
 
@@ -59,29 +67,19 @@ class _CenterpieceBadge extends StatelessWidget {
             child: ClipOval(
               child: DashedCircleBorder(
                 child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.accent.withValues(alpha: 0.6),
-                              blurRadius: 7.5,
-                            ),
-                          ],
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.accent.withValues(alpha: 0.6),
+                          blurRadius: 7.5,
                         ),
-                        child: SvgPicture.asset(AppImages.verifiedBadgeIcon),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(
-                        AppStrings.onboardingVerifiedBadge,
-                        style: AppTextStyles.badgeLabel,
-                      ),
-                    ],
+                      ],
+                    ),
+                    child: SvgPicture.asset(AppImages.verifiedBadgeIcon),
                   ),
                 ),
               ),

@@ -14,11 +14,14 @@ import '../widgets/onboarding_footer.dart';
 import '../widgets/onboarding_header.dart';
 import '../widgets/onboarding_limit_stock_page_content.dart';
 
-/// Onboarding flow: 3 swipeable pages ("Own a Piece of Cinema History",
-/// "100% Authenticated Originals", "Limited Stock — One of a Kind"),
-/// advanceable by swipe or by tapping "Next".
+/// Onboarding flow: 3 swipeable pages — own a piece of cinema history, inspect
+/// a poster in full before deciding, stock is one of a kind — advanceable by
+/// swipe or by tapping "Next".
 ///
-/// Figma: nodes 6:2, 7:2, 7:90.
+/// Figma: nodes 6:2, 7:2, 7:90. Page 2 no longer matches the frame's title
+/// ("100% Authenticated Originals"): ADR-0014 D1 bans claiming the goods are
+/// certified authentic, so the page now describes what the app lets a buyer
+/// see. Copy lives in `AppStrings`; the Figma frames are stale on this point.
 class OnboardingPageViewScreen extends ConsumerStatefulWidget {
   const OnboardingPageViewScreen({super.key});
 
