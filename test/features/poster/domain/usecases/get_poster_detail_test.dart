@@ -61,12 +61,9 @@ void main() {
   );
 
   test('propagates CatalogException thrown by the repository', () async {
-    when(() => repository.getPosterDetail('missing')).thenThrow(
-      const CatalogException(
-        code: 'POSTER_NOT_FOUND',
-        message: 'ไม่พบโปสเตอร์นี้',
-      ),
-    );
+    when(
+      () => repository.getPosterDetail('missing'),
+    ).thenThrow(const CatalogException(code: 'POSTER_NOT_FOUND'));
 
     expect(
       () => usecase('missing'),

@@ -72,27 +72,28 @@ void main() {
       );
     });
 
-    test(
-      'wraps a non-FirebaseAuthException failure (a PlatformException from '
-      "the plugin channel, say) into an AuthException that names the real "
-      'type — this used to escape uncaught and reach the login/OTP screen '
-      'as a code-less generic error with no way to tell what actually broke',
-      () async {
-        when(
-          () => firebaseAuth.signInWithCredential(any()),
-        ).thenThrow(PlatformException(code: 'channel-error', message: 'boom'));
+    test('wraps a non-FirebaseAuthException failure (a PlatformException from '
+        "the plugin channel, say) into an AuthException with a fixed code — "
+        'this used to escape uncaught and reach the login/OTP screen as a '
+        'code-less generic error with no way to tell what actually broke; '
+        'ADR-0017 D6 forbids composing the code from runtimeType, so the real '
+        'type now lands in debugDetail instead', () async {
+      when(
+        () => firebaseAuth.signInWithCredential(any()),
+      ).thenThrow(PlatformException(code: 'channel-error', message: 'boom'));
 
-        expect(
-          () => dataSource.confirmCode(verificationId: 'v', smsCode: '123456'),
-          throwsA(
-            isA<AuthException>().having(
-              (e) => e.code,
-              'code',
-              contains('PlatformException'),
-            ),
-          ),
-        );
-      },
-    );
+      expect(
+        () => dataSource.confirmCode(verificationId: 'v', smsCode: '123456'),
+        throwsA(
+          isA<AuthException>()
+              .having((e) => e.code, 'code', 'phone_confirm_unexpected')
+              .having(
+                (e) => e.debugDetail,
+                'debugDetail',
+                contains('PlatformException'),
+              ),
+        ),
+      );
+    });
   });
 }

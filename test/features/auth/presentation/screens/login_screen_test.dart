@@ -133,7 +133,10 @@ void main() {
         wrap(
           errorToThrow: const AuthException(
             code: 'wrong-password',
-            message: 'The password is invalid.',
+            // Firebase's own English text — real data sources put this in
+            // debugDetail (ADR-0017 D2/D7); asserted below that it never
+            // reaches the widget tree no matter what a guard puts here.
+            debugDetail: 'The password is invalid.',
           ),
         ),
       );
@@ -236,7 +239,7 @@ void main() {
           wrap(
             confirmPhoneCodeErrorToThrow: const AuthException(
               code: 'invalid-verification-code',
-              message: 'The SMS code has expired.',
+              debugDetail: 'The SMS code has expired.',
             ),
           ),
         );

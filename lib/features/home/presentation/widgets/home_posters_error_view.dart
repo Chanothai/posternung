@@ -15,9 +15,10 @@ import '../../../../core/widgets/app_status_view.dart';
 class HomePostersErrorView extends StatelessWidget {
   const HomePostersErrorView({super.key, this.message, required this.onRetry});
 
-  /// The backend's own `CatalogException.message` (already Thai — see
-  /// `PosterRemoteDataSource._guard`) when there is one, so the user sees
-  /// what actually failed instead of one generic line for every cause.
+  /// Resolved via `catalogErrorMessageFor` (ADR-0017 D4/D9) — the backend's
+  /// own Thai `displayMessage` when there is one (see
+  /// `PosterRemoteDataSource._guard`), so the user sees what actually
+  /// failed instead of one generic line for every cause.
   final String? message;
 
   final VoidCallback onRetry;

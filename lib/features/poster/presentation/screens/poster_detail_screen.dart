@@ -17,6 +17,7 @@ import '../../../../core/widgets/condition_grade_indicator.dart';
 import '../../../../core/widgets/gradient_background.dart';
 import '../../domain/entities/poster_detail.dart';
 import '../../domain/entities/poster_status.dart';
+import '../catalog_error_display.dart';
 import '../providers/poster_providers.dart';
 import '../widgets/poster_authenticity_section.dart';
 import '../widgets/poster_availability_status.dart';
@@ -170,11 +171,17 @@ class _PosterDetailScreenState extends ConsumerState<PosterDetailScreen>
             error: (error, stackTrace) =>
                 error is CatalogException && error.code == 'POSTER_NOT_FOUND'
                 ? PosterNotFoundView(
-                    message: error.message,
+                    message: catalogErrorDisplayMessage(
+                      error,
+                      fallback: AppStrings.posterDetailNotFoundBody,
+                    ),
                     onGoBack: () => Navigator.of(context).pop(),
                   )
                 : PosterErrorView(
-                    message: error is CatalogException ? error.message : null,
+                    message: catalogErrorMessageFor(
+                      error,
+                      fallback: AppStrings.posterDetailErrorBody,
+                    ),
                     onRetry: _notifier.refresh,
                   ),
             data: (poster) => RefreshIndicator(

@@ -48,9 +48,11 @@ class AppStatusView extends StatelessWidget {
   final IconData icon;
   final String title;
 
-  /// The explanation under [title]. Call sites pass the backend's own Thai
-  /// `CatalogException.message` when there is one, so the user sees what
-  /// actually failed instead of one generic line for every cause.
+  /// The explanation under [title]. Call sites resolve this through the
+  /// ADR-0017 D4/D9 mapper (`catalogErrorDisplayMessage`/`authErrorDisplay`
+  /// — never a raw `CatalogException`/`AuthException` field directly) so the
+  /// user sees what actually failed instead of one generic line for every
+  /// cause, without a hand-rolled `is CatalogException` check at each site.
   final String body;
 
   final AppStatusTone tone;

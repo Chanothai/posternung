@@ -34,7 +34,7 @@ void main() {
   test('propagates AuthException thrown by the repository', () async {
     when(
       () => repository.signInWithApple(),
-    ).thenThrow(const AuthException(code: 'invalid', message: 'bad token'));
+    ).thenThrow(const AuthException(code: 'invalid'));
 
     expect(() => usecase(), throwsA(isA<AuthException>()));
   });

@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../../core/error/auth_exception.dart';
-import '../../../../core/strings/app_strings.dart';
+import '../../../../core/error/debug_log.dart';
 import '../models/backend_user.dart';
 import '../models/token_response.dart';
 
@@ -100,57 +100,39 @@ class BackendAuthDataSourceImpl implements BackendAuthDataSource {
       return await action();
     } on DioException catch (e) {
       // The backend replies with a `{error_code, message, details}` envelope
-      // (message already Thai) for every AppError — surface it verbatim so the
-      // login screen can show the real code + message.
+      // (message already Thai) for every AppError — this is the *only* place
+      // `displayMessage` is allowed to come from (ADR-0017 D2). `details[]`
+      // is never rendered (D3) — captured as `debugDetail` only.
       final data = e.response?.data;
       if (data is Map && data['error_code'] is String) {
         throw AuthException(
           code: data['error_code'] as String,
-          message: (data['message'] as String?) ?? AppStrings.authErrorGeneric,
+          displayMessage: data['message'] as String?,
+          debugDetail: logDebugDetail(
+            data['details']?.toString(),
+            source: 'backend_auth_envelope',
+          ),
         );
       }
 
-      // FastAPI's own request-validation failure (a malformed request body —
-      // e.g. an empty `id_token` tripping Pydantic's `min_length=1`) answers
-      // 422 with `{detail: [{loc, msg, ...}, ...]}`, not the AppError
-      // envelope above. Without this branch it fell through to the generic
-      // `unknown_error` case below, which gives no hint what was wrong.
-      if (data is Map && data['detail'] is List) {
-        final fields = (data['detail'] as List)
-            .whereType<Map>()
-            .map((d) {
-              final loc = d['loc'];
-              final field = loc is List && loc.isNotEmpty
-                  ? loc.last.toString()
-                  : '?';
-              return '$field: ${d['msg'] ?? 'invalid'}';
-            })
-            .join('; ');
-        throw AuthException(
-          code: 'validation_error',
-          message: fields.isEmpty ? AppStrings.authErrorGeneric : fields,
-        );
-      }
+      // ADR-0017 D8: FastAPI's `{detail: [{loc, msg, ...}, ...]}` request-
+      // validation shape used to be parsed here to render Pydantic's own
+      // field names on screen — proven dead code (the backend always wraps
+      // `RequestValidationError` into the `{error_code, message, details}`
+      // envelope above, `app/main.py:73-114`), and the one path through it
+      // that could ever fire rendered internal field names verbatim. Falls
+      // through to the generic cases below instead.
 
       // No structured envelope (connection failure, gateway/non-JSON 5xx, …)
-      // → a stable code + Thai fallback message by failure type.
+      // → a stable code; `authErrorDisplay`'s feature table maps it to Thai.
       final status = e.response?.statusCode;
       if (status == null) {
-        throw const AuthException(
-          code: 'network_error',
-          message: AppStrings.authErrorNetwork,
-        );
+        throw const AuthException(code: 'network_error');
       }
       if (status >= 500) {
-        throw const AuthException(
-          code: 'server_error',
-          message: AppStrings.authErrorServer,
-        );
+        throw const AuthException(code: 'server_error');
       }
-      throw const AuthException(
-        code: 'unknown_error',
-        message: AppStrings.authErrorGeneric,
-      );
+      throw const AuthException(code: 'unknown_error');
     } on AuthException {
       rethrow;
     } catch (e) {
@@ -158,10 +140,12 @@ class BackendAuthDataSourceImpl implements BackendAuthDataSource {
       // TokenResponse.fromJson/BackendUser.fromJson can't parse, a
       // PlatformException from secure storage, etc. — used to escape this
       // method (and this whole datasource) uncaught, reaching the UI as a
-      // bare object with no `code` to display.
+      // bare object with no `code` to display. `code` is fixed, never
+      // composed from `e.runtimeType` (ADR-0017 D6); the type still goes to
+      // `debugDetail`.
       throw AuthException(
-        code: 'unexpected_${e.runtimeType}',
-        message: e.toString(),
+        code: 'backend_guard_unexpected',
+        debugDetail: logDebugDetail(e.toString(), source: 'backend_auth_guard'),
       );
     }
   }

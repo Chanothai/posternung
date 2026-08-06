@@ -1,4 +1,5 @@
 import '../../../../core/error/catalog_exception.dart';
+import '../../../../core/error/debug_log.dart';
 import '../../domain/entities/paginated_posters.dart';
 import '../../domain/entities/poster_detail.dart';
 import '../../domain/repositories/poster_repository.dart';
@@ -19,10 +20,14 @@ class PosterRepositoryImpl implements PosterRepository {
     } catch (e) {
       // toEntity() itself can throw CatalogException (unrecognized status)
       // — already handled above — this catches anything else unexpected so
-      // it never reaches the ViewModel as a bare, code-less object.
+      // it never reaches the ViewModel as a bare, code-less object. `code`
+      // is fixed, never composed from `e.runtimeType` (ADR-0017 D6).
       throw CatalogException(
-        code: 'unexpected_${e.runtimeType}',
-        message: e.toString(),
+        code: 'catalog_repo_detail_unexpected',
+        debugDetail: logDebugDetail(
+          e.toString(),
+          source: 'catalog_repo_detail',
+        ),
       );
     }
   }
@@ -41,9 +46,10 @@ class PosterRepositoryImpl implements PosterRepository {
     } on CatalogException {
       rethrow;
     } catch (e) {
+      // `code` is fixed, never composed from `e.runtimeType` (ADR-0017 D6).
       throw CatalogException(
-        code: 'unexpected_${e.runtimeType}',
-        message: e.toString(),
+        code: 'catalog_repo_list_unexpected',
+        debugDetail: logDebugDetail(e.toString(), source: 'catalog_repo_list'),
       );
     }
   }

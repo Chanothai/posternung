@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 
 import '../../../../core/error/auth_exception.dart';
-import '../../../../core/strings/app_strings.dart';
+import '../../../../core/error/debug_log.dart';
 
 /// Owns the Firebase email/password flow and returns a **Firebase ID token**
 /// for the backend to verify (`POST /auth/firebase` runs
@@ -83,23 +83,31 @@ class EmailPasswordSignInDataSourceImpl
       // the backend's Pydantic `min_length=1` with a 422 that looked like any
       // other failure. Same trap already fixed in PhoneSignInDataSource.
       if (idToken == null || idToken.isEmpty) {
-        throw const AuthException(
-          code: 'missing_id_token',
-          message: AppStrings.authErrorGeneric,
-        );
+        throw const AuthException(code: 'missing_id_token');
       }
       return idToken;
     } on FirebaseAuthException catch (e) {
-      throw AuthException(code: e.code, message: e.message ?? e.code);
+      // `e.message` is Firebase's own English diagnostic text — never a
+      // display string (ADR-0017 D2). `authErrorDisplay` maps `e.code` to
+      // Thai; this is debug-only.
+      throw AuthException(
+        code: e.code,
+        debugDetail: logDebugDetail(e.message, source: 'email_password_signin'),
+      );
     } on AuthException {
       rethrow;
     } catch (e) {
       // Anything that isn't a Firebase error still has to reach the UI with a
       // code attached — an unlabelled error renders as a generic Thai line
       // with no code, which is indistinguishable from "nothing is wrong".
+      // `code` is a fixed string, never composed from `e.runtimeType`
+      // (ADR-0017 D6) — the type still goes to `debugDetail` for diagnosis.
       throw AuthException(
-        code: 'email_password_${e.runtimeType}',
-        message: AppStrings.authErrorGeneric,
+        code: 'email_password_unexpected',
+        debugDetail: logDebugDetail(
+          e.toString(),
+          source: 'email_password_signin',
+        ),
       );
     }
   }

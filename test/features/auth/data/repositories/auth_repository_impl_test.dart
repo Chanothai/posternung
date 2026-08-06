@@ -36,7 +36,8 @@ void main() {
     });
 
     test('maps a FirebaseAuthException into an AuthException with the same '
-        'code/message', () async {
+        'code, and the SDK message only as debugDetail (ADR-0017 D2 — never '
+        'displayMessage)', () async {
       when(() => dataSource.signOut()).thenThrow(
         FirebaseAuthException(
           code: 'network-request-failed',
@@ -49,7 +50,8 @@ void main() {
         throwsA(
           isA<AuthException>()
               .having((e) => e.code, 'code', 'network-request-failed')
-              .having((e) => e.message, 'message', 'no network'),
+              .having((e) => e.debugDetail, 'debugDetail', 'no network')
+              .having((e) => e.displayMessage, 'displayMessage', isNull),
         ),
       );
     });

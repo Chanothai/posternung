@@ -83,7 +83,11 @@ void main() {
         throwsA(
           isA<CatalogException>()
               .having((e) => e.code, 'code', 'POSTER_NOT_FOUND')
-              .having((e) => e.message, 'message', 'ไม่พบโปสเตอร์นี้'),
+              .having(
+                (e) => e.displayMessage,
+                'displayMessage',
+                'ไม่พบโปสเตอร์นี้',
+              ),
         ),
       );
     });
@@ -133,7 +137,7 @@ void main() {
           isA<CatalogException>().having(
             (e) => e.code,
             'code',
-            startsWith('unexpected_'),
+            'catalog_remote_guard_unexpected',
           ),
         ),
       );
@@ -241,7 +245,7 @@ void main() {
           isA<CatalogException>().having(
             (e) => e.code,
             'code',
-            startsWith('unexpected_'),
+            'catalog_remote_guard_unexpected',
           ),
         ),
       );

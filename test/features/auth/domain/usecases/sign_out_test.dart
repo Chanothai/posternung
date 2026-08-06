@@ -26,7 +26,7 @@ void main() {
   test('propagates AuthException thrown by the repository', () async {
     when(
       () => repository.signOut(),
-    ).thenThrow(const AuthException(code: 'unknown', message: 'nope'));
+    ).thenThrow(const AuthException(code: 'unknown'));
 
     expect(() => usecase(), throwsA(isA<AuthException>()));
   });

@@ -53,12 +53,9 @@ void main() {
   test(
     'propagates a CatalogException thrown by the datasource as-is',
     () async {
-      when(() => dataSource.getPosterDetail('missing')).thenThrow(
-        const CatalogException(
-          code: 'POSTER_NOT_FOUND',
-          message: 'ไม่พบโปสเตอร์นี้',
-        ),
-      );
+      when(
+        () => dataSource.getPosterDetail('missing'),
+      ).thenThrow(const CatalogException(code: 'POSTER_NOT_FOUND'));
 
       expect(
         () => repository.getPosterDetail('missing'),
@@ -74,17 +71,16 @@ void main() {
   );
 
   test('wraps an unexpected non-CatalogException failure so it never reaches '
-      'the ViewModel bare/code-less', () async {
+      'the ViewModel bare/code-less, with a fixed code (ADR-0017 D6 — never '
+      'composed from runtimeType)', () async {
     when(() => dataSource.getPosterDetail('p1')).thenThrow(StateError('boom'));
 
     expect(
       () => repository.getPosterDetail('p1'),
       throwsA(
-        isA<CatalogException>().having(
-          (e) => e.code,
-          'code',
-          startsWith('unexpected_'),
-        ),
+        isA<CatalogException>()
+            .having((e) => e.code, 'code', 'catalog_repo_detail_unexpected')
+            .having((e) => e.debugDetail, 'debugDetail', contains('boom')),
       ),
     );
   });
@@ -109,7 +105,7 @@ void main() {
           limit: any(named: 'limit'),
           offset: any(named: 'offset'),
         ),
-      ).thenThrow(const CatalogException(code: 'server_error', message: 'พัง'));
+      ).thenThrow(const CatalogException(code: 'server_error'));
 
       expect(
         () => repository.listPosters(limit: 20, offset: 0),
@@ -119,7 +115,8 @@ void main() {
       );
     });
 
-    test('wraps an unexpected non-CatalogException failure', () async {
+    test('wraps an unexpected non-CatalogException failure with a fixed code '
+        '(ADR-0017 D6 — never composed from runtimeType)', () async {
       when(
         () => dataSource.listPosters(
           limit: any(named: 'limit'),
@@ -133,7 +130,7 @@ void main() {
           isA<CatalogException>().having(
             (e) => e.code,
             'code',
-            startsWith('unexpected_'),
+            'catalog_repo_list_unexpected',
           ),
         ),
       );

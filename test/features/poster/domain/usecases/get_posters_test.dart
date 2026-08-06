@@ -67,12 +67,7 @@ void main() {
         limit: any(named: 'limit'),
         offset: any(named: 'offset'),
       ),
-    ).thenThrow(
-      const CatalogException(
-        code: 'server_error',
-        message: 'พังที่เซิร์ฟเวอร์',
-      ),
-    );
+    ).thenThrow(const CatalogException(code: 'server_error'));
 
     expect(
       () => usecase(),

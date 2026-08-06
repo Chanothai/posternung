@@ -117,7 +117,7 @@ void main() {
         wrap(
           errorToThrow: const AuthException(
             code: 'email-already-in-use',
-            message: 'The email address is already in use.',
+            debugDetail: 'The email address is already in use.',
           ),
         ),
       );

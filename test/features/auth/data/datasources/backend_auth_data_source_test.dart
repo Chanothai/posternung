@@ -91,8 +91,8 @@ void main() {
           isA<AuthException>()
               .having((e) => e.code, 'code', 'OAUTH_TOKEN_INVALID')
               .having(
-                (e) => e.message,
-                'message',
+                (e) => e.displayMessage,
+                'displayMessage',
                 'ไม่สามารถยืนยันตัวตนกับ Google ได้ กรุณาลองใหม่',
               ),
         ),
@@ -133,74 +133,103 @@ void main() {
       );
     });
 
-    test(
-      "surfaces FastAPI's own request-validation 422 ({detail: [...]}, not "
-      'the {error_code, message} AppError envelope) with the field that '
-      'failed — this is what an empty id_token (a real regression: '
-      'getIdToken() resolving to "" instead of null) looks like on the wire',
-      () async {
-        when(
-          () => dio.post<Map<String, dynamic>>(
-            any(),
-            data: any(named: 'data'),
-            options: any(named: 'options'),
-          ),
-        ).thenThrow(
-          _dioError(
-            422,
-            data: {
-              'detail': [
-                {
-                  'type': 'string_too_short',
-                  'loc': ['body', 'id_token'],
-                  'msg': 'String should have at least 1 character',
-                },
-              ],
-            },
-          ),
-        );
+    test('a validation failure (e.g. an empty id_token — the real regression: '
+        'getIdToken() resolving to "" instead of null) arrives through the '
+        'same {error_code, message} envelope as every other AppError — '
+        'app/main.py wraps RequestValidationError into it before this '
+        'datasource ever sees a raw FastAPI {detail: [...]} shape', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(
+        _dioError(
+          422,
+          data: {
+            'error_code': 'VALIDATION_ERROR',
+            'message': 'id_token ต้องไม่ว่างเปล่า',
+          },
+        ),
+      );
 
-        expect(
-          () => dataSource.firebaseLogin(''),
-          throwsA(
-            isA<AuthException>()
-                .having((e) => e.code, 'code', 'validation_error')
-                .having((e) => e.message, 'message', contains('id_token')),
-          ),
-        );
-      },
-    );
+      expect(
+        () => dataSource.firebaseLogin(''),
+        throwsA(
+          isA<AuthException>()
+              .having((e) => e.code, 'code', 'VALIDATION_ERROR')
+              .having(
+                (e) => e.displayMessage,
+                'displayMessage',
+                'id_token ต้องไม่ว่างเปล่า',
+              ),
+        ),
+      );
+    });
 
-    test(
-      'a non-DioException failure (a 200 response with no body, so '
-      "response.data! hits null) still reaches the caller as an "
-      'AuthException, not a raw TypeError with no code to show on screen',
-      () async {
-        when(
-          () => dio.post<Map<String, dynamic>>(
-            any(),
-            data: any(named: 'data'),
-            options: any(named: 'options'),
-          ),
-        ).thenAnswer(
-          (_) async => Response<Map<String, dynamic>>(
-            data: null,
-            requestOptions: RequestOptions(path: '/'),
-          ),
-        );
+    test('a raw FastAPI {detail: [...]} shape — the pre-ADR-0017 form this '
+        "datasource used to hand-parse into Pydantic's own field names, "
+        'proven dead code because the real backend never sends it to this '
+        'endpoint (ADR-0017 D8) — now falls through to the generic '
+        'unknown_error code instead of rendering internal field names on '
+        'screen if it ever somehow arrived', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(
+        _dioError(
+          422,
+          data: {
+            'detail': [
+              {
+                'type': 'string_too_short',
+                'loc': ['body', 'id_token'],
+                'msg': 'String should have at least 1 character',
+              },
+            ],
+          },
+        ),
+      );
 
-        expect(
-          () => dataSource.firebaseLogin('x'),
-          throwsA(
-            isA<AuthException>().having(
-              (e) => e.code,
-              'code',
-              startsWith('unexpected_'),
-            ),
-          ),
-        );
-      },
-    );
+      expect(
+        () => dataSource.firebaseLogin(''),
+        throwsA(
+          isA<AuthException>().having((e) => e.code, 'code', 'unknown_error'),
+        ),
+      );
+    });
+
+    test('a non-DioException failure (a 200 response with no body, so '
+        "response.data! hits null) still reaches the caller as an "
+        'AuthException with a fixed code (ADR-0017 D6 — never composed from '
+        "the object's Dart type), not a raw TypeError with nothing to show "
+        'on screen', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenAnswer(
+        (_) async => Response<Map<String, dynamic>>(
+          data: null,
+          requestOptions: RequestOptions(path: '/'),
+        ),
+      );
+
+      expect(
+        () => dataSource.firebaseLogin('x'),
+        throwsA(
+          isA<AuthException>()
+              .having((e) => e.code, 'code', 'backend_guard_unexpected')
+              .having((e) => e.debugDetail, 'debugDetail', isNotNull),
+        ),
+      );
+    });
   });
 
   group('getMe', () {
