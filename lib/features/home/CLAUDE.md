@@ -60,10 +60,16 @@ presentation/
   a badge so it doesn't look buyable, but the tap still opens
   `PosterDetailScreen`, where `PosterSoldBanner` explains what happened —
   `GET /posters/{id}` doesn't filter by status (ADR-0005 §D5).
-- **Navigation is a bare `Navigator.push` with the real backend UUID.** No
-  `go_router`: there's no route table yet and adding one is SCR-06's call. The
-  id must come from the API — an earlier attempt used placeholder ids and
-  404'd on every tap (`lib/features/poster/CLAUDE.md`).
+- **A card tap names a path — `context.push(AppRoutes.posterDetail(poster.id))`.**
+  The route table arrived with INF-01/ADR-0018; the line that used to sit here
+  said "adding one is SCR-06's call", which contradicted ADR-0005 outright
+  (that ADR requires the table *before* SCR-06). The id must still come from
+  the API — an earlier attempt used placeholder ids and 404'd on every tap
+  (`lib/features/poster/CLAUDE.md`) — and it now travels as a path parameter,
+  which is safe precisely because a poster UUID is already public
+  (ADR-0018 D6). 🔴 Having paths does **not** mean links from outside the app
+  work: deep linking needs native config this round did not touch and is
+  deferred to INF-15 (ADR-0018 D5).
 - **Home calls the backend only when the user asks it to** — pull-to-refresh,
   the load-more pager, retry. There is **no** `WidgetsBindingObserver`
   re-fetching on `AppLifecycleState.resumed` (removed deliberately: every
