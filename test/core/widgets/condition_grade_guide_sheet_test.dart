@@ -5,6 +5,8 @@ import 'package:posternung/core/strings/app_strings.dart';
 import 'package:posternung/core/theme/app_colors.dart';
 import 'package:posternung/core/widgets/condition_grade_guide_sheet.dart';
 
+import '../../support/router_harness.dart';
+
 /// Sheet-level coverage for ADR-0016 (SCR-11 Condition Guide, AC-2 + AC-3a).
 /// `condition_grade_indicator_test.dart` covers the tappable badge that
 /// opens this sheet (including the `compact` variant, and ADR-0016 D6's
@@ -15,14 +17,20 @@ void main() {
     WidgetTester tester, {
     PosterConditionGrade? current,
   }) async {
+    // Hosted under a real `GoRouter`, not `MaterialApp(home:)`: the sheet's
+    // close button now calls `context.pop()`, which needs one. That is also
+    // what proves the ADR-0018 D2 question — a `context.pop()` from inside
+    // the sheet has to close *the sheet*, leaving the page under it standing.
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: Builder(
-            builder: (context) => ElevatedButton(
-              onPressed: () =>
-                  showConditionGradeGuideSheet(context, current: current),
-              child: const Text('open guide'),
+      routedApp(
+        routes: routesHosting(
+          Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () =>
+                    showConditionGradeGuideSheet(context, current: current),
+                child: const Text('open guide'),
+              ),
             ),
           ),
         ),

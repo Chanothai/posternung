@@ -3,14 +3,21 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:posternung/core/error/auth_exception.dart';
+import 'package:posternung/core/router/app_router.dart';
+import 'package:posternung/core/router/app_routes.dart';
 import 'package:posternung/core/strings/app_strings.dart';
 import 'package:posternung/features/auth/data/datasources/phone_sign_in_data_source.dart';
+import 'package:posternung/features/auth/domain/entities/auth_user.dart';
 import 'package:posternung/features/auth/presentation/providers/auth_providers.dart';
+import 'package:posternung/features/auth/presentation/providers/session_provider.dart';
 import 'package:posternung/features/auth/presentation/screens/login_screen.dart';
 import 'package:posternung/features/auth/presentation/screens/otp_verification_screen.dart';
 import 'package:posternung/features/auth/presentation/screens/register_screen.dart';
 import 'package:posternung/features/auth/presentation/widgets/auth_email_field.dart';
+
+import '../../../../support/router_harness.dart';
 
 class FakeAuthViewModel extends AuthViewModel {
   FakeAuthViewModel({this.errorToThrow, this.confirmPhoneCodeErrorToThrow});
@@ -67,7 +74,11 @@ class FakeAuthViewModel extends AuthViewModel {
 }
 
 void main() {
-  Widget wrap({Object? errorToThrow, Object? confirmPhoneCodeErrorToThrow}) {
+  Widget wrap({
+    Object? errorToThrow,
+    Object? confirmPhoneCodeErrorToThrow,
+    void Function(GoRouter router)? onRouter,
+  }) {
     return ProviderScope(
       overrides: [
         authViewModelProvider.overrideWith(
@@ -76,8 +87,20 @@ void main() {
             confirmPhoneCodeErrorToThrow: confirmPhoneCodeErrorToThrow,
           ),
         ),
+        // Signed out — which is the only state in which the gate at
+        // `/home` renders the screen this file is about.
+        sessionProvider.overrideWithValue(const AsyncData<AuthUser?>(null)),
       ],
-      child: const MaterialApp(home: LoginScreen()),
+      // `/home`, not `MaterialApp(home: LoginScreen())`: `LoginScreen` is
+      // not a route of its own — it is what `AuthGate` renders at
+      // `AppRoutes.homePath` while signed out (ADR-0018 D4). Starting from
+      // the path proves that is still true, and gives the screen a real
+      // router to push `/register` and `/otp` onto.
+      child: routedApp(
+        location: AppRoutes.homePath,
+        routes: appRoutes,
+        onRouter: onRouter,
+      ),
     );
   }
 
@@ -107,10 +130,11 @@ void main() {
     expect(editable.focusNode.hasFocus, isTrue);
   });
 
-  testWidgets('tapping the mode toggle navigates to the register screen', (
-    tester,
-  ) async {
-    await tester.pumpWidget(wrap());
+  testWidgets('tapping the mode toggle pushes the register screen — pushes, '
+      'so back comes straight back here rather than stranding someone who '
+      'only wanted to look', (tester) async {
+    late GoRouter router;
+    await tester.pumpWidget(wrap(onRouter: (r) => router = r));
 
     // The toggle link reads "สร้างบัญชีใหม่" (inside a Text.rich, hence
     // findRichText: true, matched against the full combined text). It sits
@@ -124,6 +148,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(RegisterScreen), findsOneWidget);
+    // `go` would show the same screen and leave nothing to go back to, so
+    // asserting only on what is rendered cannot tell the two apart.
+    expect(
+      router.canPop(),
+      isTrue,
+      reason: 'register must sit on top of the gate, not replace it',
+    );
+
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(find.byType(RegisterScreen), findsNothing);
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(router.state.uri.toString(), AppRoutes.homePath);
   });
 
   testWidgets(

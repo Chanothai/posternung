@@ -19,6 +19,8 @@ import 'package:posternung/features/poster/domain/repositories/poster_repository
 import 'package:posternung/features/poster/presentation/providers/poster_providers.dart';
 import 'package:posternung/features/poster/presentation/screens/poster_detail_screen.dart';
 
+import '../../../../support/router_harness.dart';
+
 class FakeAuthViewModel extends AuthViewModel {
   bool signOutCalled = false;
 
@@ -126,7 +128,11 @@ void main() {
       // widgets — with only the network boundary faked. No real Dio anywhere.
       posterRepositoryProvider.overrideWithValue(repository),
     ],
-    child: const MaterialApp(home: HomeScreen()),
+    // Hosted on the real route table (ADR-0018 D9): a card tap now names
+    // `/posters/<uuid>`, so what this proves is that the path resolves to
+    // the detail screen with that id — not that a widget the test itself
+    // constructed rendered.
+    child: routedApp(routes: routesHosting(const HomeScreen())),
   );
 
   // The grid is a lazy CustomScrollView, so below-the-fold content isn't laid

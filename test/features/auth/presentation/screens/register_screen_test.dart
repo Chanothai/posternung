@@ -3,11 +3,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:posternung/core/error/auth_exception.dart';
+import 'package:posternung/core/router/app_router.dart';
+import 'package:posternung/core/router/app_routes.dart';
 import 'package:posternung/core/strings/app_strings.dart';
+import 'package:posternung/features/auth/domain/entities/auth_user.dart';
 import 'package:posternung/features/auth/presentation/providers/auth_providers.dart';
+import 'package:posternung/features/auth/presentation/providers/session_provider.dart';
 import 'package:posternung/features/auth/presentation/screens/register_screen.dart';
 import 'package:posternung/features/auth/presentation/widgets/auth_email_field.dart';
+
+import '../../../../support/router_harness.dart';
 
 class FakeAuthViewModel extends AuthViewModel {
   FakeAuthViewModel({this.errorToThrow});
@@ -48,26 +55,36 @@ void main() {
           () => FakeAuthViewModel(errorToThrow: errorToThrow),
         ),
       ],
-      child: const MaterialApp(home: RegisterScreen()),
+      // Reached by its real path (ADR-0018 D9) rather than by naming the
+      // widget: that is the only way a test can fail when the route that
+      // gets a user here is wrong or missing.
+      child: routedApp(location: AppRoutes.registerPath, routes: appRoutes),
     );
   }
 
-  Widget wrapPushed({Object? errorToThrow}) {
+  Widget wrapPushed({
+    Object? errorToThrow,
+    void Function(GoRouter router)? onRouter,
+  }) {
     return ProviderScope(
       overrides: [
         authViewModelProvider.overrideWith(
           () => FakeAuthViewModel(errorToThrow: errorToThrow),
         ),
+        // A successful register ends the auth flow at `AppRoutes.homePath`,
+        // and the gate there reads the session.
+        sessionProvider.overrideWithValue(const AsyncData<AuthUser?>(null)),
       ],
-      child: MaterialApp(
-        home: Builder(
-          builder: (context) => Scaffold(
-            body: Center(
-              child: ElevatedButton(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const RegisterScreen()),
+      child: routedApp(
+        onRouter: onRouter,
+        routes: routesHosting(
+          Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: () => context.push(AppRoutes.registerPath),
+                  child: const Text('root'),
                 ),
-                child: const Text('root'),
               ),
             ),
           ),
@@ -152,10 +169,11 @@ void main() {
     expect(find.text('root'), findsOneWidget);
   });
 
-  testWidgets('a successful register pops back to the previous screen', (
-    tester,
-  ) async {
-    await tester.pumpWidget(wrapPushed());
+  testWidgets('a successful register leaves no auth screen on the stack — '
+      'it lands on the post-auth destination rather than popping one route '
+      'back to whatever pushed it (AC-6)', (tester) async {
+    late GoRouter router;
+    await tester.pumpWidget(wrapPushed(onRouter: (r) => router = r));
 
     await tester.tap(find.text('root'));
     await tester.pumpAndSettle();
@@ -169,6 +187,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(RegisterScreen), findsNothing);
-    expect(find.text('root'), findsOneWidget);
+    expect(find.text('root'), findsNothing);
+    expect(router.state.uri.toString(), AppRoutes.homePath);
   });
 }

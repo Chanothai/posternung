@@ -8,6 +8,8 @@ import 'package:posternung/core/catalog/release_region.dart';
 import 'package:posternung/core/catalog/restoration_status.dart';
 import 'package:posternung/core/catalog/size_format.dart';
 import 'package:posternung/core/error/catalog_exception.dart';
+import 'package:posternung/core/router/app_router.dart';
+import 'package:posternung/core/router/app_routes.dart';
 import 'package:posternung/core/strings/app_strings.dart';
 import 'package:posternung/core/theme/app_colors.dart';
 import 'package:posternung/core/widgets/gradient_background.dart';
@@ -15,7 +17,7 @@ import 'package:posternung/features/poster/domain/entities/poster_detail.dart';
 import 'package:posternung/features/poster/domain/entities/poster_image.dart';
 import 'package:posternung/features/poster/domain/entities/poster_status.dart';
 import 'package:posternung/features/poster/presentation/providers/poster_providers.dart';
-import 'package:posternung/features/poster/presentation/screens/poster_detail_screen.dart';
+import '../../../../support/router_harness.dart';
 import 'package:posternung/features/poster/presentation/widgets/poster_detail_image_gallery.dart';
 import 'package:posternung/features/poster/presentation/widgets/poster_details_accordion.dart';
 
@@ -146,7 +148,10 @@ void main() {
               FakePosterDetailViewModel(posterId, detail: detail, error: error),
         ),
       ],
-      child: const MaterialApp(home: PosterDetailScreen(posterId: 'p1')),
+      child: routedApp(
+        location: AppRoutes.posterDetail('p1'),
+        routes: appRoutes,
+      ),
     );
   }
 
@@ -798,7 +803,10 @@ void main() {
               (posterId) => viewModel,
             ),
           ],
-          child: const MaterialApp(home: PosterDetailScreen(posterId: 'p1')),
+          child: routedApp(
+            location: AppRoutes.posterDetail('p1'),
+            routes: appRoutes,
+          ),
         ),
       );
       await tester.pump();
@@ -824,7 +832,10 @@ void main() {
               (posterId) => viewModel,
             ),
           ],
-          child: const MaterialApp(home: PosterDetailScreen(posterId: 'p1')),
+          child: routedApp(
+            location: AppRoutes.posterDetail('p1'),
+            routes: appRoutes,
+          ),
         ),
       );
       await tester.pump();
@@ -846,7 +857,10 @@ void main() {
               (posterId) => viewModel,
             ),
           ],
-          child: const MaterialApp(home: PosterDetailScreen(posterId: 'p1')),
+          child: routedApp(
+            location: AppRoutes.posterDetail('p1'),
+            routes: appRoutes,
+          ),
         ),
       );
       await tester.pump();
