@@ -173,6 +173,30 @@ abstract final class AppStrings {
   static const String conditionGuideCurrentBadge = 'สภาพชิ้นนี้';
   static const String conditionGradeUnspecifiedLabel = 'ไม่ระบุสภาพ';
 
+  // --- Condition grade guide: wear-trace list (ADR-0016 AC-3a) ---
+  /// Prefix before the joined [PosterConditionGradeX.wearTraces] list —
+  /// draft wording, content of the list itself locked to BL-60's
+  /// vocabulary by D9 (see the getter's doc comment), but this label is
+  /// not part of that lock.
+  static const String conditionGuideTracesLabel = 'ร่องรอยที่อาจพบ: ';
+
+  /// Shown instead of [conditionGuideTracesLabel] when
+  /// [PosterConditionGradeX.wearTraces] is empty (`mint` only) — the trace
+  /// section must never be blank, per the guide sheet's own test suite.
+  static const String conditionGuideNoTracesLabel =
+      'ไม่มีร่องรอยที่สังเกตเห็นได้';
+
+  // --- Condition grade guide: Fine ↔ Very Good boundary callout
+  // (ADR-0016 D3(ข) — the one pair of adjacent grades collectors' English
+  // naming reads backwards on, and the reason SCR-11 exists at all per
+  // ADR-0003). Draft wording — flagged for GATE 3.
+  static const String conditionGuideFineVeryGoodCalloutTitle =
+      'จุดที่มักเข้าใจผิด';
+  static const String conditionGuideFineVeryGoodCalloutBody =
+      '"Fine" อยู่เหนือ "Very Good" บนสเกลนี้ แม้ชื่อจะฟังดูสวนทางกัน — '
+      'ชื่อเรียกเป็นคำศัพท์มาตรฐานที่วงการนักสะสมใช้ ไม่ได้เรียงตามความหมาย'
+      'ในภาษาอังกฤษทั่วไป';
+
   // --- Poster Detail (SCR-05) ---
   // Says *why* to zoom, not how — inspecting condition before buying is the
   // job (BR-05/ADR-0003), and a gesture instruction would go stale the

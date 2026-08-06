@@ -38,6 +38,14 @@ extension PosterConditionGradeX on PosterConditionGrade {
   /// by "Very Good" reading as better than "Fine" when it's the opposite.
   int get scalePosition => PosterConditionGrade.values.indexOf(this) + 1;
 
+  /// The `"x/8"` fragment ADR-0003 mandates pairing with [label] everywhere
+  /// a grade is shown, and ADR-0016 D6 additionally mandates pairing with
+  /// any *color* used to represent the scale. Kept as one getter so the
+  /// exact format (`4/8`, not `4 of 8` or `4-8`) has a single source across
+  /// `ConditionGradeIndicator`, the guide sheet's grade rows, and its
+  /// per-row position track.
+  String get scaleFractionLabel => '$scalePosition/$scaleLength';
+
   /// Standard collector-grading term, Title Case English — deliberately not
   /// translated (ADR-0003: this is the vocabulary the target audience
   /// already reads, unlike a numeric C1–C10 scale).
@@ -71,6 +79,85 @@ extension PosterConditionGradeX on PosterConditionGrade {
       'สภาพพอใช้ มีตำหนิที่มองเห็นได้ง่าย เหมาะสำหรับนักสะสมที่เน้นความหายาก',
     PosterConditionGrade.poor =>
       'สภาพต่ำ มีความเสียหายชัดเจน เก็บไว้เพื่อคุณค่าทางประวัติศาสตร์เป็นหลัก',
+  };
+
+  /// Structured wear-trace breakdown for this grade (ADR-0016 AC-3a / D9).
+  ///
+  /// The vocabulary these phrases may use is locked — **`ADR-0016` D9
+  /// §ขอบเขตของการล็อก is the sole owner of that rule, including which part
+  /// of a phrase the lock covers.** Read it before rewording anything here;
+  /// don't restate it in this file (D9 says so by name).
+  ///
+  /// (code-critic 2026-08-06 round 1 caught `รอยยับ` and `ฉีก`/`รอยฉีก`/
+  /// `ฉีกขาด` here — neither is in BL-60's six terms. Fixed by removing
+  /// both, not by unilaterally adding them to BL-60 — that vocabulary is
+  /// the user's to extend, and whether "torn/creased" needs its own D9 term
+  /// is now a GATE 3 question, not a decision made by editing this file.
+  ///
+  /// GATE 3 (2026-08-06) resolved that question: the user approved `ฉีก`
+  /// as a seventh locked term; `ยับ` stays rejected. See ADR-0016 D9
+  /// §ขอบเขตของการล็อก for the current list — not restated here.)
+  ///
+  /// Empty for [mint] — there is no trace to list, not a missing value.
+  /// Rendering that empty case is a **UI** concern (a dedicated "no traces"
+  /// line, not a blank section) — see
+  /// `AppStrings.conditionGuideNoTracesLabel` at the one call site
+  /// (`condition_grade_guide_sheet.dart`).
+  ///
+  /// Each of the 7 nouns forms its own severity *ladder* across whichever
+  /// grades mention it, and that ladder must read as monotonically
+  /// non-decreasing from [mint] toward [poor] — GATE 3 round 2 (2026-08-06)
+  /// found two places this broke (`good`/`fair` used byte-identical text
+  /// for `ขอบ`; `poor`'s `รอยพับ` phrase read *milder* than `fair`'s
+  /// because it dropped `ชัดเจน`) and asked for every repeated dimension to
+  /// be re-audited, not just the two flagged spots. The ladders, read top
+  /// (mildest) to bottom (worst), as they appear below:
+  ///   - รอยพับ: เล็กน้อยมาก(nearMint) → เบา ๆ(veryFine) →
+  ///     สังเกตเห็นได้(fine) → หลายจุด(veryGood) → ชัดเจนหลายจุด(good) →
+  ///     ชัดเจนทั่วใบ(fair) → หนาแน่นทั่วทั้งใบ(poor)
+  ///   - ขอบ (wear escalating into tear at the bottom two grades):
+  ///     มีรอยเล็กน้อย(veryFine) → สึกบาง ๆ(fine) → สึกชัดขึ้น(veryGood) →
+  ///     สึกชัดเจน(good) → สึกและมีรอยฉีกเล็กน้อย(fair) →
+  ///     สึกและฉีกขาด(poor)
+  ///   - รูหมุด: มีรูหมุด(fair) → มีรูหมุดชัดเจน(poor)
+  ///   - คราบ: จาง ๆ(veryGood) → ที่สังเกตเห็นได้(good) → ชัดเจน(fair) →
+  ///     ชัดเจนหลายจุด(poor)
+  ///   - สีซีด: เล็กน้อย(good) → ที่สังเกตเห็นได้(fair) → ชัดเจน(poor)
+  ///   - เทป: only [poor] mentions it — no cross-grade ladder to check.
+  List<String> get wearTraces => switch (this) {
+    PosterConditionGrade.mint => const [],
+    PosterConditionGrade.nearMint => const ['รอยพับที่มุมเล็กน้อยมาก'],
+    PosterConditionGrade.veryFine => const ['รอยพับเบา ๆ', 'ขอบมีรอยเล็กน้อย'],
+    PosterConditionGrade.fine => const [
+      'รอยพับที่สังเกตเห็นได้',
+      'ขอบสึกบาง ๆ',
+    ],
+    PosterConditionGrade.veryGood => const [
+      'รอยพับหลายจุด',
+      'ขอบสึกชัดขึ้น',
+      'มีคราบจาง ๆ',
+    ],
+    PosterConditionGrade.good => const [
+      'รอยพับชัดเจนหลายจุด',
+      'ขอบสึกชัดเจน',
+      'มีคราบที่สังเกตเห็นได้',
+      'มีสีซีดเล็กน้อย',
+    ],
+    PosterConditionGrade.fair => const [
+      'รอยพับชัดเจนทั่วใบ',
+      'มีรูหมุด',
+      'ขอบสึกและมีรอยฉีกเล็กน้อย',
+      'มีคราบชัดเจน',
+      'มีสีซีดที่สังเกตเห็นได้',
+    ],
+    PosterConditionGrade.poor => const [
+      'รอยพับหนาแน่นทั่วทั้งใบ',
+      'มีรูหมุดชัดเจน',
+      'ขอบสึกและฉีกขาด',
+      'มีคราบชัดเจนหลายจุด',
+      'สีซีดชัดเจน',
+      'มีรอยเทปซ่อม',
+    ],
   };
 
   /// The wire value used by `posternung-backend`'s `PosterCondition` enum
