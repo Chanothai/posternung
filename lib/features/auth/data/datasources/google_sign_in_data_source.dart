@@ -3,7 +3,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../../core/error/auth_cancelled_exception.dart';
 import '../../../../core/error/auth_exception.dart';
-import '../../../../core/strings/app_strings.dart';
+import '../../../../core/error/debug_log.dart';
 
 /// Owns the Google Sign-In flow and returns a **Firebase ID token** for the
 /// backend to verify (`POST /auth/firebase` runs `verify_firebase_token`, so a
@@ -33,10 +33,7 @@ class GoogleSignInDataSourceImpl implements GoogleSignInDataSource {
       final account = await GoogleSignIn.instance.authenticate();
       final googleIdToken = account.authentication.idToken;
       if (googleIdToken == null) {
-        throw const AuthException(
-          code: 'missing_id_token',
-          message: AppStrings.authErrorGeneric,
-        );
+        throw const AuthException(code: 'missing_id_token');
       }
 
       final credential = GoogleAuthProvider.credential(idToken: googleIdToken);
@@ -45,22 +42,24 @@ class GoogleSignInDataSourceImpl implements GoogleSignInDataSource {
       );
       final firebaseIdToken = await userCredential.user?.getIdToken();
       if (firebaseIdToken == null) {
-        throw const AuthException(
-          code: 'missing_id_token',
-          message: AppStrings.authErrorGeneric,
-        );
+        throw const AuthException(code: 'missing_id_token');
       }
       return firebaseIdToken;
     } on GoogleSignInException catch (e) {
       if (e.code == GoogleSignInExceptionCode.canceled) {
         throw const AuthCancelledException();
       }
+      // `e.description` is the SDK's own English diagnostic text, never a
+      // display string (ADR-0017 D2) — debug-only.
       throw AuthException(
         code: e.code.name,
-        message: e.description ?? e.code.name,
+        debugDetail: logDebugDetail(e.description, source: 'google_signin'),
       );
     } on FirebaseAuthException catch (e) {
-      throw AuthException(code: e.code, message: e.message ?? e.code);
+      throw AuthException(
+        code: e.code,
+        debugDetail: logDebugDetail(e.message, source: 'google_signin'),
+      );
     }
   }
 

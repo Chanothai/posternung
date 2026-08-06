@@ -6,6 +6,7 @@ import '../../../../core/catalog/release_region.dart';
 import '../../../../core/catalog/restoration_status.dart';
 import '../../../../core/catalog/size_format.dart';
 import '../../../../core/error/catalog_exception.dart';
+import '../../../../core/error/debug_log.dart';
 import '../../domain/entities/poster_detail.dart';
 import '../../domain/entities/poster_status.dart';
 import 'poster_image_model.dart';
@@ -72,9 +73,14 @@ abstract class PosterDetailModel with _$PosterDetailModel {
   PosterDetail toEntity() {
     final parsedStatus = posterStatusFromApi(status);
     if (parsedStatus == null) {
+      // English developer diagnostic — debug-only (ADR-0017 D2), never a
+      // display string.
       throw CatalogException(
         code: 'unknown_poster_status',
-        message: 'Unrecognized poster status: $status',
+        debugDetail: logDebugDetail(
+          'Unrecognized poster status: $status',
+          source: 'poster_detail_model',
+        ),
       );
     }
     return PosterDetail(

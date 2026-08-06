@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/design_system/app_spacing.dart';
-import '../../../../core/error/catalog_exception.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../poster/presentation/catalog_error_display.dart';
 import '../../../poster/presentation/screens/poster_detail_screen.dart';
 import '../providers/home_posters_provider.dart';
 import '../state/home_posters_state.dart';
@@ -54,7 +54,10 @@ class HomeAllPostersSection extends ConsumerWidget {
               ),
             ),
             error: (error, stackTrace) => HomePostersErrorView(
-              message: error is CatalogException ? error.message : null,
+              message: catalogErrorMessageFor(
+                error,
+                fallback: AppStrings.homePostersErrorBody,
+              ),
               // `retry()`, not `refresh()`: this path has no data underneath
               // to preserve, so it shows a spinner instead of leaving the
               // error view looking untouched.

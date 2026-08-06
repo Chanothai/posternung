@@ -59,9 +59,11 @@ abstract final class AppStrings {
   static const String authTogglePromptRegister = 'มีบัญชีอยู่แล้ว? ';
   static const String authTogglePromptLogin = 'ยังไม่มีบัญชี? ';
   static const String authMobileOnlyMessage = 'รองรับเฉพาะบนมือถือ';
-  static const String authGenericErrorMessage =
-      'Something went wrong. Please try again.';
-  static const String authGateErrorPrefix = 'Something went wrong: ';
+  // `authGenericErrorMessage`/`authGateErrorPrefix` (English placeholder
+  // strings) removed under ADR-0017 — the raw-error-text paths that used
+  // them (`_messageFor`'s sentinel check, `auth_gate.dart`'s `$error`
+  // interpolation) are gone; `authErrorGeneric` below is the one Thai
+  // fallback line now.
 
   // --- Auth: OTP verification ---
   static const String authOtpHeading = 'ยืนยันเบอร์โทรศัพท์ของคุณ';

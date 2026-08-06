@@ -9,10 +9,7 @@ void main() {
       'maps a known Firebase code to a Thai message and echoes the code',
       () {
         final display = authErrorDisplay(
-          const AuthException(
-            code: 'wrong-password',
-            message: 'The password is invalid.',
-          ),
+          const AuthException(code: 'wrong-password'),
         );
 
         expect(display.message, AppStrings.authErrorWrongPassword);
@@ -20,12 +17,25 @@ void main() {
       },
     );
 
-    test('passes the backend envelope Thai message through as-is', () {
+    test("the feature's code table wins even when displayMessage is also set "
+        '— ADR-0017 D4\'s step order is fixed, not "whichever is present"', () {
+      final display = authErrorDisplay(
+        const AuthException(
+          code: 'wrong-password',
+          displayMessage: 'ข้อความจาก backend ที่ไม่ควรถูกใช้ตรงนี้',
+        ),
+      );
+
+      expect(display.message, AppStrings.authErrorWrongPassword);
+    });
+
+    test('passes the backend envelope displayMessage through when the code '
+        "isn't in the feature's table", () {
       // Backend AppError → `{error_code, message}` (message already Thai).
       final display = authErrorDisplay(
         const AuthException(
           code: 'INVALID_CREDENTIALS',
-          message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง',
+          displayMessage: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง',
         ),
       );
 
@@ -33,50 +43,54 @@ void main() {
       expect(display.code, 'INVALID_CREDENTIALS');
     });
 
-    test('falls back to the generic Thai message for the English generic', () {
+    test('falls back to the generic Thai message when displayMessage is '
+        'null (ADR-0017 D1 — no more English-sentinel workaround, there is '
+        'simply nothing to show)', () {
       final display = authErrorDisplay(
-        const AuthException(
-          code: 'missing_id_token',
-          message: AppStrings.authGenericErrorMessage,
-        ),
+        const AuthException(code: 'missing_id_token'),
       );
 
       expect(display.message, AppStrings.authErrorGeneric);
       expect(display.code, 'missing_id_token');
     });
 
-    test('falls back to the generic Thai message for an empty message', () {
+    test('falls back to the generic Thai message for an empty/blank '
+        'displayMessage', () {
       final display = authErrorDisplay(
-        const AuthException(code: 'weird', message: ''),
+        const AuthException(code: 'weird', displayMessage: '   '),
       );
 
       expect(display.message, AppStrings.authErrorGeneric);
       expect(display.code, 'weird');
     });
 
+    test('maps the transport-level network_error/server_error codes thrown '
+        'by BackendAuthDataSource/AuthRepositoryImpl to Thai, not just '
+        'Firebase codes', () {
+      expect(
+        authErrorDisplay(const AuthException(code: 'network_error')).message,
+        AppStrings.authErrorNetwork,
+      );
+      expect(
+        authErrorDisplay(const AuthException(code: 'server_error')).message,
+        AppStrings.authErrorServer,
+      );
+    });
+
     test('maps phone-auth Firebase codes to Thai instead of falling through '
-        'to Firebase\'s raw English message', () {
+        "to a generic line", () {
       final invalidCode = authErrorDisplay(
-        const AuthException(
-          code: 'invalid-verification-code',
-          message: 'The SMS verification code used has expired.',
-        ),
+        const AuthException(code: 'invalid-verification-code'),
       );
       expect(invalidCode.message, AppStrings.authErrorInvalidVerificationCode);
 
       final invalidNumber = authErrorDisplay(
-        const AuthException(
-          code: 'invalid-phone-number',
-          message: 'The format of the phone number provided is incorrect.',
-        ),
+        const AuthException(code: 'invalid-phone-number'),
       );
       expect(invalidNumber.message, AppStrings.authErrorInvalidPhoneNumber);
 
       final quota = authErrorDisplay(
-        const AuthException(
-          code: 'quota-exceeded',
-          message: 'The SMS quota for this project has been exceeded.',
-        ),
+        const AuthException(code: 'quota-exceeded'),
       );
       expect(quota.message, AppStrings.authErrorQuotaExceeded);
     });
@@ -84,12 +98,7 @@ void main() {
     test('maps account-exists-with-different-credential (social sign-in) to '
         'Thai instead of the raw English code', () {
       final display = authErrorDisplay(
-        const AuthException(
-          code: 'account-exists-with-different-credential',
-          message:
-              'An account already exists with the same email address '
-              'but different sign-in credentials.',
-        ),
+        const AuthException(code: 'account-exists-with-different-credential'),
       );
 
       expect(
@@ -97,6 +106,19 @@ void main() {
         AppStrings.authErrorAccountExistsWithDifferentCredential,
       );
       expect(display.code, 'account-exists-with-different-credential');
+    });
+
+    test('never surfaces debugDetail — it is not a parameter this function can '
+        'read at all (ADR-0017 D7)', () {
+      final display = authErrorDisplay(
+        const AuthException(
+          code: 'weird',
+          debugDetail: 'raw SDK text that must never reach the screen',
+        ),
+      );
+
+      expect(display.message, isNot(contains('raw SDK text')));
+      expect(display.message, AppStrings.authErrorGeneric);
     });
   });
 
@@ -107,7 +129,7 @@ void main() {
 
     test('delegates to authErrorDisplay for an AuthException', () {
       final display = authErrorDisplayFor(
-        const AuthException(code: 'wrong-password', message: 'invalid'),
+        const AuthException(code: 'wrong-password'),
       );
 
       expect(display, isNotNull);
@@ -115,19 +137,23 @@ void main() {
       expect(display.code, 'wrong-password');
     });
 
-    test(
-      'falls back to the runtime type as the code for anything that is not '
-      'an AuthException — every data-source guard is supposed to wrap '
-      "failures into one before they reach state, so this case is itself a "
-      'bug; it must still show *something* diagnosable rather than a '
-      'code-less generic line that looks identical to "everything is fine"',
-      () {
-        final display = authErrorDisplayFor(StateError('boom'));
+    test('shows the fixed code `unhandled_error` — not the runtime type — for '
+        'anything that is not an AuthException (ADR-0017 OD-1). Every '
+        'data-source guard is supposed to wrap failures into an AuthException '
+        "before they reach state, so this case is itself a bug; it must "
+        'still show *something* diagnosable rather than a code-less generic '
+        'line that looks identical to "everything is fine" — but the '
+        'diagnostic detail (the real type) goes to the debug log, not the '
+        'screen. This reverses the app\'s original decision on this exact '
+        'line (which rendered `error.runtimeType` directly) — D6 forbids a '
+        'runtime-composed string reaching the screen, full stop, and that '
+        "includes this fallback path.", () {
+      final display = authErrorDisplayFor(StateError('boom'));
 
-        expect(display, isNotNull);
-        expect(display!.message, AppStrings.authErrorGeneric);
-        expect(display.code, 'StateError');
-      },
-    );
+      expect(display, isNotNull);
+      expect(display!.message, AppStrings.authErrorGeneric);
+      expect(display.code, 'unhandled_error');
+      expect(display.code, isNot(contains('StateError')));
+    });
   });
 }

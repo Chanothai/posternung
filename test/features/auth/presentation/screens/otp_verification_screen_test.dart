@@ -216,7 +216,7 @@ void main() {
         wrapPushed(
           confirmPhoneCodeErrorToThrow: const AuthException(
             code: 'invalid-verification-code',
-            message: 'The SMS code has expired.',
+            debugDetail: 'The SMS code has expired.',
           ),
           onConfirmPhoneCode: (_, code) => capturedCodes.add(code),
         ),

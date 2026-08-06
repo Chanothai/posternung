@@ -83,7 +83,7 @@ void main() {
       when(() => storage.readAccessToken()).thenAnswer((_) async => 'expired');
       when(
         () => backend.getMe('expired'),
-      ).thenThrow(const AuthException(code: 'unauthorized', message: 'x'));
+      ).thenThrow(const AuthException(code: 'unauthorized'));
       when(() => storage.readRefreshToken()).thenAnswer((_) async => 'refresh');
       when(() => backend.refresh('refresh')).thenAnswer(
         (_) async =>
@@ -103,7 +103,7 @@ void main() {
       when(() => storage.readAccessToken()).thenAnswer((_) async => 'expired');
       when(
         () => backend.getMe('expired'),
-      ).thenThrow(const AuthException(code: 'unauthorized', message: 'x'));
+      ).thenThrow(const AuthException(code: 'unauthorized'));
       when(() => storage.readRefreshToken()).thenAnswer((_) async => null);
 
       final user = await makeContainer().read(backendSessionProvider.future);
@@ -118,7 +118,7 @@ void main() {
         when(() => storage.readAccessToken()).thenAnswer((_) async => 'a');
         when(
           () => backend.getMe('a'),
-        ).thenThrow(const AuthException(code: 'network_error', message: 'x'));
+        ).thenThrow(const AuthException(code: 'network_error'));
 
         final user = await makeContainer().read(backendSessionProvider.future);
 
@@ -212,9 +212,9 @@ void main() {
       when(
         () => emailPassword.register(email: 'new@b.com', password: 'pw'),
       ).thenAnswer((_) async => 'id-tok');
-      when(() => backend.firebaseLogin('id-tok')).thenThrow(
-        const AuthException(code: 'network_error', message: 'ผิดพลาด'),
-      );
+      when(
+        () => backend.firebaseLogin('id-tok'),
+      ).thenThrow(const AuthException(code: 'network_error'));
       when(() => emailPassword.deleteCurrentUser()).thenAnswer((_) async {});
 
       final container = makeContainer();
@@ -268,7 +268,7 @@ void main() {
         ).thenAnswer((_) async => 'refresh-token');
         when(
           () => backend.logout('refresh-token'),
-        ).thenThrow(const AuthException(code: 'network_error', message: 'x'));
+        ).thenThrow(const AuthException(code: 'network_error'));
 
         final container = makeContainer();
         await container.read(backendSessionProvider.future);

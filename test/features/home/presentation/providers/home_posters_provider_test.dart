@@ -106,12 +106,7 @@ void main() {
           limit: any(named: 'limit'),
           offset: any(named: 'offset'),
         ),
-      ).thenThrow(
-        const CatalogException(
-          code: 'server_error',
-          message: 'พังที่เซิร์ฟเวอร์',
-        ),
-      );
+      ).thenThrow(const CatalogException(code: 'server_error'));
       final container = makeContainer();
 
       await expectLater(
@@ -193,7 +188,7 @@ void main() {
         limit: any(named: 'limit'),
         offset: any(named: 'offset'),
       ),
-    ).thenThrow(const CatalogException(code: 'network_error', message: 'พัง'));
+    ).thenThrow(const CatalogException(code: 'network_error'));
     final container = makeContainer();
     await expectLater(
       container.read(homePostersProvider.future),
@@ -234,9 +229,7 @@ void main() {
           limit: any(named: 'limit'),
           offset: any(named: 'offset'),
         ),
-      ).thenThrow(
-        const CatalogException(code: 'network_error', message: 'พัง'),
-      );
+      ).thenThrow(const CatalogException(code: 'network_error'));
       final container = makeContainer();
       await expectLater(
         container.read(homePostersProvider.future),
@@ -440,10 +433,7 @@ void main() {
         final container = makeContainer();
         await container.read(homePostersProvider.future);
 
-        const failure = CatalogException(
-          code: 'network_error',
-          message: 'เน็ตหลุดระหว่างโหลดหน้าถัดไป',
-        );
+        const failure = CatalogException(code: 'network_error');
         when(
           () => repository.listPosters(
             limit: any(named: 'limit'),
@@ -547,9 +537,7 @@ void main() {
           limit: any(named: 'limit'),
           offset: any(named: 'offset'),
         ),
-      ).thenThrow(
-        const CatalogException(code: 'network_error', message: 'พัง'),
-      );
+      ).thenThrow(const CatalogException(code: 'network_error'));
       final container = makeContainer();
       await expectLater(
         container.read(homePostersProvider.future),
@@ -633,9 +621,7 @@ void main() {
         limit: any(named: 'limit'),
         offset: any(named: 'offset'),
       ),
-    ).thenThrow(
-      const CatalogException(code: 'network_error', message: 'เน็ตหลุด'),
-    );
+    ).thenThrow(const CatalogException(code: 'network_error'));
     final container = makeContainer();
     await expectLater(
       container.read(homePostersProvider.future),

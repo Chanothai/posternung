@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:developer' as developer;
 
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/error/auth_exception.dart';
@@ -185,14 +183,10 @@ class BackendSessionNotifier extends AsyncNotifier<AuthUser?> {
     final backend = ref.read(backendAuthDataSourceProvider);
     final storage = ref.read(tokenStorageProvider);
 
-    // Printed whole, on one line, so it can be selected and copied straight
-    // into Postman/curl against `/auth/firebase` — PrettyDioLogger's request
-    // body log (below this call, once the POST actually fires) wraps and
-    // truncates long values, which a ~1000-char JWT always is. Debug-only;
-    // never present in a release build.
-    if (kDebugMode) {
-      developer.log(idToken, name: 'firebase-id-token');
-    }
+    // No token logging here, debug build or not — `security-baseline` §2 /
+    // ADR-0017 OD-2 forbid it even under a `kDebugMode` guard. (This used to
+    // print the raw Firebase ID token for pasting into Postman/curl; that
+    // convenience is gone on purpose.)
 
     final tokens = await backend.firebaseLogin(idToken);
     await storage.save(

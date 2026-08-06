@@ -71,12 +71,9 @@ void main() {
   );
 
   test('build() surfaces a CatalogException as AsyncError', () async {
-    when(() => repository.getPosterDetail('missing')).thenThrow(
-      const CatalogException(
-        code: 'POSTER_NOT_FOUND',
-        message: 'ไม่พบโปสเตอร์นี้',
-      ),
-    );
+    when(
+      () => repository.getPosterDetail('missing'),
+    ).thenThrow(const CatalogException(code: 'POSTER_NOT_FOUND'));
     final container = makeContainer();
 
     await expectLater(

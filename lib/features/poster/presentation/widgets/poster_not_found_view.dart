@@ -12,7 +12,8 @@ import '../../../../core/widgets/app_status_view.dart';
 class PosterNotFoundView extends StatelessWidget {
   const PosterNotFoundView({super.key, this.message, required this.onGoBack});
 
-  /// The backend's own `CatalogException.message` (already Thai — see
+  /// Resolved via `catalogErrorDisplayMessage` (ADR-0017 D4/D9) — the
+  /// backend's own Thai `displayMessage` when there is one (see
   /// `PosterRemoteDataSource._guard`), shown in place of the static
   /// [AppStrings.posterDetailNotFoundBody] copy when available. `null`
   /// falls back to the static copy.

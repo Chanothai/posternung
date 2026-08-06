@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import '../../../../core/design_system/app_dimens.dart';
 import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
-import '../../../../core/error/catalog_exception.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../poster/presentation/catalog_error_display.dart';
 import '../state/home_posters_state.dart';
 
 /// The pager under SCR-03's grid: how much of the catalog is on screen, and
@@ -48,10 +48,13 @@ class HomeLoadMoreFooter extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             Text(
               // The backend's own Thai message when there is one — same
-              // treatment the first-page error view gives it.
-              error is CatalogException
-                  ? error.message
-                  : AppStrings.homeLoadMoreErrorBody,
+              // treatment the first-page error view gives it (ADR-0017 D9
+              // shared mapper, not a hand-rolled `is CatalogException` check).
+              catalogErrorMessageFor(
+                    error,
+                    fallback: AppStrings.homeLoadMoreErrorBody,
+                  ) ??
+                  AppStrings.homeLoadMoreErrorBody,
               style: AppTextStyles.statusBody,
               textAlign: TextAlign.center,
             ),

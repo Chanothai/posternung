@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../../core/error/auth_exception.dart';
-import '../../../../core/strings/app_strings.dart';
+import '../../../../core/error/debug_log.dart';
 
 /// Outcome of [PhoneSignInDataSource.sendCode].
 sealed class PhoneVerificationResult {}
@@ -91,37 +91,51 @@ class PhoneSignInDataSourceImpl implements PhoneSignInDataSource {
           );
           final idToken = await userCredential.user?.getIdToken();
           if (idToken == null || idToken.isEmpty) {
-            completeError(
-              const AuthException(
-                code: 'missing_id_token',
-                message: AppStrings.authErrorGeneric,
-              ),
-            );
+            completeError(const AuthException(code: 'missing_id_token'));
             return;
           }
           if (!completer.isCompleted) {
             completer.complete(PhoneAutoVerified(idToken));
           }
         } on FirebaseAuthException catch (e) {
+          // `e.message` is Firebase's own English diagnostic text, never a
+          // display string (ADR-0017 D2) — debug-only.
           completeError(
-            AuthException(code: e.code, message: e.message ?? e.code),
+            AuthException(
+              code: e.code,
+              debugDetail: logDebugDetail(
+                e.message,
+                source: 'phone_verification_completed',
+              ),
+            ),
           );
         } catch (e) {
           // Anything other than FirebaseAuthException (a PlatformException
           // from the plugin channel, etc.) used to escape uncaught — surface
-          // it as an AuthException instead, with the real type in the code
-          // so it doesn't read as a generic, undiagnosable failure.
+          // it as an AuthException instead. `code` is a fixed string, never
+          // composed from `e.runtimeType` (ADR-0017 D6); the type still goes
+          // to `debugDetail` so it doesn't read as a generic, undiagnosable
+          // failure there.
           completeError(
             AuthException(
-              code: 'phone_signin_${e.runtimeType}',
-              message: e.toString(),
+              code: 'phone_verification_completed_unexpected',
+              debugDetail: logDebugDetail(
+                e.toString(),
+                source: 'phone_verification_completed',
+              ),
             ),
           );
         }
       },
       verificationFailed: (FirebaseAuthException e) {
         completeError(
-          AuthException(code: e.code, message: e.message ?? e.code),
+          AuthException(
+            code: e.code,
+            debugDetail: logDebugDetail(
+              e.message,
+              source: 'phone_verification_failed',
+            ),
+          ),
         );
       },
       codeSent: (String verificationId, int? resendToken) {
@@ -162,14 +176,16 @@ class PhoneSignInDataSourceImpl implements PhoneSignInDataSource {
       // `{"id_token": ""}`, failing the backend's `min_length=1` validation
       // with a 422 that's indistinguishable from any other bad request.
       if (idToken == null || idToken.isEmpty) {
-        throw const AuthException(
-          code: 'missing_id_token',
-          message: AppStrings.authErrorGeneric,
-        );
+        throw const AuthException(code: 'missing_id_token');
       }
       return idToken;
     } on FirebaseAuthException catch (e) {
-      throw AuthException(code: e.code, message: e.message ?? e.code);
+      // `e.message` is Firebase's own English diagnostic text, never a
+      // display string (ADR-0017 D2) — debug-only.
+      throw AuthException(
+        code: e.code,
+        debugDetail: logDebugDetail(e.message, source: 'phone_confirm_code'),
+      );
     } on AuthException {
       rethrow; // the missing_id_token throw above — don't re-wrap it below.
     } catch (e) {
@@ -177,9 +193,10 @@ class PhoneSignInDataSourceImpl implements PhoneSignInDataSource {
       // MissingPluginException, ...) used to escape this method uncaught,
       // reaching the UI as a bare object with no `code` to show — the exact
       // symptom of a wrong-verification-code report with no diagnostic line.
+      // `code` is fixed, never composed from `e.runtimeType` (ADR-0017 D6).
       throw AuthException(
-        code: 'phone_signin_${e.runtimeType}',
-        message: e.toString(),
+        code: 'phone_confirm_unexpected',
+        debugDetail: logDebugDetail(e.toString(), source: 'phone_confirm_code'),
       );
     }
   }

@@ -109,10 +109,7 @@ void main() {
   );
 
   void stubListError([
-    Object error = const CatalogException(
-      code: 'server_error',
-      message: 'เซิร์ฟเวอร์ขัดข้อง',
-    ),
+    Object error = const CatalogException(code: 'server_error'),
   ]) {
     when(
       () => repository.listPosters(
@@ -195,8 +192,11 @@ void main() {
       await tester.pumpWidget(wrap());
       await tester.pumpAndSettle();
 
-      expect(find.text('โหลดรายการโปสเตอร์ไม่สำเร็จ'), findsOneWidget);
-      expect(find.text('เซิร์ฟเวอร์ขัดข้อง'), findsOneWidget);
+      expect(find.text(AppStrings.homePostersErrorTitle), findsOneWidget);
+      // 'server_error' is mapped through the shared catalog table
+      // (ADR-0017 D9), not a raw exception message — assert against the
+      // constant it resolves to, not a hand-typed literal.
+      expect(find.text(AppStrings.authErrorServer), findsOneWidget);
 
       stubList(_page([_summary(title: 'Alien')]));
       await tester.tap(find.text('ลองใหม่อีกครั้ง'));
@@ -247,6 +247,23 @@ void main() {
         findsOneWidget,
       );
     });
+
+    testWidgets(
+      'a CatalogException(code: unknown_error) falls back to this screen\'s '
+      "own static copy — not the poster-detail screen's, which is what the "
+      'pre-ADR-0017 code baked into every unknown_error regardless of which '
+      'screen rendered it',
+      (tester) async {
+        await useTallSurface(tester);
+        stubListError(const CatalogException(code: 'unknown_error'));
+
+        await tester.pumpWidget(wrap());
+        await tester.pumpAndSettle();
+
+        expect(find.text(AppStrings.homePostersErrorTitle), findsOneWidget);
+        expect(find.text(AppStrings.homePostersErrorBody), findsOneWidget);
+      },
+    );
   });
 
   group('required state: sold_out (AC-4)', () {
@@ -299,9 +316,9 @@ void main() {
           ),
         ]),
       );
-      when(() => repository.getPosterDetail(any())).thenThrow(
-        const CatalogException(code: 'network_error', message: 'เน็ตหลุด'),
-      );
+      when(
+        () => repository.getPosterDetail(any()),
+      ).thenThrow(const CatalogException(code: 'network_error'));
 
       await tester.pumpWidget(wrap());
       await tester.pumpAndSettle();
@@ -451,9 +468,9 @@ void main() {
       await useTallSurface(tester);
       const uuid = '33333333-3333-4333-8333-333333333333';
       stubList(_page([_summary(id: uuid, title: 'Blade Runner')]));
-      when(() => repository.getPosterDetail(any())).thenThrow(
-        const CatalogException(code: 'network_error', message: 'เน็ตหลุด'),
-      );
+      when(
+        () => repository.getPosterDetail(any()),
+      ).thenThrow(const CatalogException(code: 'network_error'));
 
       await tester.pumpWidget(wrap());
       await tester.pumpAndSettle();
@@ -556,16 +573,14 @@ void main() {
       await tester.pumpWidget(wrap());
       await tester.pumpAndSettle();
 
-      stubListError(
-        const CatalogException(
-          code: 'network_error',
-          message: 'โหลดหน้าถัดไปไม่ได้',
-        ),
-      );
+      stubListError(const CatalogException(code: 'network_error'));
       await tester.tap(find.text(AppStrings.homeLoadMoreButton));
       await tester.pumpAndSettle();
 
-      expect(find.text('โหลดหน้าถัดไปไม่ได้'), findsOneWidget);
+      // 'network_error' is mapped through the shared catalog table
+      // (ADR-0017 D9), not a raw exception message — assert against the
+      // constant it resolves to, not a hand-typed literal.
+      expect(find.text(AppStrings.authErrorNetwork), findsOneWidget);
       expect(find.text('Poster 0'), findsOneWidget);
       // The screen-level error state belongs to a *first* page that failed;
       // an optional extra page must never escalate to it.
@@ -578,6 +593,27 @@ void main() {
       expect(find.text('Poster 3'), findsOneWidget);
       expect(find.text('โหลดหน้าถัดไปไม่ได้'), findsNothing);
     });
+
+    testWidgets(
+      'a failed page with code unknown_error falls back to this footer\'s '
+      "own static copy — the third of three screens that each keep their "
+      'own fallback rather than sharing one baked into the exception '
+      '(ADR-0017 D9)',
+      (tester) async {
+        await useTallSurface(tester);
+        stubCatalog(catalogOf(4));
+
+        await tester.pumpWidget(wrap());
+        await tester.pumpAndSettle();
+
+        stubListError(const CatalogException(code: 'unknown_error'));
+        await tester.tap(find.text(AppStrings.homeLoadMoreButton));
+        await tester.pumpAndSettle();
+
+        expect(find.text(AppStrings.homeLoadMoreErrorBody), findsOneWidget);
+        expect(find.text('Poster 0'), findsOneWidget);
+      },
+    );
   });
 
   group('when Home talks to the backend', () {

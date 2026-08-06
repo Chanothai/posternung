@@ -3,7 +3,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../../core/error/auth_cancelled_exception.dart';
 import '../../../../core/error/auth_exception.dart';
-import '../../../../core/strings/app_strings.dart';
+import '../../../../core/error/debug_log.dart';
 import '../../domain/entities/auth_user.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_remote_data_source.dart';
@@ -22,12 +22,14 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       await _remoteDataSource.signOut();
     } on firebase.FirebaseAuthException catch (e) {
-      throw AuthException(code: e.code, message: e.message ?? e.code);
-    } catch (_) {
-      throw const AuthException(
-        code: 'unknown',
-        message: AppStrings.authGenericErrorMessage,
+      // `e.message` is Firebase's own English diagnostic text, never a
+      // display string (ADR-0017 D2) — debug-only.
+      throw AuthException(
+        code: e.code,
+        debugDetail: logDebugDetail(e.message, source: 'auth_repo_signout'),
       );
+    } catch (_) {
+      throw const AuthException(code: 'unknown');
     }
   }
 
@@ -47,14 +49,19 @@ class AuthRepositoryImpl implements AuthRepository {
       if (e.code == AuthorizationErrorCode.canceled) {
         throw const AuthCancelledException();
       }
-      throw AuthException(code: e.code.name, message: e.message);
-    } on firebase.FirebaseAuthException catch (e) {
-      throw AuthException(code: e.code, message: e.message ?? e.code);
-    } catch (_) {
-      throw const AuthException(
-        code: 'unknown',
-        message: AppStrings.authGenericErrorMessage,
+      // `e.message` is the SDK's own English diagnostic text, never a
+      // display string (ADR-0017 D2) — debug-only.
+      throw AuthException(
+        code: e.code.name,
+        debugDetail: logDebugDetail(e.message, source: 'auth_repo_guard'),
       );
+    } on firebase.FirebaseAuthException catch (e) {
+      throw AuthException(
+        code: e.code,
+        debugDetail: logDebugDetail(e.message, source: 'auth_repo_guard'),
+      );
+    } catch (_) {
+      throw const AuthException(code: 'unknown');
     }
   }
 

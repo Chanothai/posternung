@@ -229,9 +229,11 @@ void main() {
           code: 'POSTER_NOT_FOUND',
           // Deliberately distinct from the static
           // `AppStrings.posterDetailNotFoundTitle`/`...Body` copy, so this
-          // test can prove the *backend's* message is what's shown, not a
-          // static string that happens to read similarly.
-          message: 'ไม่พบโปสเตอร์รหัส p1 ในระบบ',
+          // test can prove the *backend's* displayMessage is what's shown,
+          // not a static string that happens to read similarly. Also proves
+          // `POSTER_NOT_FOUND` isn't in `_catalogMessages` — if it ever were
+          // added there, this test would start failing and say why.
+          displayMessage: 'ไม่พบโปสเตอร์รหัส p1 ในระบบ',
         ),
       ),
     );
@@ -254,27 +256,42 @@ void main() {
 
   testWidgets(
     'a generic failure (e.g. network_error) shows the retry error view with '
-    'the backend\'s own message (Medium #7)',
+    "this feature's own Thai text for that code (ADR-0017 D9 — network_error "
+    "never carries a backend envelope at all, so it always comes from "
+    "catalogErrorDisplayMessage's code table, not a displayMessage)",
+    (tester) async {
+      await tester.pumpWidget(
+        wrap(error: const CatalogException(code: 'network_error')),
+      );
+      await tester.pump();
+
+      expect(find.text('เกิดข้อผิดพลาด'), findsOneWidget);
+      expect(find.text(AppStrings.authErrorNetwork), findsOneWidget);
+      expect(
+        find.text('ไม่สามารถโหลดข้อมูลโปสเตอร์ได้ กรุณาลองใหม่อีกครั้ง'),
+        findsNothing,
+      );
+      expect(find.text('ลองใหม่อีกครั้ง'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    "a POSTER_NOT_FOUND-adjacent unmapped code with a backend displayMessage "
+    "shows *that* text, proving the envelope path (D2) still works for "
+    "codes this feature's table doesn't know about",
     (tester) async {
       await tester.pumpWidget(
         wrap(
           error: const CatalogException(
-            code: 'network_error',
-            message: 'เชื่อมต่อเครือข่ายไม่สำเร็จ',
+            code: 'server_maintenance',
+            displayMessage: 'ระบบปิดปรับปรุงชั่วคราว',
           ),
         ),
       );
       await tester.pump();
 
       expect(find.text('เกิดข้อผิดพลาด'), findsOneWidget);
-      // The backend/exception's own message, not the static
-      // `AppStrings.posterDetailErrorBody` copy.
-      expect(find.text('เชื่อมต่อเครือข่ายไม่สำเร็จ'), findsOneWidget);
-      expect(
-        find.text('ไม่สามารถโหลดข้อมูลโปสเตอร์ได้ กรุณาลองใหม่อีกครั้ง'),
-        findsNothing,
-      );
-      expect(find.text('ลองใหม่อีกครั้ง'), findsOneWidget);
+      expect(find.text('ระบบปิดปรับปรุงชั่วคราว'), findsOneWidget);
     },
   );
 
@@ -289,6 +306,24 @@ void main() {
         find.text('ไม่สามารถโหลดข้อมูลโปสเตอร์ได้ กรุณาลองใหม่อีกครั้ง'),
         findsOneWidget,
       );
+    },
+  );
+
+  testWidgets(
+    'a CatalogException(code: unknown_error) falls back to this screen\'s '
+    'own static copy too — same as a non-CatalogException failure, since '
+    "unknown_error isn't in this feature's code table and carries no "
+    'displayMessage (ADR-0017 D9 — this used to be baked into the exception '
+    "at throw time as this exact screen's copy regardless of which screen "
+    'rendered it; now every screen resolves its own)',
+    (tester) async {
+      await tester.pumpWidget(
+        wrap(error: const CatalogException(code: 'unknown_error')),
+      );
+      await tester.pump();
+
+      expect(find.text('เกิดข้อผิดพลาด'), findsOneWidget);
+      expect(find.text(AppStrings.posterDetailErrorBody), findsOneWidget);
     },
   );
 
@@ -738,12 +773,7 @@ void main() {
 
     testWidgets('no title at all while loading or failed', (tester) async {
       await tester.pumpWidget(
-        wrap(
-          error: const CatalogException(
-            code: 'network_error',
-            message: 'ต่อเน็ตไม่ได้',
-          ),
-        ),
+        wrap(error: const CatalogException(code: 'network_error')),
       );
       await tester.pump();
 
