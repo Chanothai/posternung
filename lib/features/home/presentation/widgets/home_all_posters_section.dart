@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/app_spacing.dart';
+import '../../../../core/router/app_routes.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../poster/presentation/catalog_error_display.dart';
-import '../../../poster/presentation/screens/poster_detail_screen.dart';
 import '../providers/home_posters_provider.dart';
 import '../state/home_posters_state.dart';
 import 'home_load_more_footer.dart';
@@ -104,15 +105,10 @@ class _Grid extends StatelessWidget {
             final poster = posters.items[index];
             return HomePosterCard(
               poster: poster,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  // The real backend UUID — never a synthesized id. Wiring
-                  // this to placeholder ids 404'd on every tap once already
-                  // (`lib/features/poster/CLAUDE.md`). No `go_router`: there
-                  // is no route table yet, and adding one is SCR-06's call.
-                  builder: (_) => PosterDetailScreen(posterId: poster.id),
-                ),
-              ),
+              // The real backend UUID goes into the path — never a
+              // synthesized id. Wiring this to placeholder ids 404'd on every
+              // tap once already (`lib/features/poster/CLAUDE.md`).
+              onTap: () => context.push(AppRoutes.posterDetail(poster.id)),
             );
           },
         ),

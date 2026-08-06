@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/assets/app_images.dart';
 import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
+import '../../../../core/router/app_routes.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -14,6 +16,7 @@ import '../../../../core/utils/thai_phone_number.dart';
 import '../../data/datasources/phone_sign_in_data_source.dart';
 import '../auth_error_display.dart';
 import '../auth_flow_navigation.dart';
+import '../otp_route_args.dart';
 import '../providers/auth_providers.dart';
 import '../widgets/auth_email_field.dart';
 import '../widgets/auth_error_banner.dart';
@@ -21,13 +24,12 @@ import '../widgets/auth_nav_link_row.dart';
 import '../widgets/auth_password_field.dart';
 import '../widgets/auth_primary_button.dart';
 import '../widgets/auth_scaffold.dart';
-import 'otp_verification_screen.dart';
-import 'register_screen.dart';
 
 /// Which credential the auth card is collecting. Email is the login flow;
 /// phone is passwordless — entering a number sends straight to
-/// [OtpVerificationScreen]. Register lives on its own screen ([RegisterScreen]),
-/// reached via the nav link at the bottom of email mode.
+/// `AppRoutes.otpPath`. Register lives on its own screen
+/// (`AppRoutes.registerPath`), reached via the nav link at the bottom of
+/// email mode.
 enum _AuthMethod { email, phone }
 
 /// Login screen — email/phone method tabs, matching the old `LoginPage`'s
@@ -71,13 +73,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           .sendPhoneCode(phoneNumber);
       if (!mounted) return;
       if (result is SmsCodeSent) {
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => OtpVerificationScreen(
-              phoneNumber: phoneNumber,
-              verificationId: result.verificationId,
-              resendToken: result.resendToken,
-            ),
+        // `push`, so back from OTP returns here rather than replacing this
+        // screen. The three values ride in `extra` and never touch the URL
+        // (ADR-0018 D6) — `OtpRouteArgs` documents why.
+        await context.push(
+          AppRoutes.otpPath,
+          extra: OtpRouteArgs(
+            phoneNumber: phoneNumber,
+            verificationId: result.verificationId,
+            resendToken: result.resendToken,
           ),
         );
         // Back from OTP without having completed it (or after a failed
@@ -110,11 +114,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   void _setMethod(_AuthMethod method) => setState(() => _method = method);
 
-  void _goToRegister() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const RegisterScreen()));
-  }
+  /// `push`, not `go` — the register screen's "already have an account?" link
+  /// and the system back gesture both have to come back here.
+  void _goToRegister() => context.push(AppRoutes.registerPath);
 
   void _toggleObscurePassword() =>
       setState(() => _obscurePassword = !_obscurePassword);
