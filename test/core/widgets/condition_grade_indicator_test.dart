@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:posternung/core/catalog/poster_condition_grade.dart';
+import 'package:posternung/core/theme/app_colors.dart';
 import 'package:posternung/core/widgets/condition_grade_indicator.dart';
 
 void main() {
@@ -10,6 +11,27 @@ void main() {
           body: ConditionGradeIndicator(grade: grade, compact: compact),
         ),
       );
+
+  /// The pill's border color — reaches into the `Container` the private
+  /// `_Pill` widget builds, since `_Pill` itself isn't importable from a
+  /// test file. Used to pin ADR-0016 D6 (the border must be the grade's
+  /// `scaleColor`, not the neutral default) without needing `_Pill` to be
+  /// public just for testing.
+  Color? pillBorderColor(WidgetTester tester) {
+    final container = tester.widget<Container>(
+      find
+          .descendant(
+            of: find.byType(ConditionGradeIndicator),
+            matching: find.byWidgetPredicate(
+              (widget) => widget is Container && widget.decoration != null,
+            ),
+          )
+          .first,
+    );
+    final decoration = container.decoration! as BoxDecoration;
+    final border = decoration.border;
+    return border is Border ? border.top.color : null;
+  }
 
   testWidgets(
     'null grade shows an "unspecified" status, not a fake grade and not '
@@ -42,6 +64,15 @@ void main() {
     expect(find.text('Very Good (5/8)'), findsOneWidget);
   });
 
+  testWidgets('the pill border shows the grade\'s scale color, paired with the '
+      'x/8 fraction already in its label text (ADR-0016 D6) — must fail if '
+      'the border reverts to the neutral default', (tester) async {
+    await tester.pumpWidget(wrap(PosterConditionGrade.veryGood));
+
+    expect(pillBorderColor(tester), PosterConditionGrade.veryGood.scaleColor);
+    expect(pillBorderColor(tester), isNot(AppColors.borderMuted));
+  });
+
   testWidgets('tapping opens the condition guide sheet with all 8 grades', (
     tester,
   ) async {
@@ -67,6 +98,16 @@ void main() {
 
       expect(find.text('Very Good (5/8)'), findsOneWidget);
       expect(find.text('Very Good'), findsNothing);
+    });
+
+    testWidgets('still shows the scale color as the border too — D6 names this '
+        'mode explicitly as having no exception (ADR-0016 D6)', (tester) async {
+      await tester.pumpWidget(
+        wrap(PosterConditionGrade.veryGood, compact: true),
+      );
+
+      expect(pillBorderColor(tester), PosterConditionGrade.veryGood.scaleColor);
+      expect(pillBorderColor(tester), isNot(AppColors.borderMuted));
     });
 
     testWidgets('drops the info icon but stays tappable', (tester) async {

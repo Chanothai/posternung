@@ -77,12 +77,20 @@ class ConditionGradeIndicator extends StatelessWidget {
         onTap: () => showConditionGradeGuideSheet(context, current: grade),
         child: _Pill(
           padding: _padding,
+          // ADR-0016 D6 — the grade's scale color is the pill border,
+          // never a fill the label text would need to contrast against.
+          // It costs zero extra layout width (unlike a leading color dot),
+          // which matters here: the `compact` variant already runs tight
+          // inside a 140px grid cell (see the "fits a 140px-wide cell"
+          // test). The text right inside this same pill already carries
+          // "x/8" (see below), so the color is never shown unlabeled.
+          borderColor: grade.scaleColor,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Flexible(
                 child: Text(
-                  '${grade.label} (${grade.scalePosition}/${grade.scaleLength})',
+                  '${grade.label} (${grade.scaleFractionLabel})',
                   style: AppTextStyles.homeConditionTag.copyWith(
                     color: AppColors.textPrimary,
                   ),
@@ -114,17 +122,25 @@ class ConditionGradeIndicator extends StatelessWidget {
 }
 
 class _Pill extends StatelessWidget {
-  const _Pill({required this.padding, required this.child});
+  const _Pill({
+    required this.padding,
+    required this.child,
+    this.borderColor = AppColors.borderMuted,
+  });
 
   final EdgeInsets padding;
   final Widget child;
+
+  /// Defaults to the neutral border used for the `grade == null` case,
+  /// where there's no grade color to show at all.
+  final Color borderColor;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        border: Border.all(color: AppColors.borderMuted),
+        border: Border.all(color: borderColor),
         borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: child,
