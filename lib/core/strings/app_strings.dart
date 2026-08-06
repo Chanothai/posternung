@@ -173,6 +173,12 @@ abstract final class AppStrings {
   static const String conditionGuideCurrentBadge = 'สภาพชิ้นนี้';
   static const String conditionGradeUnspecifiedLabel = 'ไม่ระบุสภาพ';
 
+  /// Tooltip / semantic label of the sheet's close button. The button itself
+  /// is not decoration: with all 8 grades listed the sheet fills the screen,
+  /// leaving no barrier to tap and no non-scrolling area to drag — verified
+  /// on device 2026-08-06, where the guide could not be dismissed at all.
+  static const String conditionGuideCloseLabel = 'ปิด';
+
   // --- Condition grade guide: wear-trace list (ADR-0016 AC-3a) ---
   /// Prefix before the joined [PosterConditionGradeX.wearTraces] list —
   /// draft wording, content of the list itself locked to BL-60's

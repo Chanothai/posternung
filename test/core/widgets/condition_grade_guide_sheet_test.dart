@@ -260,6 +260,81 @@ void main() {
   );
 
   testWidgets(
+    'the close button clears the top inset — a full-height sheet must not '
+    'render its header under the status bar / notch. Observed on iPhone 17 '
+    'Pro 2026-08-06: the title sat behind the Dynamic Island and the close '
+    'button touched the top edge, because the default `useSafeArea: false` '
+    'strips the top padding out of MediaQuery and the sheet\'s own SafeArea '
+    'then guards nothing.',
+    (tester) async {
+      const topInsetLogical = 60.0;
+      tester.view.padding = FakeViewPadding(
+        top: topInsetLogical * tester.view.devicePixelRatio,
+      );
+      tester.view.viewPadding = FakeViewPadding(
+        top: topInsetLogical * tester.view.devicePixelRatio,
+      );
+      addTearDown(tester.view.reset);
+
+      await openSheet(tester);
+
+      expect(
+        tester.getRect(find.byKey(const ValueKey('condition-guide-close'))).top,
+        greaterThanOrEqualTo(topInsetLogical),
+        reason:
+            'the close button must sit below the top inset, not under the '
+            'status bar',
+      );
+    },
+  );
+
+  testWidgets(
+    'the sheet is dismissable from a control that never scrolls away — the '
+    'grade list is tall enough to fill the screen, which takes away both of '
+    'the framework\'s built-in exits at once (no barrier left to tap, and a '
+    'scrollable child that swallows drag-to-dismiss). Verified broken on '
+    'device 2026-08-06: the guide opened and could not be closed at all.',
+    (tester) async {
+      await openSheet(tester);
+
+      final closeButton = find.byKey(const ValueKey('condition-guide-close'));
+      expect(closeButton, findsOneWidget);
+
+      // The content really does overflow — otherwise the rest of this test
+      // proves nothing, since an un-scrollable sheet keeps its barrier and
+      // this whole failure mode never arises.
+      final scrollable = find.byType(SingleChildScrollView);
+      expect(scrollable, findsOneWidget);
+      expect(
+        tester.getSize(scrollable).height,
+        lessThan(
+          tester.getSize(find.byKey(const ValueKey('grade-column'))).height,
+        ),
+        reason:
+            'the grade list must be taller than its viewport for this test '
+            'to exercise the on-device condition',
+      );
+
+      // Scrolling the list must not move the close button — this is what
+      // goes red if the header is ever folded back inside the scroll view,
+      // where it would look present in a fresh-open assertion yet be
+      // unreachable the moment the user scrolls (mutation: delete
+      // `_SheetHeader` from the Column and put the title/close row back at
+      // the top of the SingleChildScrollView's child).
+      final rectBeforeScroll = tester.getRect(closeButton);
+      await tester.drag(scrollable, const Offset(0, -400));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(closeButton), rectBeforeScroll);
+
+      await tester.tap(closeButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.conditionGuideTitle), findsNothing);
+      expect(find.text('open guide'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'the Fine <-> Very Good boundary callout exists and sits between the '
     'two rows on screen — the one emphasis ADR-0016 D3(ข) makes '
     'non-optional',

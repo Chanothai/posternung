@@ -33,6 +33,17 @@ Future<void> showConditionGradeGuideSheet(
       borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
     ),
     isScrollControlled: true,
+    // Required, not cosmetic: with `isScrollControlled` the sheet grows to
+    // the full screen height, and the default `useSafeArea: false` makes
+    // `showModalBottomSheet` wrap the route in
+    // `MediaQuery.removePadding(removeTop: true)` — which zeroes the top
+    // inset, so the `SafeArea` inside `_ConditionGradeGuideSheet` silently
+    // guards nothing and the header renders *under* the status bar and
+    // notch (observed on iPhone 17 Pro, 2026-08-06: the title sat behind the
+    // Dynamic Island and the close button touched the top edge). `true`
+    // instead wraps the sheet in `SafeArea(bottom: false)`, leaving the
+    // bottom inset for the inner `SafeArea` to handle — no double padding.
+    useSafeArea: true,
     builder: (context) => _ConditionGradeGuideSheet(current: current),
   );
 }
@@ -66,31 +77,114 @@ class _ConditionGradeGuideSheet extends StatelessWidget {
     // `mainAxisSize: MainAxisSize.min` alone, which only sizes the Column to
     // its content and does nothing to keep that content within the sheet's
     // own height constraint.
+    //
+    // 🔴 The scrollable is deliberately *not* the sheet's whole body: on
+    // device (2026-08-06) the content is tall enough to fill the screen, so
+    // (a) `showModalBottomSheet`'s barrier ends up entirely off-screen —
+    // nothing left to tap to dismiss — and (b) the modal's own drag-to-
+    // dismiss gesture never fires, because a scrollable child consumes every
+    // vertical drag before the sheet sees it. Both of the framework's
+    // built-in ways out disappear at once, which is exactly what happened:
+    // the guide opened and could not be closed. [_SheetHeader] is pinned
+    // outside the scroll view to restore both — an explicit close button,
+    // and a non-scrolling strip the drag gesture can still reach.
     return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg,
-          AppSpacing.lg,
-          AppSpacing.lg,
-          AppSpacing.xl,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              AppStrings.conditionGuideTitle,
-              style: AppTextStyles.homeSectionHeading,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SheetHeader(),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                0,
+                AppSpacing.lg,
+                AppSpacing.xl,
+              ),
+              child: Column(
+                // Lets the test suite compare the scrolling content's height
+                // against its viewport, i.e. prove the sheet really does
+                // overflow — the precondition for the "can't be dismissed"
+                // failure this header exists to fix.
+                key: const ValueKey('grade-column'),
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    AppStrings.conditionGuideSubtitle,
+                    style: AppTextStyles.cardSubtitle,
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  ..._buildGradeRows(),
+                ],
+              ),
             ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              AppStrings.conditionGuideSubtitle,
-              style: AppTextStyles.cardSubtitle,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The sheet's non-scrolling top strip: drag handle, title, and the close
+/// button. Everything here is about *getting back out* of the guide — see
+/// the note in [_ConditionGradeGuideSheet.build] for why the sheet can't
+/// rely on the barrier or on drag-to-dismiss once the grade list fills the
+/// screen.
+///
+/// The handle is drawn here rather than via `showModalBottomSheet`'s
+/// `showDragHandle: true` because that one is colored from the ambient
+/// `BottomSheetThemeData`, which this app doesn't configure — on
+/// [AppColors.surfaceDark] it renders near-invisible, i.e. it would signal
+/// "draggable" to nobody.
+class _SheetHeader extends StatelessWidget {
+  const _SheetHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.sm,
+        AppSpacing.sm,
+        AppSpacing.sm,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.textSecondary.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(AppRadius.xs),
+              ),
             ),
-            const SizedBox(height: AppSpacing.lg),
-            ..._buildGradeRows(),
-          ],
-        ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  AppStrings.conditionGuideTitle,
+                  style: AppTextStyles.homeSectionHeading,
+                ),
+              ),
+              IconButton(
+                // Keyed so the guide sheet's test suite pins the *specific*
+                // control, not "some IconButton on the sheet".
+                key: const ValueKey('condition-guide-close'),
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close),
+                iconSize: 22,
+                color: AppColors.textSecondary,
+                tooltip: AppStrings.conditionGuideCloseLabel,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
