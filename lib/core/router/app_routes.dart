@@ -8,6 +8,8 @@
 /// declares exactly these paths, so adding a route without a constant here
 /// fails rather than quietly creating a second source of truth.
 abstract final class AppRoutes {
+  AppRoutes._();
+
   /// Cold-start location. Onboarding is still shown on every launch — the
   /// "don't show it twice" half is SCR-01 AC-3 and needs persistent storage
   /// the app does not have yet (ADR-0018 D7).

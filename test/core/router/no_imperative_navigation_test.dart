@@ -109,6 +109,25 @@ void main() {
     expect(hits(lib, 'Navigator.maybePop'), isEmpty);
   });
 
+  test('main.dart drives MaterialApp.router from the provider and has no '
+      'home: left (AC-2) — the entry screen is the / route now, not a widget '
+      'named in main', () {
+    // Comments stripped: the file explains *why* there is no `home:` any
+    // more, and a raw search reads that sentence as the thing it denies.
+    final String main = File(
+      'lib/main.dart',
+    ).readAsLinesSync().map(stripComment).join('\n');
+    expect(main, contains('MaterialApp.router'));
+    expect(main, contains('routerConfig: ref.watch(routerProvider)'));
+    expect(main, isNot(contains('home:')));
+    // The environment override that resolves the native flavor has to
+    // survive the switch to a router — nothing else picks SIT/UAT/prod.
+    expect(
+      main,
+      contains('environmentProvider.overrideWithValue(environment)'),
+    );
+  });
+
   test('no deep-link plumbing was added — ADR-0018 D5 defers all of it to '
       'INF-15, and the native side of it is out of scope entirely (AC-7)', () {
     expect(hits(lib, 'uni_links'), isEmpty);
