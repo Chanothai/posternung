@@ -9,6 +9,7 @@ import '../../../../core/assets/app_images.dart';
 import '../../../../core/design_system/app_dimens.dart';
 import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
+import '../../../../core/router/app_navigation.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -171,9 +172,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                 children: [
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: _BackButton(
-                      onPressed: () => Navigator.maybePop(context),
-                    ),
+                    child: _BackButton(onPressed: () => context.popOrGoHome()),
                   ),
                   const _BrandHeader(),
                   const SizedBox(height: AppSpacing.sm),

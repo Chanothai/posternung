@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../catalog/poster_condition_grade.dart';
 import '../design_system/app_radius.dart';
@@ -176,7 +177,13 @@ class _SheetHeader extends StatelessWidget {
                 // Keyed so the guide sheet's test suite pins the *specific*
                 // control, not "some IconButton on the sheet".
                 key: const ValueKey('condition-guide-close'),
-                onPressed: () => Navigator.of(context).pop(),
+                // Closes the sheet, not the page under it: a modal sheet is
+                // pushed on the same Navigator `go_router` builds, and
+                // `GoRouterDelegate.pop` pops the top route of that
+                // Navigator (`delegate.dart:96-103`). ADR-0018 D2 left this
+                // on `Navigator` because the behaviour was unverified;
+                // verified during INF-01, so the D8 allowlist is now empty.
+                onPressed: () => context.pop(),
                 icon: const Icon(Icons.close),
                 iconSize: 22,
                 color: AppColors.textSecondary,
