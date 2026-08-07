@@ -27,22 +27,7 @@ lib/features/<feature_name>/
 
 **A feature only has the layers it needs.** A purely presentational feature with no data dependency (e.g. `onboarding`) has no `data/` or `domain/` folder — don't scaffold empty layers "for consistency." Add `data/` and `domain/` the moment the feature actually talks to a repository.
 
-Cross-feature, reusable code lives in `lib/core/`:
-
-```
-lib/core/
-  theme/         # design tokens: colors, text styles
-  design_system/ # layout tokens: spacing, radius, sizing (same convention as theme/)
-  strings/       # centralized UI copy: AppStrings (same convention as theme/)
-  assets/        # image asset paths: AppImages (same convention as theme/)
-  error/         # shared exception/failure types
-  config/        # build-environment resolution — see "Build environments" below
-  network/       # shared API client setup (dio/http), interceptors
-  widgets/       # generic reusable widgets (buttons, loaders, etc.)
-  utils/         # extensions, formatters, validators
-```
-
-See `lib/core/CLAUDE.md` for what's actually inside each subfolder today.
+Cross-feature, reusable code lives in `lib/core/` — see `lib/core/CLAUDE.md` for what's inside each subfolder today, and which conventions each one enforces.
 
 **New image/icon assets:** when adding a new image or icon under `assets/images/`, add a corresponding `static const String` constant to `AppImages` (`lib/core/assets/app_images.dart`) in the same change. Never reference `'assets/images/...'` as a literal string inside `SvgPicture.asset(...)` or `Image.asset(...)` calls in feature code — this applies to all new feature work going forward, not just existing screens.
 

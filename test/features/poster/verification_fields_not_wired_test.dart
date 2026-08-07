@@ -25,11 +25,19 @@ import 'package:flutter_test/flutter_test.dart';
 /// 🔴 จงใจไม่ match คำว่า `verification` ลอย ๆ — `lib/features/auth/presentation/
 /// screens/otp_verification_screen.dart` มีอยู่จริงและไม่เกี่ยวกับ ADR-0014 เลย
 /// การ match กว้างกว่านี้จะได้เทสที่แดงด้วยเหตุผลผิด แล้วคนถัดไปจะปิดมันทิ้ง
+/// 🔴 **ต้องเติมชื่อใหม่ทุกครั้งที่ backend rename ฟิลด์** — ด่านนี้ผูกกับ *สตริง*
+/// ไม่ใช่กับฟิลด์ · ADR-0014 D22 เปลี่ยน `verification_note` → `reference_note`
+/// เมื่อ 2026-08-07 · ถ้าเก็บแต่ชื่อเก่า ด่านจะครอบไม่ถึงชื่อใหม่ **โดยไม่มีอะไรฟ้อง**
+/// (ฝั่ง backend กันกับดักตัวเดียวกันไว้แล้วที่
+/// `tests/unit/test_seed_importer_omits_unverified_adr0009_fields.py`)
+/// · เก็บชื่อเก่าไว้ด้วย เพราะโค้ดเก่าที่ยังเขียนชื่อเดิมก็ต้องยังถูกจับ
 const _forbiddenTokens = <String>[
   'verification_status',
   'verificationStatus',
   'verification_note',
   'verificationNote',
+  'reference_note',
+  'referenceNote',
 ];
 
 /// ไฟล์เดียวที่ได้รับยกเว้น — ตัวเทสนี้เอง ซึ่งต้องเขียนโทเคนออกมาตรง ๆ เพื่อไล่หามัน

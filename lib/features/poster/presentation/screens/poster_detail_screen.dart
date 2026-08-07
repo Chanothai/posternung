@@ -20,7 +20,6 @@ import '../../domain/entities/poster_detail.dart';
 import '../../domain/entities/poster_status.dart';
 import '../catalog_error_display.dart';
 import '../providers/poster_providers.dart';
-import '../widgets/poster_authenticity_section.dart';
 import '../widgets/poster_availability_status.dart';
 import '../widgets/poster_detail_image_gallery.dart';
 import '../widgets/poster_details_accordion.dart';
@@ -495,10 +494,14 @@ class _PosterDetailBodyState extends State<_PosterDetailBody> {
               ],
               const SizedBox(height: AppSpacing.md),
               PosterAvailabilityStatus(status: poster.status),
-              PosterAuthenticitySection(
-                isAuthenticated: poster.isAuthenticated,
-                authenticityNote: poster.authenticityNote,
-              ),
+              // 🔴 ADR-0014 D27 — ไม่มีบล็อก "ความถูกต้องแท้จริง" บนหน้านี้โดยตั้งใจ
+              // ถอดออกทั้งบล็อก (หัวข้อ · ป้ายผ่าน/ไม่ผ่านการตรวจสอบความแท้ ·
+              // ไอคอนโล่ติ๊กถูก) เมื่อ 2026-08-07 ไม่ใช่แค่เปลี่ยนถ้อยคำ เพราะ D1
+              // ห้ามอ้างความแท้โดยไม่มีเงื่อนไข และคอลัมน์ verification ทั้งหมดยัง
+              // NULL 117/117 (writer คือ INF-13 ยังไม่เริ่ม) จึงไม่มีอะไรจะแสดง
+              // แม้ OD-2 จะผ่านพรุ่งนี้
+              // ⚠️ `is_authenticated`/`authenticity_note` **ยังอยู่ครบทุกชั้น** —
+              // รอบนี้ปิด "คำอ้างบนจอ" ไม่ได้ปิด "ฟิลด์ในระบบ" (นั่นคือ INF-14)
               const SizedBox(height: AppSpacing.lg),
               PosterDetailsAccordion(
                 posterType: poster.posterType,

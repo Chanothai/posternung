@@ -93,9 +93,11 @@ presentation/
                   # any control implying a purchase flow this round),
                   # PosterSoldBanner (AC-5's "way forward" — stays on the
                   # same screen, doesn't replace the whole listing),
-                  # PosterAuthenticitySection (ADR-0005 §D2 — only
-                  # is_authenticated + authenticity_note; provenance lives
-                  # in the accordion instead, not duplicated),
+                  # (PosterAuthenticitySection was removed 2026-08-07 per
+                  # ADR-0014 D27 — the whole "ความถูกต้องแท้จริง" block, not
+                  # just its wording. D1 forbids authenticity claims and the
+                  # negative label asserted the same process existed. Do not
+                  # recreate it; `provenance` still shows in the accordion.),
                   # PosterDetailsAccordion (AC-2/§D3, flattened by
                   # ADR-0011 §D1′ — poster_type, size, release_date_text,
                   # copyright_year, provenance, restoration_note,

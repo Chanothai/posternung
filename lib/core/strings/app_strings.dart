@@ -220,12 +220,11 @@ abstract final class AppStrings {
   static const String posterDetailSoldBody =
       'ของชิ้นนี้มีเพียงชิ้นเดียวและมีผู้ซื้อไปเรียบร้อยแล้วระหว่างที่คุณกำลังดูอยู่';
   static const String posterDetailSoldCta = 'เลือกดูโปสเตอร์ชิ้นอื่น';
-  static const String posterDetailAuthenticitySectionTitle =
-      'ความถูกต้องแท้จริง';
-  static const String posterDetailAuthenticVerifiedLabel =
-      'ผ่านการตรวจสอบความแท้แล้ว';
-  static const String posterDetailAuthenticUnverifiedLabel =
-      'ยังไม่ผ่านการตรวจสอบความแท้';
+  // 🔴 ADR-0014 D1/D27 — ลบสามค่าคงที่ของบล็อก "ความถูกต้องแท้จริง" ออกเมื่อ
+  // 2026-08-07 (`posterDetailAuthenticitySectionTitle` ·
+  // `posterDetailAuthenticVerifiedLabel` · `posterDetailAuthenticUnverifiedLabel`)
+  // **ห้ามเขียนกลับมาไม่ว่าถ้อยคำใด** — D1 ห้ามอ้างว่าร้านตรวจความแท้ และป้ายฝั่งลบ
+  // ("ยังไม่ผ่าน…") ก็ยืนยันว่ามีการตรวจแบบนั้นอยู่จริงเหมือนกัน
   static const String posterDetailDetailsSectionTitle = 'รายละเอียด';
   static const String posterDetailProvenanceLabel = 'ที่มา (Provenance)';
   static const String posterDetailSizeLabel = 'ขนาด';
@@ -254,4 +253,33 @@ abstract final class AppStrings {
       'ไม่สามารถโหลดข้อมูลโปสเตอร์ได้ กรุณาลองใหม่อีกครั้ง';
   static const String posterDetailErrorRetryCta = 'ลองใหม่อีกครั้ง';
   static const String posterDetailBackButtonTooltip = 'ย้อนกลับ';
+
+  // --- External reference link (ADR-0014 D1 · Amendment D11-D16) ---
+  //
+  // 🔴 NOT WIRED TO ANY UI YET, AND MUST NOT BE. Rendering anything about
+  // `verification_*` is blocked by ADR-0014 D5.1 until OD-2 (legal review)
+  // closes. These strings exist so the wording is settled *before* the SCR-05
+  // round, not so someone can hook them up early. The negative test
+  // `test/features/poster/verification_fields_not_wired_test.dart` still guards
+  // `lib/` — these constants are deliberately named without `verification` so
+  // they do not trip it, which is exactly why this comment has to say so.
+  //
+  // 🔴 FORBIDDEN VOCABULARY — for this dialog and every other string that
+  // talks about a reference source: น่าเชื่อถือ · มาตรฐานสากล · ทางการ ·
+  // ยืนยันได้ · ที่ทั่วโลกยอมรับ, or anything of that kind. Vouching for the
+  // *source* is the same unprovable claim as vouching for the *product*, just
+  // moved one step away — which is the whole thing ADR-0014 D1 forbids.
+  //
+  // 🔴 MUST open in the device browser (`url_launcher` with
+  // `LaunchMode.externalApplication`) — never an in-app WebView, which makes
+  // someone else's site look like our content. Android 11+ needs a `<queries>`
+  // entry in the manifest or `canLaunchUrl` returns false silently.
+  // `url_launcher` is not in `pubspec.yaml` yet — adding it belongs to the
+  // round that wires this up.
+  static const String externalLinkDialogTitle = 'เปิดเว็บไซต์ภายนอก';
+  static const String externalLinkDialogBody =
+      'ลิงก์นี้จะเปิดในเบราว์เซอร์ของเครื่องคุณ '
+      'IMP Awards เป็นคลังภาพโปสเตอร์ที่เราใช้ค้นแบบ ไม่ใช่เว็บไซต์ของเรา';
+  static const String externalLinkDialogCancelCta = 'ยกเลิก';
+  static const String externalLinkDialogConfirmCta = 'เปิดลิงก์';
 }
