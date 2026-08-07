@@ -220,12 +220,11 @@ abstract final class AppStrings {
   static const String posterDetailSoldBody =
       'ของชิ้นนี้มีเพียงชิ้นเดียวและมีผู้ซื้อไปเรียบร้อยแล้วระหว่างที่คุณกำลังดูอยู่';
   static const String posterDetailSoldCta = 'เลือกดูโปสเตอร์ชิ้นอื่น';
-  static const String posterDetailAuthenticitySectionTitle =
-      'ความถูกต้องแท้จริง';
-  static const String posterDetailAuthenticVerifiedLabel =
-      'ผ่านการตรวจสอบความแท้แล้ว';
-  static const String posterDetailAuthenticUnverifiedLabel =
-      'ยังไม่ผ่านการตรวจสอบความแท้';
+  // 🔴 ADR-0014 D1/D27 — ลบสามค่าคงที่ของบล็อก "ความถูกต้องแท้จริง" ออกเมื่อ
+  // 2026-08-07 (`posterDetailAuthenticitySectionTitle` ·
+  // `posterDetailAuthenticVerifiedLabel` · `posterDetailAuthenticUnverifiedLabel`)
+  // **ห้ามเขียนกลับมาไม่ว่าถ้อยคำใด** — D1 ห้ามอ้างว่าร้านตรวจความแท้ และป้ายฝั่งลบ
+  // ("ยังไม่ผ่าน…") ก็ยืนยันว่ามีการตรวจแบบนั้นอยู่จริงเหมือนกัน
   static const String posterDetailDetailsSectionTitle = 'รายละเอียด';
   static const String posterDetailProvenanceLabel = 'ที่มา (Provenance)';
   static const String posterDetailSizeLabel = 'ขนาด';

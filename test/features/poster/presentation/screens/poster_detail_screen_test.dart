@@ -183,8 +183,15 @@ void main() {
       find.text('มีชิ้นเดียว ของหายากที่เมื่อขายแล้วจะไม่กลับมาอีก'),
       findsOneWidget,
     );
-    expect(find.text('ผ่านการตรวจสอบความแท้แล้ว'), findsOneWidget);
-    expect(find.text('Verified by in-house expert.'), findsOneWidget);
+    // 🔴 ADR-0014 D1/D27 — assertion **กลับด้าน** เมื่อ 2026-08-07: เดิมข้อนี้
+    // ยืนยันว่าป้าย 'ผ่านการตรวจสอบความแท้แล้ว' กับ `authenticityNote` ของ fixture
+    // ต้องขึ้นจอ · ทั้งบล็อกถูกถอดออกแล้ว จึงต้องยืนยันว่า **ไม่มี** แทน
+    // ทั้งที่ fixture ยังตั้ง `isAuthenticated: true` + note ไว้เหมือนเดิม —
+    // เงื่อนไขฝั่งข้อมูลไม่เปลี่ยน สิ่งที่เปลี่ยนคือหน้าจอเลิกอ้าง
+    expect(find.text('ผ่านการตรวจสอบความแท้แล้ว'), findsNothing);
+    expect(find.text('ความถูกต้องแท้จริง'), findsNothing);
+    expect(find.text('Verified by in-house expert.'), findsNothing);
+    expect(find.byIcon(Icons.gpp_good_outlined), findsNothing);
     expect(find.text('รายละเอียด'), findsOneWidget); // accordion title
   });
 
@@ -198,8 +205,11 @@ void main() {
     expect(listingTitle('Untitled Import'), findsOneWidget);
     // No era/studio → no subtitle line.
     expect(find.textContaining('•'), findsNothing);
-    // is_authenticated: false → the "unverified" label, not "verified".
-    expect(find.text('ยังไม่ผ่านการตรวจสอบความแท้'), findsOneWidget);
+    // 🔴 ADR-0014 D1/D27 — `is_authenticated: false` เคยทำให้ป้าย
+    // 'ยังไม่ผ่านการตรวจสอบความแท้' ขึ้นจอ · **ฝั่งลบก็ถูกถอดเหมือนกัน** เพราะ
+    // มันยืนยันว่ามี "การตรวจสอบความแท้" ที่ร้านทำอยู่จริงพอ ๆ กับฝั่งบวก
+    expect(find.text('ยังไม่ผ่านการตรวจสอบความแท้'), findsNothing);
+    expect(find.byIcon(Icons.gpp_maybe_outlined), findsNothing);
     // provenance/size/description all null → accordion has nothing to
     // show, so it's omitted entirely (D3: hide, don't show "-").
     expect(find.text('รายละเอียด'), findsNothing);
@@ -1103,9 +1113,13 @@ void main() {
           // ConditionGradeIndicator's own mandated format (ADR-0003).
           '${grade.label} (${grade.scalePosition}/${grade.scaleLength})',
           AppStrings.posterDetailSingleStockNotice,
-          AppStrings.posterDetailAuthenticitySectionTitle,
-          AppStrings.posterDetailAuthenticVerifiedLabel,
-          'Verified by in-house expert.', // authenticityNote — fixture data
+          // 🔴 ADR-0014 D27 (2026-08-07) — เดิมเซตนี้มีอีก 3 บรรทัด: หัวข้อ
+          // 'ความถูกต้องแท้จริง' · ป้าย 'ผ่านการตรวจสอบความแท้แล้ว' · และ
+          // `authenticityNote` ของ fixture ('Verified by in-house expert.')
+          // ทั้งบล็อกถูกถอดออกจากหน้า จึงหายไปจากเซตนี้ **เพราะเราลบของออกจริง**
+          // ไม่ใช่เพราะ assertion อ่อนลง — `_fullPoster()` ยังตั้ง
+          // `isAuthenticated: true` + `authenticityNote` ไว้เหมือนเดิม ดังนั้น
+          // ถ้ามีใครเอาบล็อกกลับมา เทสนี้จะแดงทันที (นั่นคือหน้าที่ของมัน)
         });
       },
     );
