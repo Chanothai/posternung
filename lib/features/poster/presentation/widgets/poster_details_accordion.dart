@@ -205,7 +205,7 @@ class _DetailRow extends StatelessWidget {
           child: Text(
             value,
             style: AppTextStyles.bodyDescription,
-            textAlign: TextAlign.right,
+            textAlign: TextAlign.end,
           ),
         ),
       ],
