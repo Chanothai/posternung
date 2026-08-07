@@ -254,4 +254,33 @@ abstract final class AppStrings {
       'ไม่สามารถโหลดข้อมูลโปสเตอร์ได้ กรุณาลองใหม่อีกครั้ง';
   static const String posterDetailErrorRetryCta = 'ลองใหม่อีกครั้ง';
   static const String posterDetailBackButtonTooltip = 'ย้อนกลับ';
+
+  // --- External reference link (ADR-0014 D1 · Amendment D11-D16) ---
+  //
+  // 🔴 NOT WIRED TO ANY UI YET, AND MUST NOT BE. Rendering anything about
+  // `verification_*` is blocked by ADR-0014 D5.1 until OD-2 (legal review)
+  // closes. These strings exist so the wording is settled *before* the SCR-05
+  // round, not so someone can hook them up early. The negative test
+  // `test/features/poster/verification_fields_not_wired_test.dart` still guards
+  // `lib/` — these constants are deliberately named without `verification` so
+  // they do not trip it, which is exactly why this comment has to say so.
+  //
+  // 🔴 FORBIDDEN VOCABULARY — for this dialog and every other string that
+  // talks about a reference source: น่าเชื่อถือ · มาตรฐานสากล · ทางการ ·
+  // ยืนยันได้ · ที่ทั่วโลกยอมรับ, or anything of that kind. Vouching for the
+  // *source* is the same unprovable claim as vouching for the *product*, just
+  // moved one step away — which is the whole thing ADR-0014 D1 forbids.
+  //
+  // 🔴 MUST open in the device browser (`url_launcher` with
+  // `LaunchMode.externalApplication`) — never an in-app WebView, which makes
+  // someone else's site look like our content. Android 11+ needs a `<queries>`
+  // entry in the manifest or `canLaunchUrl` returns false silently.
+  // `url_launcher` is not in `pubspec.yaml` yet — adding it belongs to the
+  // round that wires this up.
+  static const String externalLinkDialogTitle = 'เปิดเว็บไซต์ภายนอก';
+  static const String externalLinkDialogBody =
+      'ลิงก์นี้จะเปิดในเบราว์เซอร์ของเครื่องคุณ '
+      'IMP Awards เป็นคลังภาพโปสเตอร์ที่เราใช้ค้นแบบ ไม่ใช่เว็บไซต์ของเรา';
+  static const String externalLinkDialogCancelCta = 'ยกเลิก';
+  static const String externalLinkDialogConfirmCta = 'เปิดลิงก์';
 }
