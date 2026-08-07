@@ -92,10 +92,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         return;
       }
       if (result is PhoneAutoVerified) {
-        // The session is already published — LoginScreen is AuthGate's
-        // child, not a pushed route, so completeAuthFlow's popUntil is a
-        // no-op here; it still owns the unfocus for consistency with the
-        // other paths below.
+        // The session is already published, so `AuthGate` swaps to the
+        // destination by itself. `completeAuthFlow` still runs: this screen
+        // is `AuthGate`'s child at `AppRoutes.homePath` with nothing stacked
+        // above it, so the `go` inside resolves to the location we are
+        // already on and moves nothing — but it owns the unfocus, and
+        // sending every success through the one call is what stops each
+        // screen from having to know how deep it happens to be.
         completeAuthFlow(context);
       }
       // Error: already surfaced by the AuthErrorBanner below, which watches
