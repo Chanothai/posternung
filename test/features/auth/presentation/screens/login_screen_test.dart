@@ -231,9 +231,12 @@ void main() {
 
     testWidgets(
       'submitting a valid 9-digit phone number navigates to the OTP screen '
-      'showing the phone number',
+      'showing the phone number — and the URL that navigation produced '
+      'carries none of the phone number, verification id or resend token '
+      '(AC-5 / ADR-0018 D6)',
       (tester) async {
-        await tester.pumpWidget(wrap());
+        late GoRouter router;
+        await tester.pumpWidget(wrap(onRouter: (r) => router = r));
         await tester.tap(find.text(AppStrings.authMethodPhoneTab));
         await tester.pump();
 
@@ -245,6 +248,27 @@ void main() {
 
         expect(find.byType(OtpVerificationScreen), findsOneWidget);
         expect(find.text('+66812345678'), findsOneWidget);
+
+        // 🔴 This is the assertion that has to be made *here* rather than in
+        // `app_router_test.dart`. That file starts a router at
+        // `AppRoutes.otpPath` and then checks the location is
+        // `AppRoutes.otpPath` — a URL the test fed in itself, which stays
+        // true no matter what the production call site does. What matters is
+        // the URL `LoginScreen._submit` produced, so it is read after the
+        // real tap and nowhere else.
+        final uri = router.state.uri;
+        expect(uri.path, AppRoutes.otpPath);
+        expect(uri.queryParameters, isEmpty);
+        expect(uri.fragment, isEmpty);
+
+        final location = uri.toString();
+        expect(location, AppRoutes.otpPath);
+        expect(location, isNot(contains('+66812345678')));
+        // Also without the '+': percent-encoded or stripped is still a leak.
+        expect(location, isNot(contains('66812345678')));
+        // The id the fake view model handed back at this exact call site —
+        // not a literal retyped here, so it cannot drift out of the check.
+        expect(location, isNot(contains('test-verification-id')));
       },
     );
 

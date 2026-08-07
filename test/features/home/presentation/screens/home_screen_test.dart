@@ -7,7 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:posternung/core/catalog/poster_condition_grade.dart';
+import 'package:go_router/go_router.dart';
 import 'package:posternung/core/error/catalog_exception.dart';
+import 'package:posternung/core/router/app_routes.dart';
 import 'package:posternung/core/strings/app_strings.dart';
 import 'package:posternung/features/auth/presentation/providers/auth_providers.dart';
 import 'package:posternung/features/home/presentation/screens/home_screen.dart';
@@ -121,7 +123,7 @@ void main() {
     ).thenThrow(error);
   }
 
-  Widget wrap() => ProviderScope(
+  Widget wrap({void Function(GoRouter router)? onRouter}) => ProviderScope(
     overrides: [
       authViewModelProvider.overrideWith(() => authViewModel),
       // The whole real chain above the repository runs — usecase, provider,
@@ -132,7 +134,10 @@ void main() {
     // `/posters/<uuid>`, so what this proves is that the path resolves to
     // the detail screen with that id — not that a widget the test itself
     // constructed rendered.
-    child: routedApp(routes: routesHosting(const HomeScreen())),
+    child: routedApp(
+      routes: routesHosting(const HomeScreen()),
+      onRouter: onRouter,
+    ),
   );
 
   // The grid is a lazy CustomScrollView, so below-the-fold content isn't laid
@@ -326,12 +331,22 @@ void main() {
         () => repository.getPosterDetail(any()),
       ).thenThrow(const CatalogException(code: 'network_error'));
 
-      await tester.pumpWidget(wrap());
+      late GoRouter router;
+      await tester.pumpWidget(wrap(onRouter: (r) => router = r));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Sold One'));
       await tester.pumpAndSettle();
 
       expect(find.byType(PosterDetailScreen), findsOneWidget);
+      // Pushed, not gone to. `go` would render the same screen while
+      // deleting the way back to the grid, and system back is the one thing
+      // no test in this project can observe (`project-gotchas` §5) — so the
+      // stack shape has to be asserted here, at the real tap.
+      expect(
+        router.canPop(),
+        isTrue,
+        reason: 'a card tap must leave the catalog underneath',
+      );
     });
   });
 
@@ -478,13 +493,24 @@ void main() {
         () => repository.getPosterDetail(any()),
       ).thenThrow(const CatalogException(code: 'network_error'));
 
-      await tester.pumpWidget(wrap());
+      late GoRouter router;
+      await tester.pumpWidget(wrap(onRouter: (r) => router = r));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Blade Runner'));
       await tester.pumpAndSettle();
 
       expect(find.byType(PosterDetailScreen), findsOneWidget);
       verify(() => repository.getPosterDetail(uuid)).called(1);
+      // The uuid reached the URL, and it got there by pushing — the fourth
+      // leg of AC-6 (PosterDetail → back → Home) proved at the card rather
+      // than at a `router.push` the test performed itself.
+      expect(router.state.uri.toString(), AppRoutes.posterDetail(uuid));
+      expect(router.canPop(), isTrue);
+
+      router.pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(PosterDetailScreen), findsNothing);
+      expect(find.text('Blade Runner'), findsOneWidget);
     });
   });
 
