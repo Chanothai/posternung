@@ -1,12 +1,12 @@
 ---
 name: run-and-verify-on-device
 description: >
-  วิธีรัน PosterNung บน iOS simulator หรือเครื่องจริงเพื่อ verify งานด้วยตาตัวเอง —
-  กันบิลด์ชนกับ session ที่ผู้ใช้เปิดค้างไว้, อ่าน log ให้ออก, กดหน้าจอผ่าน simulator
-  tool, แล้วเก็บกวาด. ใช้ skill นี้เมื่อจะ reproduce บั๊กบนอุปกรณ์จริง, ต้องพิสูจน์ว่า
-  งานที่แก้ไปใช้ได้จริงไม่ใช่แค่ unit test เขียว, ผู้ใช้ขอให้ "ลองบนเครื่อง"/"รันดูหน่อย",
-  หรือเจอ Xcode build failed / concurrent builds / build ค้างไม่มี output
-  — ใช้แม้ผู้ใช้จะไม่พูดคำว่า skill
+  วิธีรัน PosterNung บน iOS simulator, Android emulator หรือเครื่องจริงเพื่อ verify งาน
+  ด้วยตาตัวเอง — กันบิลด์ชนกับ session ที่ผู้ใช้เปิดค้างไว้, สร้าง/บูต AVD, อ่าน log ให้ออก,
+  กดหน้าจอ, แล้วเก็บกวาด. ใช้ skill นี้เมื่อจะ reproduce บั๊กบนอุปกรณ์จริง, ต้องพิสูจน์ว่า
+  งานที่แก้ไปใช้ได้จริงไม่ใช่แค่ unit test เขียว, ต้องทดสอบปุ่ม back ของ Android,
+  ผู้ใช้ขอให้ "ลองบนเครื่อง"/"รันดูหน่อย", หรือเจอ Xcode build failed / concurrent builds /
+  emulator บูตไม่ขึ้น / build ค้างไม่มี output — ใช้แม้ผู้ใช้จะไม่พูดคำว่า skill
 ---
 
 # รันและ verify บนอุปกรณ์จริง (PosterNung)
@@ -109,6 +109,94 @@ ps aux | grep "flutter run --flavor sit -d <udid>" | grep -v grep | awk '{print 
 | กด "ถัดไป"/"ข้าม" แล้วหน้าจอไม่ขยับ | hit-test บนพื้น gradient ไม่ติด | swipe แทน (§4) |
 | แอปเปิดมาเข้า Home เลยทั้งที่ยังไม่ล็อกอิน | token เก่ายังอยู่ใน secure storage → `_restore()` ยิง `/auth/me` สำเร็จ | ไม่ใช่บั๊ก ถ้าจะเทสต์ล็อกอินใหม่ต้อง sign out ก่อน |
 | `timeout 90 flutter ...` ไม่ทำงาน | macOS ไม่มี `timeout` (เป็นของ GNU coreutils) | ใช้ timeout ของ Bash tool แทน |
+
+## 7. Android emulator
+
+**ใช้เมื่อไหร่:** อยากเห็นของจริงโดยไม่ต้องพึ่ง iOS · ทดสอบ **ปุ่ม back ของ Android**
+ซึ่ง widget test พิสูจน์ไม่ได้ (`project-gotchas` §5) · หรือ iOS build พังอยู่
+(INF-16 — **ไม่ได้บล็อกเส้นทางนี้ ยืนยัน 2026-08-07**)
+
+### 7.1 ต้องมี AVD ก่อน — เครื่องนี้เคยไม่มีเลยสักตัว
+
+`flutter devices` **ไม่แสดง Android อะไรเลย**และไม่บอกว่าทำไม ต้องเช็คเอง:
+```bash
+SDK=~/Library/Android/sdk
+"$SDK/emulator/emulator" -list-avds            # ว่าง = ยังไม่มี AVD
+ls "$SDK/system-images"                        # ดูว่ามี image อะไรให้ใช้บ้าง
+"$SDK/cmdline-tools/latest/bin/avdmanager" create avd \
+  -n posternung_api31 -k "system-images;android-31;google_apis_playstore;arm64-v8a" -d pixel_6
+```
+`adb`/`emulator` **ไม่อยู่ใน PATH** ต้องเรียกด้วย path เต็มจาก `$SDK` เสมอ
+(`flutter doctor` เขียวได้โดยที่ทั้งสองตัวไม่อยู่ใน PATH — มันหาเจอเอง เราไม่เจอ)
+
+### 7.2 บูตด้วย flag ชุดนี้ ไม่ใช่รันเปล่า ๆ
+
+```bash
+"$SDK/emulator/emulator" -avd posternung_api31 -no-snapshot-load \
+  -gpu host -memory 1536 -cores 2 -no-boot-anim > /tmp/emu.log 2>&1 &
+until [ "$("$SDK/platform-tools/adb" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do sleep 8; done
+```
+
+🔴 **รันเปล่า ๆ แล้วตายเงียบบนเครื่องนี้** — emulator ขอ RAM 5120 MB เจอว่าง 2843 MB
+จึงถอยไป software GL แล้ว QEMU ค้างจนถูกฆ่า อาการที่เห็นคือ `adb devices` ว่างตลอด
+ส่วนสาเหตุจริงอยู่ใน log เท่านั้น:
+```
+WARNING | Software GL rendering will be used due to system memory pressure ... (Available Memory: 2843 MB, Required: 5120 MB)
+ERROR   | detected a hanging thread 'QEMU2 main loop'. No response for 18139 ms
+```
+ตัวกินหลักคือ docker stack ของ backend ที่เปิดค้าง — `docker ps` ก่อนถ้าบูตไม่ขึ้นซ้ำ
+
+### 7.3 🔴 baseURL ของ emulator ไม่ใช่ `127.0.0.1`
+
+`apiBaseUrlFor()` (`lib/core/config/api_base_url_resolver.dart`) คืน **LAN IP** สำหรับ `sit`
+ซึ่ง **emulator เข้าไม่ถึง** เพราะเน็ตของมันถูก virtualize — host คือ `10.0.2.2` เสมอ
+
+```bash
+flutter build apk --flavor sit --debug --dart-define=API_BASE_URL=http://10.0.2.2:8000
+"$SDK/platform-tools/adb" install -r build/app/outputs/flutter-apk/app-sit-debug.apk
+```
+
+⚠️ **`--dart-define` เป็นค่า compile-time** เปลี่ยนทีต้อง**บิลด์ใหม่** ติดตั้ง APK เดิมซ้ำไม่ช่วย
+· **อาการเวลาลืม: ค้างที่วงกลมหมุนไม่มี error ไม่มี banner** เพราะ request ไม่ timeout สักที
+ดูเหมือนแอปแฮงก์ทั้งที่ตัวแอปปกติ — เจอจริง 2026-08-07
+
+### 7.4 เปิดแอปและกดหน้าจอ
+
+`monkey` **ไม่น่าเชื่อถือ** (คืน `VM exiting with result code -5` แล้วไม่เปิดอะไรเลย)
+ใช้ `am start` พร้อมชื่อ activity ที่ resolve มาจริง — **applicationId มี suffix `.sit`
+แต่ชื่อคลาสไม่มี** จึงเดาเองไม่ได้:
+```bash
+ADB="$SDK/platform-tools/adb"
+$ADB shell cmd package resolve-activity --brief -c android.intent.category.LAUNCHER com.frameshine.posternung.sit | tail -1
+$ADB shell am start -W -n com.frameshine.posternung.sit/com.frameshine.posternung.MainActivity
+$ADB exec-out screencap -p > /tmp/s.png      # ถ่ายรูปก่อนแตะทุกครั้ง
+$ADB shell input tap 940 195                 # 🔴 พิกัดเป็น "pixel" ไม่ใช่ point — ต่างจาก iOS §4
+$ADB shell input swipe 800 1200 200 1200 300
+$ADB shell input keyevent KEYCODE_BACK       # ← ตัวที่ widget test แทนไม่ได้
+```
+`am start -W` ขึ้น `Status: timeout` ได้ทั้งที่แอปเปิดสำเร็จ — **ยืนยันด้วย
+`Fully drawn` ใน logcat หรือ `dumpsys activity activities | grep ResumedActivity` แทน**
+
+### 7.5 อ่านผลจาก logcat
+
+```bash
+$ADB logcat -c                                   # ล้างก่อนเริ่มทุกครั้ง
+$ADB logcat -d | grep -iE 'overflow|RenderFlex|FATAL|GoError|nothing to pop|Exception'
+```
+`logcat -b crash` **ว่างเปล่าได้แม้แอปไม่ทำงาน** (เช่นตอน `monkey` ไม่เปิดอะไรเลย) —
+อย่าอ่านว่า "ไม่ crash = เปิดสำเร็จ" ต้องเช็ค `ps -A | grep poster` ด้วย
+
+### 7.6 เก็บกวาด
+
+```bash
+$ADB emu kill        # แล้วเช็คซ้ำ — ps aux | grep "[e]mulator -avd"
+```
+emulator กิน RAM หลาย GB บนเครื่องที่ swap เกือบเต็มอยู่แล้ว **ปิดทุกครั้งที่ verify เสร็จ**
+
+### สิ่งที่ Android แทน iOS ไม่ได้
+
+Apple Sign-In · gesture back (ปัดขอบจอ ไม่ใช่ปุ่ม back) · พฤติกรรม ATS/keychain ·
+ทุกอย่างที่ AC เขียนว่า iOS ตรง ๆ — **งานพวกนี้ยังติด INF-16 อยู่จริง**
 
 ## เมื่อไหร่ควรอ่านต่อ
 
