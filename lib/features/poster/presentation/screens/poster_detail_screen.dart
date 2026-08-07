@@ -9,6 +9,7 @@ import '../../../../core/catalog/size_format.dart';
 import '../../../../core/design_system/app_dimens.dart';
 import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/error/catalog_exception.dart';
+import '../../../../core/router/app_navigation.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -21,8 +22,8 @@ import '../catalog_error_display.dart';
 import '../providers/poster_providers.dart';
 import '../widgets/poster_authenticity_section.dart';
 import '../widgets/poster_availability_status.dart';
-import '../widgets/poster_details_accordion.dart';
 import '../widgets/poster_detail_image_gallery.dart';
+import '../widgets/poster_details_accordion.dart';
 import '../widgets/poster_error_view.dart';
 import '../widgets/poster_not_found_view.dart';
 import '../widgets/poster_restoration_badge.dart';
@@ -129,7 +130,7 @@ class _PosterDetailScreenState extends ConsumerState<PosterDetailScreen>
           child: _GlassCircleButton(
             icon: Icons.arrow_back,
             tooltip: AppStrings.posterDetailBackButtonTooltip,
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => context.popOrGoHome(),
           ),
         ),
         // Nothing to name until the poster has actually loaded — the bar is
@@ -175,7 +176,7 @@ class _PosterDetailScreenState extends ConsumerState<PosterDetailScreen>
                       error,
                       fallback: AppStrings.posterDetailNotFoundBody,
                     ),
-                    onGoBack: () => Navigator.of(context).pop(),
+                    onGoBack: () => context.popOrGoHome(),
                   )
                 : PosterErrorView(
                     message: catalogErrorMessageFor(
@@ -191,7 +192,7 @@ class _PosterDetailScreenState extends ConsumerState<PosterDetailScreen>
                 poster: poster,
                 scrollController: _scrollController,
                 zoomController: _zoomController,
-                onBrowseOthers: () => Navigator.of(context).pop(),
+                onBrowseOthers: () => context.popOrGoHome(),
               ),
             ),
           ),

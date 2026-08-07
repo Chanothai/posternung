@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
+import '../../../../core/router/app_navigation.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -150,7 +151,7 @@ class _RegisterCard extends StatelessWidget {
             AuthNavLinkRow(
               promptText: AppStrings.authTogglePromptRegister,
               actionText: AppStrings.authSubmitLogin,
-              onTap: () => Navigator.of(context).pop(),
+              onTap: () => context.popOrGoHome(),
             ),
           ],
         ),

@@ -3,11 +3,19 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:posternung/core/error/auth_exception.dart';
+import 'package:posternung/core/router/app_router.dart';
+import 'package:posternung/core/router/app_routes.dart';
 import 'package:posternung/core/strings/app_strings.dart';
 import 'package:posternung/features/auth/data/datasources/phone_sign_in_data_source.dart';
+import 'package:posternung/features/auth/domain/entities/auth_user.dart';
+import 'package:posternung/features/auth/presentation/otp_route_args.dart';
 import 'package:posternung/features/auth/presentation/providers/auth_providers.dart';
+import 'package:posternung/features/auth/presentation/providers/session_provider.dart';
 import 'package:posternung/features/auth/presentation/screens/otp_verification_screen.dart';
+
+import '../../../../support/router_harness.dart';
 
 class FakeAuthViewModel extends AuthViewModel {
   FakeAuthViewModel({
@@ -99,12 +107,18 @@ void main() {
           ),
         ),
       ],
-      child: MaterialApp(
-        home: OtpVerificationScreen(
+      // Reached by its real path with its real `extra`, not by handing the
+      // constructor three values (ADR-0018 D9). That is also what makes the
+      // negative assertion in `app_router_test.dart` meaningful: the same
+      // route, with the same arguments, and nothing of them in the URL.
+      child: routedApp(
+        location: AppRoutes.otpPath,
+        extra: OtpRouteArgs(
           phoneNumber: testPhoneNumber,
           verificationId: testVerificationId,
           resendToken: resendToken,
         ),
+        routes: appRoutes,
       ),
     );
   }
@@ -112,6 +126,7 @@ void main() {
   Widget wrapPushed({
     Object? confirmPhoneCodeErrorToThrow,
     void Function(String verificationId, String smsCode)? onConfirmPhoneCode,
+    void Function(GoRouter router)? onRouter,
   }) {
     return ProviderScope(
       overrides: [
@@ -121,21 +136,26 @@ void main() {
             onConfirmPhoneCode: onConfirmPhoneCode,
           ),
         ),
+        // A success here ends the auth flow, which lands on
+        // `AppRoutes.homePath` — and the gate there reads the session.
+        sessionProvider.overrideWithValue(const AsyncData<AuthUser?>(null)),
       ],
-      child: MaterialApp(
-        home: Builder(
-          builder: (context) => Scaffold(
-            body: Center(
-              child: ElevatedButton(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const OtpVerificationScreen(
+      child: routedApp(
+        onRouter: onRouter,
+        routes: routesHosting(
+          Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: () => context.push(
+                    AppRoutes.otpPath,
+                    extra: const OtpRouteArgs(
                       phoneNumber: testPhoneNumber,
                       verificationId: testVerificationId,
                     ),
                   ),
+                  child: const Text('root'),
                 ),
-                child: const Text('root'),
               ),
             ),
           ),
@@ -180,13 +200,15 @@ void main() {
 
   testWidgets(
     'entering a complete 6-digit code calls confirmPhoneCode automatically '
-    'exactly once, with the verification ID and code, then pops to root on '
-    'success',
+    'exactly once, with the verification ID and code, then leaves no auth '
+    'screen on the stack (AC-6)',
     (tester) async {
       final capturedCodes = <String>[];
       String? capturedVerificationId;
+      late GoRouter router;
       await tester.pumpWidget(
         wrapPushed(
+          onRouter: (r) => router = r,
           onConfirmPhoneCode: (verificationId, code) {
             capturedVerificationId = verificationId;
             capturedCodes.add(code);
@@ -202,8 +224,12 @@ void main() {
 
       expect(capturedVerificationId, testVerificationId);
       expect(capturedCodes, ['472019']);
+      // `completeAuthFlow` replaces the stack rather than popping one route
+      // (ADR-0018 D4): the OTP screen is gone, the screen that pushed it is
+      // gone with it, and the location is the post-auth destination.
       expect(find.byType(OtpVerificationScreen), findsNothing);
-      expect(find.text('root'), findsOneWidget);
+      expect(find.text('root'), findsNothing);
+      expect(router.state.uri.toString(), AppRoutes.homePath);
     },
   );
 

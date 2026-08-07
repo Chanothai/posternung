@@ -5,8 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/config/environment.dart';
 import 'core/config/environment_provider.dart';
 import 'core/config/firebase_options_selector.dart';
+import 'core/router/app_router.dart';
 import 'core/strings/app_strings.dart';
-import 'features/onboarding/presentation/screens/onboarding_page_view_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,18 +20,20 @@ void main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
+  Widget build(BuildContext context, WidgetRef ref) {
+    // `MaterialApp.router` rather than `home:` — the first screen is now the
+    // `/` entry in the route table, not a widget named here (ADR-0018).
+    return MaterialApp.router(
       title: AppStrings.appName,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const OnboardingPageViewScreen(),
+      routerConfig: ref.watch(routerProvider),
     );
   }
 }

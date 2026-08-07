@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/app_spacing.dart';
+import '../../../../core/router/app_routes.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/gradient_background.dart';
-import '../../../auth/presentation/auth_gate.dart';
-import '../../../home/presentation/screens/home_screen.dart';
 import '../providers/onboarding_providers.dart';
 import '../widgets/onboarding_authenticate_page_content.dart';
 import '../widgets/onboarding_first_page_content.dart';
@@ -46,13 +46,12 @@ class _OnboardingPageViewScreenState
     super.dispose();
   }
 
-  void _enterApp() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const AuthGate(builder: _buildHome)),
-    );
-  }
-
-  static Widget _buildHome(BuildContext context) => const HomeScreen();
+  /// `go`, not `push` — onboarding is finished, so it must not stay on the
+  /// stack for a back gesture to return to. That is what the
+  /// `pushReplacement` this replaced did too. What is behind
+  /// [AppRoutes.homePath] (still `AuthGate`, unchanged) is the route table's
+  /// business, not this screen's.
+  void _enterApp() => context.go(AppRoutes.homePath);
 
   void _onNext(int currentPage) {
     if (currentPage < onboardingPageCount - 1) {

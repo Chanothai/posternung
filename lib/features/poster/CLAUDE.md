@@ -252,9 +252,11 @@ presentation/
   schema's `required` list, and the backend returns `null` when the primary
   image sits under an internal-only storage key. Every call site needs a
   deliberate placeholder rather than a broken frame.
-- **This screen now has a real caller.** `features/home/`'s
-  `HomeAllPostersSection` `Navigator.push`es `PosterDetailScreen(posterId:
-  poster.id)` with the **real backend UUID** from `GET /posters`. An earlier
+- **This screen now has a real caller, and a real address.** It lives at
+  `AppRoutes.posterDetailPath` (`/posters/:posterId`), and `features/home/`'s
+  `HomeAllPostersSection` reaches it with
+  `context.push(AppRoutes.posterDetail(poster.id))` carrying the **real
+  backend UUID** from `GET /posters`. An earlier
   attempt used `HomePoster`'s placeholder mock ids (e.g.
   `'mock-blade-runner'`) and 404'd on every tap; that was reverted and is
   only safe now because Home reads real ids. Never wire this screen to a
