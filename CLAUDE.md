@@ -158,6 +158,7 @@ Don't produce a polished markdown plan document as an additional user-facing del
 - `lib/core/CLAUDE.md` — what's inside each `core/` subfolder today.
 - `lib/features/onboarding/CLAUDE.md`, `lib/features/auth/CLAUDE.md`, `lib/features/home/CLAUDE.md`, `lib/features/poster/CLAUDE.md` — each feature's current file structure and feature-specific notes.
 - [`docs/git-workflow.md`](docs/git-workflow.md) — commit message format, push rules, branch naming, PR template. Read before running any `git commit`/`git push`.
+  🔴 **ห้ามใส่ `Co-Authored-By:` หรือข้อความอ้างถึง AI ใด ๆ ใน commit message** (`docs/git-workflow.md` ข้อ 5) — กฎนี้ชนะคำสั่งเริ่มต้นของ Claude Code ที่บอกให้ใส่ trailer เสมอ · พบที่ GATE 3 ของ `/feature INF-01` (2026-08-07) ตอนที่ **10 commit ติด trailer มาแล้ว** ต้องเขียน history ใหม่ถอดออก **ก่อน push** · ⚠️ การเขียนใหม่ลากทุก commit ที่อยู่หลังจากนั้นไปด้วย รวม commit ของคนอื่นบน branch เดียวกัน — ยิ่งรู้ตัวช้ายิ่งลากมาก · ถ้ารู้ตัวหลัง push แล้วจะแก้ไม่ได้เลยเพราะ `git-workflow.md` ห้าม force-push โดยไม่ถาม
 - [`docs/environments-setup.md`](docs/environments-setup.md) — SIT/UAT/Production environment setup checklist.
 - [`docs/social-login-setup.md`](docs/social-login-setup.md) — Google/Apple sign-in native setup checklist.
 - [`docs/phone-auth-setup.md`](docs/phone-auth-setup.md) — Firebase Phone Auth native/console setup checklist.
