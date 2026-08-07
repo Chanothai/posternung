@@ -153,10 +153,25 @@ void main() {
     expect(pubspec, contains('go_router:'));
   });
 
-  test('GoRouterState.extra is cast in exactly one place (ADR-0018 D6) — a '
-      'second cast site is the known way this stops being type-safe', () {
-    final List<String> castSites = hits(lib, RegExp(r'\.extra!? as '));
-    expect(castSites, hasLength(1), reason: 'extra cast sites: $castSites');
-    expect(castSites.single, contains('core/router/app_router.dart'));
+  test('GoRouterState.extra is read in one file and never unchecked '
+      '(ADR-0018 D6) — a second reader is the known way this stops being '
+      'type-safe, and an unchecked cast is a crash rather than a redirect', () {
+    // No `as`/`!` casts at all: `extra` is `Object?`, and the one place that
+    // reads it type-promotes instead. `state.extra! as OtpRouteArgs` threw
+    // on screen after a `GoRouter.refresh()` — the `redirect` guard does not
+    // re-run for an already-resolved match (verified, go_router 17.4.0).
+    expect(hits(lib, RegExp(r'\.extra!')), isEmpty);
+    expect(hits(lib, RegExp(r'\.extra as ')), isEmpty);
+    expect(hits(lib, 'as OtpRouteArgs'), isEmpty);
+
+    final List<String> readers = hits(lib, RegExp(r'(?:state|State)\.extra\b'));
+    expect(readers, isNotEmpty, reason: 'the matcher must find the real reads');
+    for (final String site in readers) {
+      expect(
+        site,
+        contains('core/router/app_router.dart'),
+        reason: 'extra read outside the router: $readers',
+      );
+    }
   });
 }

@@ -335,6 +335,79 @@ void main() {
     });
   });
 
+  group('refreshing while standing on /otp', () {
+    testWidgets('a GoRouter.refresh() does not put a crash on the screen — '
+        'it rebuilds this route with extra dropped and does NOT re-run the '
+        'redirect, so the builder has to cope on its own', (tester) async {
+      final GoRouter router = await pumpAt(
+        tester,
+        AppRoutes.homePath,
+        session: const AsyncData<AuthUser?>(null),
+      );
+      router.push(
+        AppRoutes.otpPath,
+        extra: const OtpRouteArgs(
+          phoneNumber: phoneNumber,
+          verificationId: verificationId,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(OtpVerificationScreen), findsOneWidget);
+
+      router.refresh();
+      await tester.pumpAndSettle();
+
+      // The important half: no exception reached the frame. Before this was
+      // handled, `state.extra! as OtpRouteArgs` threw "Null check operator
+      // used on a null value" right here.
+      expect(tester.takeException(), isNull);
+      expect(find.byType(OtpVerificationScreen), findsNothing);
+      expect(router.state.uri.toString(), AppRoutes.homePath);
+    });
+
+    testWidgets('the same holds when a refreshListenable fires — that is the '
+        'shape a route-level auth guard needs (ADR-0018 §ต้องทำตามมา 2), so '
+        'this path becomes live next round', (tester) async {
+      final ChangeNotifier notifier = ChangeNotifier();
+      addTearDown(notifier.dispose);
+      final GoRouter router = GoRouter(
+        initialLocation: AppRoutes.homePath,
+        routes: appRoutes,
+        refreshListenable: notifier,
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authViewModelProvider.overrideWith(_NoopAuthViewModel.new),
+            posterRepositoryProvider.overrideWithValue(repository),
+            sessionProvider.overrideWithValue(const AsyncData<AuthUser?>(null)),
+          ],
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      router.push(
+        AppRoutes.otpPath,
+        extra: const OtpRouteArgs(
+          phoneNumber: phoneNumber,
+          verificationId: verificationId,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(OtpVerificationScreen), findsOneWidget);
+
+      // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+      notifier.notifyListeners();
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(router.state.uri.toString(), AppRoutes.homePath);
+    });
+  });
+
   group('popOrGoHome', () {
     testWidgets('pops when there is something to pop', (tester) async {
       final GoRouter router = await pumpAt(
