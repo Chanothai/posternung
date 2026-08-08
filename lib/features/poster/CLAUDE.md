@@ -54,6 +54,19 @@ data/
                   # failure into CatalogException (core/error/) before it
                   # crosses into domain/.
 presentation/
+  catalog_error_display.dart
+                  # ADR-0017 D9 — ตาราง `code`→ไทย **ของฟีเจอร์นี้**
+                  # (`_catalogMessages`) + ตัวห่อที่เรียกอัลกอริทึมกลาง
+                  # `resolveErrorDisplay()` ของ `core/error/`. อัลกอริทึม
+                  # อยู่ที่ core เพราะ auth ใช้ตัวเดียวกัน แต่ *ตาราง* อยู่
+                  # ที่นี่ตามกฎ feature-first — โค้ดใหม่ที่ต้องแสดง error
+                  # ของ catalog ต้องเรียกผ่านไฟล์นี้ ห้ามเขียน
+                  # `error is CatalogException ? ... : null` เองอีก
+                  # (ADR-0017 D9 เกิดมาเพื่อลบรูปแบบนั้นที่ซ้ำ 3 ที่).
+                  # 🔴 argument ตัวแรกที่ส่งให้ `resolveErrorDisplay()`
+                  # ต้องเป็น `e.displayMessage` เท่านั้น — slot นั้นเป็น
+                  # positional จึงมีเทสสแกนคุมไว้แยกต่างหาก
+                  # (`test/core/error_message_safety_test.dart`).
   providers/      # poster_providers.dart — DI chain (datasource →
                   # repository → usecases: getPosterDetailProvider,
                   # getPostersProvider) + PosterDetailViewModel, an
