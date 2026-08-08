@@ -130,6 +130,131 @@ void main() {
     );
   });
 
+  test('every `debugDetail:` constructor argument in lib/ is wrapped in '
+      '`logDebugDetail(` (ADR-0017 D7 — the kDebugMode guard lives inside that '
+      'helper, so an unwrapped assignment silently turns the one sanctioned '
+      'diagnostic channel back into store-and-discard)', () {
+    // 🔴 พบด้วย mutation 2026-08-06: ถอด wrapper ออกจาก
+    // `google_sign_in_data_source.dart:56` แล้ว `flutter test` **ยังเขียว
+    // 370/370** — ไม่มีเทสตัวไหนคุมการห่อนี้เลยสักตัว · เคสนี้คือตัวที่ปิดช่องนั้น
+    //
+    // ทำไมสำคัญกว่าที่ดู: ADR-0017 §ผลที่ตามมา ข้อ 4 บันทึกไว้ว่ารอบนั้น
+    // **ลด "ข้อมูลที่ผู้ใช้เห็น" โดยไม่ได้เพิ่ม "ข้อมูลที่ทีมเห็น"** (ยังไม่มี crash
+    // reporting — NFR-08) · `logDebugDetail()` จึงเป็นช่องทาง diagnostic
+    // *ช่องเดียว* ที่มีอยู่จริงวันนี้ การถอดมันออกเงียบ ๆ ทำให้ debug ตาบอดสนิท
+    final offenders = <String>[];
+    for (final file in dartFiles) {
+      final path = relPath(file);
+      for (final line in file.readAsStringSync().split('\n')) {
+        final index = line.indexOf('debugDetail:');
+        if (index < 0) continue;
+        final after = line.substring(index + 'debugDetail:'.length).trim();
+        // ค่าอาจขึ้นบรรทัดใหม่ (`debugDetail: logDebugDetail(` แล้ว argument
+        // อยู่บรรทัดถัดไป) — ที่ต้องอยู่ติดกันคือ *ชื่อฟังก์ชัน* ไม่ใช่ทั้ง expression
+        if (!after.startsWith('logDebugDetail(')) {
+          offenders.add('$path: ${line.trim()}');
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      isEmpty,
+      reason:
+          'พบ `debugDetail:` ที่ไม่ได้ห่อด้วย logDebugDetail() — ADR-0017 D7 '
+          'บังคับให้ค่านี้ออกจากแอปได้ทางเดียวคือ log line ที่ guard ด้วย '
+          'kDebugMode ซึ่ง guard นั้นอยู่ *ในตัวฟังก์ชัน* จึงลืมไม่ได้ '
+          'ถ้าไม่เรียกผ่านมัน\n'
+          'จุดที่พบ:\n  ${offenders.join('\n  ')}',
+    );
+  });
+
+  test('`logDebugDetail` is referenced only from its own file and from data '
+      'layers (ADR-0017 D7 — the D10 scan above bans the token `debugDetail` '
+      'under presentation/, but `logDebugDetail` has a capital D and slips '
+      'straight past that check)', () {
+    // ⚠️ ช่องนี้บันทึกไว้เองใน known_gaps ของ INF-02: ชื่อ `logDebugDetail`
+    // ไม่ match `contains('debugDetail')` ของเคสข้างบน จึงเรียกจากที่ไหนก็ได้ ·
+    // วันนี้ถูกเพราะถูกเรียกจาก data layer ล้วน — แต่ "วันนี้ถูก" ไม่ใช่กฎ
+    const definition = 'lib/core/error/debug_log.dart';
+    final offenders = <String>[];
+    for (final file in dartFiles) {
+      final path = relPath(file);
+      if (path == definition) continue;
+      if (!file.readAsStringSync().contains('logDebugDetail')) continue;
+      if (!path.contains('/data/')) offenders.add(path);
+    }
+
+    expect(
+      offenders,
+      isEmpty,
+      reason:
+          'พบการเรียก logDebugDetail() นอกชั้น data — ค่านี้เป็น diagnostic '
+          'ของชั้นที่เห็น exception ต้นทางเท่านั้น การเรียกจากชั้นอื่น '
+          '(โดยเฉพาะ presentation/) คือการดึง debugDetail เข้าใกล้ชั้น render '
+          'ซึ่ง D7 ห้าม\n'
+          'จุดที่พบ:\n  ${offenders.join('\n  ')}',
+    );
+    // closed-world — ถ้าไฟล์นิยามหายไปหรือเปลี่ยนชื่อ เคสข้างบนจะผ่านฟรีทันที
+    expect(File(definition).existsSync(), isTrue, reason: '$definition หายไป');
+  });
+
+  test('the first argument of every `resolveErrorDisplay(` call in lib/ is a '
+      '`.displayMessage` — ADR-0017 D4 step 2 may only ever receive the '
+      'backend-envelope field, and that slot is positional so the D2 scan '
+      'above cannot see what goes into it', () {
+    // 🔴 ช่องที่ *ดีไซน์รอบนี้สร้างขึ้นเอง* ไม่ใช่ข้อจำกัดทั่วไปของการสแกน:
+    // พารามิเตอร์ถูกทำเป็น positional โดยเจตนา (เหตุผลอยู่ใน doc comment ของ
+    // `error_display.dart`) เพื่อไม่ให้ไฟล์ที่แค่ *ส่งต่อ* ค่าต้องเข้า allowlist ของ D2
+    // ผลข้างเคียงคือ mapper ส่งค่าอะไรเข้าไปก็ได้โดยเทสเขียว
+    //
+    // ยืนยันด้วย mutation 2026-08-06: เปลี่ยน `e.displayMessage` → `e.toString()`
+    // ใน `catalog_error_display.dart` แล้วเทสสแกนยังเขียวครบ
+    const definition = 'lib/core/error/error_display.dart';
+    final offenders = <String>[];
+    for (final file in dartFiles) {
+      final path = relPath(file);
+      if (path == definition) continue;
+      final lines = file.readAsStringSync().split('\n');
+      for (var i = 0; i < lines.length; i++) {
+        if (!lines[i].contains('resolveErrorDisplay(')) continue;
+        // argument ตัวแรกอยู่ท้ายบรรทัดเดียวกัน หรือบรรทัดถัดไป (dart format
+        // ขึ้นบรรทัดใหม่เมื่อ argument list ยาว) — ยอมรับทั้งสองรูป
+        final tail = lines[i].split('resolveErrorDisplay(').last.trim();
+        final first = tail.isEmpty ? lines[i + 1].trim() : tail;
+        if (!RegExp(r'^\w+\.displayMessage,?$').hasMatch(first)) {
+          offenders.add('$path:${i + 1}: $first');
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      isEmpty,
+      reason:
+          'argument ตัวแรกของ resolveErrorDisplay() ต้องเป็น '
+          '`<exception>.displayMessage` เท่านั้น — ADR-0017 D2 กำหนดว่าช่องนั้น '
+          'เติมได้จาก envelope {error_code, message} ของ backend เท่านั้น '
+          'การส่ง e.toString() หรือข้อความจาก SDK เข้าไปคือการพาข้อความดิบ '
+          'ขึ้นจอผ่านขั้นที่ 2 ของ D4\n'
+          'จุดที่พบ:\n  ${offenders.join('\n  ')}',
+    );
+    // closed-world — เคสข้างบนวนเฉพาะไฟล์ที่ *มี* การเรียก ถ้าวันหนึ่งไม่มีใคร
+    // เรียกเลย มันจะผ่านฟรีทั้งที่ mapper ถูกรื้อทิ้ง
+    final callers = dartFiles
+        .where((f) => relPath(f) != definition)
+        .where((f) => f.readAsStringSync().contains('resolveErrorDisplay('))
+        .map(relPath)
+        .toList();
+    expect(
+      callers,
+      hasLength(2),
+      reason:
+          'ADR-0017 D9 — ต้องมี mapper ต่อฟีเจอร์ 2 ตัว (auth · catalog) '
+          'ที่เรียกอัลกอริทึมกลาง · เจอ: $callers',
+    );
+  });
+
   test('sanity: the allowlisted datasources still exist and still construct an '
       'exception with displayMessage — guards against the allowlist silently '
       'protecting nothing after a rename/delete', () {

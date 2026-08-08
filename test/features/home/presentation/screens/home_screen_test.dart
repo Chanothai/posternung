@@ -273,6 +273,13 @@ void main() {
 
         expect(find.text(AppStrings.homePostersErrorTitle), findsOneWidget);
         expect(find.text(AppStrings.homePostersErrorBody), findsOneWidget);
+        // 🔴 assertion เชิงลบ — ชื่อเทสอ้างว่า "ไม่ใช่ของหน้า poster detail"
+        // แต่เดิมไม่มีบรรทัดนี้ จึงไม่เคยตรวจสิ่งที่ชื่อมันอ้างเลย (INF-02
+        // known_gap · project-gotchas §3) · ผลจริงยังถูกเพราะสองค่าคงที่ต่างกัน
+        // แต่ "ถูกโดยบังเอิญ" กับ "ถูกเพราะมีคนตรวจ" ไม่เท่ากัน: วันที่มีคนเผลอ
+        // ให้ fallback ของสองหน้าชี้ค่าเดียวกัน เทสนี้ต้องเป็นตัวที่ฟ้อง
+        expect(find.text(AppStrings.posterDetailErrorTitle), findsNothing);
+        expect(find.text(AppStrings.posterDetailErrorBody), findsNothing);
       },
     );
   });
