@@ -1123,5 +1123,83 @@ void main() {
         });
       },
     );
+
+    // 🔴 BL-92 — ช่องที่ `code-critic` ชี้ไว้ตั้งแต่รอบ ADR-0014 D27 แล้วยังไม่ได้ปิด
+    // จนถึงวันนี้: closed-world สองตัวข้างบนตรวจ **`Text`** กับ **สิ่งที่กดได้**
+    // เท่านั้น · บล็อก "ความถูกต้องแท้จริง" ที่ D27 ถอดออกไปเป็น **วงแหวน 48px +
+    // ไอคอนโล่** (ADR-0012 D1 แถว 7:1008) ซึ่งไม่ใช่ทั้งสองอย่าง — เอากลับมาแบบ
+    // *ไม่มีข้อความ* และ *กดไม่ได้* แล้วมันลอดครบทุกด่านที่มีอยู่:
+    //   · ไม่มี `Text` ใหม่           → เซตข้อความข้างบนไม่ขยับ
+    //   · ไม่ใช่ปุ่ม ไม่รับ tap        → จำนวน IconButton/InkWell/GestureDetector ไม่ขยับ
+    //   · ไม่ได้อยู่ใน accordion       → เทสของ accordion มองไม่เห็น
+    // ที่เหลืออยู่คือ `findsNothing` ของ `gpp_good_outlined`/`gpp_maybe_outlined`
+    // สองบรรทัด ซึ่งจับได้เฉพาะตอนที่คนเอา **ไอคอนตัวเดิมเป๊ะ** กลับมา — เปลี่ยนเป็น
+    // `Icons.verified` · `Icons.shield_outlined` · `gpp_good` (ไม่มี `_outlined`)
+    // ก็ลอดหมด · ปัญหาชนิดเดียวกับที่ comment ของเทสด้านบนบันทึกไว้เองเรื่อง
+    // `find.byIcon(Icons.favorite)` ที่ไม่ครอบ `_rounded`/`_sharp`/`_outlined`
+    testWidgets('the exact set of icons on screen is the audited set — an authenticity '
+        'ring/shield brought back with any glyph, with no text and no tap '
+        'handler, fails here where every other closed-world check passes it '
+        '(BL-92)', (tester) async {
+      await useTallSurface(tester);
+      await tester.pumpWidget(
+        wrap(
+          detail: _fullPoster(
+            images: const [
+              PosterImage(
+                id: 'i1',
+                url: 'https://example.invalid/1.jpg',
+                isPrimary: true,
+                sortOrder: 0,
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // ทั้งหน้า ไม่ใช่แค่ body — วงแหวนความแท้เคยอยู่ใน `ListView` ก็จริง แต่
+      // การจำกัด scope ไว้ที่นั่นแปลว่าใครย้ายมันไปแปะบน app bar หรือทับบนรูป
+      // (ที่ที่ตราประทับแบบนี้มักไปอยู่) แล้วรอด · ที่นี่จึงนับทุก `Icon` บนจอ
+      // และเป็น closed-world ตัวเดียวของไฟล์นี้ที่ครอบ **นอก** `ListView`
+      final icons = tester
+          .widgetList<Icon>(find.byType(Icon))
+          .map((w) => w.icon)
+          .toList();
+
+      // แต่ละตัวมีที่มาที่อ้างได้จากซอร์ส ไม่ใช่จากสิ่งที่จอเรนเดอร์วันนี้ —
+      // นั่นคือเงื่อนไขที่ทำให้ allowlist มีค่า (skill `test-quality` §4):
+      //   · arrow_back    — `_GlassCircleButton` ของ leading (poster_detail_screen.dart:130)
+      //   · zoom_in       — `_ZoomAction` ตอนยังไม่ซูม (:389) · สลับเป็น zoom_out เมื่อซูม
+      //   · info_outline  — `ConditionGradeIndicator` ตัวเปิดคู่มือสเกล
+      //                     (condition_grade_indicator.dart:110-111 · ADR-0003)
+      //   · warning_amber_rounded — ป้ายเร่งเร้าของสถานะ `available`
+      //                     (poster_availability_status.dart:68 · ADR-0012 D1 · figma 7:1002)
+      //                     · fixture นี้เป็น `PosterStatus.available` จึงต้องมีตัวนี้
+      //   · expand_more   — trailing ที่ `ExpansionTile` ใส่ให้เองใน `PosterDetailsAccordion`
+      // 🔴 ไม่มีไอคอน "ความแท้" อยู่ในรายการนี้ และนั่นคือทั้งหมดของข้อนี้
+      //
+      // `unorderedEquals` ไม่ใช่การผ่อน — มันยังบังคับ **จำนวนเท่ากันและจับคู่ได้
+      // ครบทุกตัว** (multiset) ของใหม่ตัวเดียวก็แดง · ที่ไม่ล็อกลำดับเพราะลำดับที่ได้
+      // คือลำดับ traversal ของ element tree (body มาก่อน app bar) ซึ่งเป็นรายละเอียด
+      // ภายในของ `Scaffold` ไม่ใช่กฎที่ ADR ข้อไหนพูดถึง — ล็อกไว้ก็จะแดงจากการ
+      // จัดวางใหม่ที่ไม่ได้ผิดอะไร แล้วคนจะแก้ด้วยการเรียงลำดับใน expect ตามไปเรื่อย ๆ
+      expect(
+        icons,
+        unorderedEquals(<IconData>[
+          Icons.arrow_back,
+          Icons.zoom_in,
+          Icons.info_outline,
+          Icons.warning_amber_rounded,
+          Icons.expand_more,
+        ]),
+      );
+
+      // ยังเก็บ assertion เชิงลบแบบระบุชื่อไว้ด้วย — ซ้อนกันโดยตั้งใจ ไม่ใช่
+      // ของค้าง: ถ้าวันหน้ามีคนขยาย allowlist ข้างบนเพราะเพิ่มไอคอนอื่นเข้ามาจริง
+      // (badge บูรณะ · แถบสถานะ) สองบรรทัดนี้ยังกันไอคอนโล่คู่เดิมไว้อยู่
+      expect(find.byIcon(Icons.gpp_good_outlined), findsNothing);
+      expect(find.byIcon(Icons.gpp_maybe_outlined), findsNothing);
+    });
   });
 }
