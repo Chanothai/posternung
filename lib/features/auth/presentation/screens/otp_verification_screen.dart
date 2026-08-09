@@ -18,31 +18,25 @@ import '../../data/datasources/phone_sign_in_data_source.dart';
 import '../auth_error_display.dart';
 import '../auth_flow_navigation.dart';
 import '../providers/auth_providers.dart';
+import '../providers/otp_flow_provider.dart';
 import '../widgets/auth_error_banner.dart';
 
 /// OTP verification screen — user enters the 6-digit code Firebase texted to
 /// [phoneNumber]. Shares the login screen's visual shell (gradient + glass
 /// card + brand header) so the two read as one flow.
 class OtpVerificationScreen extends ConsumerStatefulWidget {
-  const OtpVerificationScreen({
-    required this.phoneNumber,
-    required this.verificationId,
-    this.resendToken,
-    super.key,
-  });
+  const OtpVerificationScreen({required this.phoneNumber, super.key});
 
   /// E.164 phone number the code was sent to (e.g. `+66812345678`) — shown
-  /// in the subtitle and reused if the user taps resend.
+  /// in the subtitle. Display only, and it does not change for the life of a
+  /// flow, so it is passed in rather than read back on every use.
+  ///
+  /// `verificationId` and `resendToken` are deliberately **not** fields here.
+  /// They live in `otpFlowProvider` and are read at the moment they are used
+  /// (ADR-0018 Amendment 2 A2-D2): resend replaces them, and a second copy
+  /// cached in this widget is how the screen ends up verifying a code
+  /// against the SMS *before* the one the user is holding.
   final String phoneNumber;
-
-  /// Firebase's verification ID for the code currently in flight. Replaced
-  /// locally on resend.
-  final String verificationId;
-
-  /// The `forceResendingToken` from the send that brought the user here.
-  /// Required for resend to actually trigger a second SMS — Firebase sends
-  /// nothing without it. Replaced locally on each successful resend.
-  final int? resendToken;
 
   @override
   ConsumerState<OtpVerificationScreen> createState() =>
@@ -56,8 +50,6 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
 
-  late String _verificationId = widget.verificationId;
-  late int? _resendToken = widget.resendToken;
   int _secondsRemaining = _resendCountdownSeconds;
   Timer? _resendTimer;
 
@@ -111,13 +103,21 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
     if (_secondsRemaining > 0) return;
     final result = await ref
         .read(authViewModelProvider.notifier)
-        .sendPhoneCode(widget.phoneNumber, resendToken: _resendToken);
+        .sendPhoneCode(
+          widget.phoneNumber,
+          resendToken: ref.read(otpFlowProvider)?.resendToken,
+        );
     if (!mounted) return;
     if (result is SmsCodeSent) {
-      setState(() {
-        _verificationId = result.verificationId;
-        _resendToken = result.resendToken;
-      });
+      // Into the provider, not into this State — the flow owns these, and
+      // this is the write that makes a resent code verifiable after a
+      // `GoRouter.refresh()` (Amendment 2 A2-D2, INF-18 AC-2).
+      ref
+          .read(otpFlowProvider.notifier)
+          .codeResent(
+            verificationId: result.verificationId,
+            resendToken: result.resendToken,
+          );
       _startResendCountdown();
     } else if (result is PhoneAutoVerified) {
       // Rare on resend, but handle it the same way the initial send does:
@@ -129,11 +129,20 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
 
   Future<void> _submit() async {
     if (_isSubmitting) return;
+    // Read at the moment of use, so a resend that happened since this screen
+    // was built is what gets verified.
+    final String? verificationId = ref.read(otpFlowProvider)?.verificationId;
+    if (verificationId == null) {
+      // The flow ended underneath us (the user is on their way out). Sending
+      // a confirmation now would publish a session for a screen nobody is
+      // looking at.
+      return;
+    }
     _isSubmitting = true;
     final code = _controller.text;
     await ref
         .read(authViewModelProvider.notifier)
-        .confirmPhoneCode(verificationId: _verificationId, smsCode: code);
+        .confirmPhoneCode(verificationId: verificationId, smsCode: code);
     if (!mounted) return;
     if (ref.read(authViewModelProvider).hasError) {
       // Wrong code: clear the input so the user can retype without manually

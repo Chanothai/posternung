@@ -153,25 +153,99 @@ void main() {
     expect(pubspec, contains('go_router:'));
   });
 
-  test('GoRouterState.extra is read in one file and never unchecked '
-      '(ADR-0018 D6) — a second reader is the known way this stops being '
-      'type-safe, and an unchecked cast is a crash rather than a redirect', () {
-    // No `as`/`!` casts at all: `extra` is `Object?`, and the one place that
-    // reads it type-promotes instead. `state.extra! as OtpRouteArgs` threw
-    // on screen after a `GoRouter.refresh()` — the `redirect` guard does not
-    // re-run for an already-resolved match (verified, go_router 17.4.0).
+  /// Every `lib/` file that imports go_router — the only files in which a
+  /// `.extra` could possibly be `GoRouterState.extra`.
+  ///
+  /// Scoping by import rather than by a list of filenames is what lets this
+  /// assert **zero** without knowing anything about Dio: `RequestOptions.extra`
+  /// lives in files that do not import go_router, so they are not in scope
+  /// and no allowlist has to name them (INF-18 AC-4). An allowlist of
+  /// filenames, or worse of line numbers, would rot the moment either file
+  /// moved — and would rot silently, in the direction of passing.
+  ///
+  /// 🔴 The import must be matched with **both quote styles**. `analysis_options.yaml`
+  /// leaves `prefer_single_quotes` commented out, so `import "package:go_router/…"`
+  /// is legal here — and a scope that only recognised `'` would drop such a
+  /// file out of range entirely, taking every `.extra` in it along. That is
+  /// not hypothetical: it was the state of this test when `code-critic`
+  /// reviewed INF-18, and a file added with double quotes read
+  /// `GoRouterState.of(context).extra` with the suite green.
+  List<File> goRouterFiles(Directory root) {
+    return root
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((File f) => f.path.endsWith('.dart'))
+        .where(
+          (File f) => f.readAsLinesSync().any(
+            (String l) =>
+                l.contains(RegExp('''import ['"]package:go_router''')),
+          ),
+        )
+        .toList();
+  }
+
+  test('no file that uses go_router touches `.extra` at all (ADR-0018 D6 + '
+      'Amendment 2 A2-D2) — a route argument is how the phone-verification '
+      'flow used to be silently dropped on every refresh', () {
+    // The old shape of this test allowed exactly one reader and required the
+    // matcher to find it. Amendment 2 moved that state into a provider, so
+    // "there is a reader" became false by construction and the assertion had
+    // to become the stronger one: there are none. It also drops the
+    // `(?:state|State)\.extra` matcher, whose recorded blind spot was a read
+    // through a differently-named variable (`screens.yaml` INF-01
+    // `standing_rules`) — `\.extra\b` has no such gap.
+    //
+    // 🔴 What that blind spot became, rather than what it stopped being: the
+    // matcher no longer misses a read, but the *scope* can still miss a whole
+    // file. `goRouterFiles` decides membership from an import line, so
+    // anything that reaches `GoRouterState` without one — a re-export, a
+    // `part of`, an alias — is invisible here no matter how the read is
+    // spelled. Still text, still not an AST, still a guardrail rather than a
+    // boundary (ADR-0018 D8).
+    final List<File> scoped = goRouterFiles(lib);
+
+    // Positive control 1: the scope is real. A run that resolved to no files
+    // would pass the assertion below while checking nothing.
+    expect(
+      scoped,
+      isNotEmpty,
+      reason: 'no lib/ file imports go_router — the scope is broken',
+    );
+
+    // Positive control 2: the matcher can match. A regex that matches nothing
+    // at all would also pass the assertion below.
+    expect(
+      stripComment(
+        "final Object? e = state.extra;",
+      ).contains(RegExp(r'\.extra\b')),
+      isTrue,
+      reason: 'the matcher no longer recognises a real read',
+    );
+
+    final List<String> offenders = <String>[];
+    for (final File file in scoped) {
+      final List<String> lines = file.readAsLinesSync();
+      for (int i = 0; i < lines.length; i++) {
+        if (stripComment(lines[i]).contains(RegExp(r'\.extra\b'))) {
+          offenders.add('${file.path}:${i + 1}');
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      isEmpty,
+      reason:
+          'a route argument came back. State a route cannot render without '
+          'belongs in a provider reached through `requireRouteState` — '
+          '`extra` is JSON-encoded by go_router and becomes null on refresh: '
+          '$offenders',
+    );
+
+    // The casts that turned the dropped value into a crash on screen. Kept
+    // as their own assertion: `extra` reappearing *with* a safe read would
+    // still be the pattern this forbids, and these would not catch it.
     expect(hits(lib, RegExp(r'\.extra!')), isEmpty);
     expect(hits(lib, RegExp(r'\.extra as ')), isEmpty);
-    expect(hits(lib, 'as OtpRouteArgs'), isEmpty);
-
-    final List<String> readers = hits(lib, RegExp(r'(?:state|State)\.extra\b'));
-    expect(readers, isNotEmpty, reason: 'the matcher must find the real reads');
-    for (final String site in readers) {
-      expect(
-        site,
-        contains('core/router/app_router.dart'),
-        reason: 'extra read outside the router: $readers',
-      );
-    }
   });
 }
