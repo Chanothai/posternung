@@ -15,17 +15,35 @@ Response<Map<String, dynamic>> _resp(Map<String, dynamic> data) => Response(
 Response<void> _voidResp() =>
     Response(statusCode: 204, requestOptions: RequestOptions(path: '/'));
 
-DioException _dioError(int status, {Object? data}) => DioException(
-  requestOptions: RequestOptions(path: '/'),
-  response: Response(
+// Built through Dio's own `.badResponse`/`.connectionError` factories, not
+// the bare `DioException(...)` constructor — those factories are what
+// production code actually goes through, and they're the only thing that
+// sets `.message` to a realistic (non-null) SDK string. A bare constructor
+// leaves `.message` at its default of `null`, which used to make every
+// negative `displayMessage == null` assertion in this file vacuous: it
+// would have passed even if a mutant piped `e.message` straight into
+// `displayMessage`, because there was never a non-null `e.message` for that
+// mutant to leak in the first place (code-critic, INF-20 round 1 — M9).
+// Going through the real factory also means this fixture can't drift from
+// what Dio actually sends when the SDK's own message wording changes across
+// versions.
+DioException _dioError(int status, {Object? data}) {
+  final requestOptions = RequestOptions(path: '/');
+  return DioException.badResponse(
     statusCode: status,
-    data: data,
-    requestOptions: RequestOptions(path: '/'),
-  ),
-);
+    requestOptions: requestOptions,
+    response: Response(
+      statusCode: status,
+      data: data,
+      requestOptions: requestOptions,
+    ),
+  );
+}
 
-DioException _dioNoResponse() =>
-    DioException(requestOptions: RequestOptions(path: '/'));
+DioException _dioNoResponse() => DioException.connectionError(
+  requestOptions: RequestOptions(path: '/'),
+  reason: 'Connection refused',
+);
 
 void main() {
   late MockDio dio;
@@ -36,6 +54,25 @@ void main() {
   setUp(() {
     dio = MockDio();
     dataSource = BackendAuthDataSourceImpl(dio);
+  });
+
+  // Closed-world check on the fixtures above (test-quality §4) — every
+  // `displayMessage`/`debugDetail == null` negative assertion in this file
+  // only has teeth because `_dioError`/`_dioNoResponse` carry a real,
+  // non-null `.message` for a leaking mutant to actually leak. Nothing else
+  // in this file re-verifies that; if `DioException.badResponse`/
+  // `.connectionError` ever stopped setting `.message`, or someone reverted
+  // either helper back to the bare `DioException(...)` constructor, every
+  // negative assertion below would silently go vacuous again exactly like
+  // the round-1 defect (code-critic, INF-20 round 2) — this is the one test
+  // that would say so out loud instead of staying green by accident.
+  test('fixture sanity: _dioError and _dioNoResponse both carry a non-null, '
+      'non-empty .message, as real DioExceptions from these factories '
+      'always do', () {
+    expect(_dioError(404).message, isNotNull);
+    expect(_dioError(404).message, isNotEmpty);
+    expect(_dioNoResponse().message, isNotNull);
+    expect(_dioNoResponse().message, isNotEmpty);
   });
 
   group('firebaseLogin', () {
@@ -94,7 +131,13 @@ void main() {
                 (e) => e.displayMessage,
                 'displayMessage',
                 'ไม่สามารถยืนยันตัวตนกับ Google ได้ กรุณาลองใหม่',
-              ),
+              )
+              // ADR-0017 Amendment 1 AC-10, third direction — an envelope
+              // with no `details` key must give a null debugDetail, not
+              // silently fall back to something else (e.g. `e.message`,
+              // which is now realistic/non-null in this fixture and would
+              // be an easy thing to leak in by accident).
+              .having((e) => e.debugDetail, 'debugDetail', isNull),
         ),
       );
     });
@@ -111,7 +154,14 @@ void main() {
       expect(
         () => dataSource.firebaseLogin('x'),
         throwsA(
-          isA<AuthException>().having((e) => e.code, 'code', 'network_error'),
+          isA<AuthException>()
+              .having((e) => e.code, 'code', 'network_error')
+              // ADR-0017 Amendment 1 A1-D6 — this branch never sees a
+              // backend envelope at all, so displayMessage must stay null;
+              // this is the assertion that would catch a regression where
+              // someone starts populating it from `e.message` (Dio's own
+              // English connection-failure text).
+              .having((e) => e.displayMessage, 'displayMessage', isNull),
         ),
       );
     });
@@ -128,7 +178,9 @@ void main() {
       expect(
         () => dataSource.firebaseLogin('x'),
         throwsA(
-          isA<AuthException>().having((e) => e.code, 'code', 'server_error'),
+          isA<AuthException>()
+              .having((e) => e.code, 'code', 'server_error')
+              .having((e) => e.displayMessage, 'displayMessage', isNull),
         ),
       );
     });
@@ -198,7 +250,13 @@ void main() {
       expect(
         () => dataSource.firebaseLogin(''),
         throwsA(
-          isA<AuthException>().having((e) => e.code, 'code', 'unknown_error'),
+          isA<AuthException>()
+              .having((e) => e.code, 'code', 'unknown_error')
+              // ADR-0017 Amendment 1 A1-D6 — no branch that falls through to
+              // this generic code may carry a displayMessage; there is no
+              // envelope here at all (just the un-recognized {detail: [...]}
+              // shape), so nothing safe to show exists.
+              .having((e) => e.displayMessage, 'displayMessage', isNull),
         ),
       );
     });
@@ -226,9 +284,49 @@ void main() {
         throwsA(
           isA<AuthException>()
               .having((e) => e.code, 'code', 'backend_guard_unexpected')
-              .having((e) => e.debugDetail, 'debugDetail', isNotNull),
+              .having((e) => e.debugDetail, 'debugDetail', isNotNull)
+              // ADR-0017 Amendment 1 A1-D6 — this is a bare TypeError from
+              // `response.data!`, never a backend envelope; nothing here is
+              // safe to show on screen.
+              .having((e) => e.displayMessage, 'displayMessage', isNull),
         ),
       );
+    });
+
+    test("the envelope's `details` reaches debugDetail, never displayMessage "
+        '(ADR-0017 Amendment 1 AC-10) — the two must never collapse into the '
+        'same value even when a single envelope carries both', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          any(),
+          data: any(named: 'data'),
+          options: any(named: 'options'),
+        ),
+      ).thenThrow(
+        _dioError(
+          422,
+          data: {
+            'error_code': 'VALIDATION_ERROR',
+            'message': 'ข้อมูลไม่ถูกต้อง',
+            'details': [
+              {
+                'loc': ['body', 'id_token'],
+                'msg': 'field required',
+              },
+            ],
+          },
+        ),
+      );
+
+      try {
+        await dataSource.firebaseLogin('');
+        fail('expected an AuthException');
+      } on AuthException catch (e) {
+        expect(e.displayMessage, 'ข้อมูลไม่ถูกต้อง');
+        expect(e.debugDetail, isNotNull);
+        expect(e.debugDetail, isNot(e.displayMessage));
+        expect(e.debugDetail, contains('id_token'));
+      }
     });
   });
 

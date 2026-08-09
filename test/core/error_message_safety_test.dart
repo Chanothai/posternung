@@ -4,23 +4,52 @@
 // (ADR-0014 D5.1): a plain text scan over `lib/`, not an AST check — see
 // `project-gotchas` §3 and ADR-0017 §ผลที่ตามมา ข้อ 5 for what that does and
 // doesn't prove. Scope is `lib/` only, on purpose: `test/` fixtures need to
-// construct `AuthException`/`CatalogException` with arbitrary `debugDetail`/
-// `displayMessage` values to exercise the mapper, and that is not a D2/D7
-// violation — only production code populating those fields wrongly is.
+// construct a `BackendErrorEnvelope` (via `test/support/backend_envelope_
+// fixture.dart`, itself round-tripping a real `DioException` through the
+// real parser — see ADR-0017 Amendment 1, OD-A) and an arbitrary
+// `debugDetail` to exercise the mapper, and that is not a D2/D7 violation —
+// only production code populating those fields wrongly is.
+//
+// 🔴 Amendment 1 (2026-08-09) replaced the file-path allowlist this file
+// used to check for `displayMessage:` with a stronger mechanism: the field
+// is no longer a parameter of either exception class's public constructor
+// at all (`AuthException.fromEnvelope`/`CatalogException.fromEnvelope` are
+// the only way in, gated by `BackendErrorEnvelope`'s private constructor —
+// see `lib/core/error/backend_envelope.dart`). The scan below now bans both
+// write forms (`displayMessage:` and `displayMessage =`) anywhere in `lib/`
+// outside `lib/core/error/`, rather than naming specific files — there is no
+// allowlist left to widen when a third datasource is added. It still does
+// not (and must not) ban the plain `.displayMessage` getter read — the two
+// feature mappers relay the field to `resolveErrorDisplay()` and are meant
+// to keep doing that from `presentation/`.
 
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-/// The only two places allowed to populate `displayMessage` when
-/// constructing `AuthException`/`CatalogException` (ADR-0017 D2) — the two
-/// datasources that actually see a backend `{error_code, message}` envelope.
-/// Written as full paths from the package root, same convention as
-/// `verification_fields_not_wired_test.dart`'s `_selfPath`.
-const _displayMessageAllowlist = <String>[
-  'lib/features/auth/data/datasources/backend_auth_data_source.dart',
-  'lib/features/poster/data/datasources/poster_remote_data_source.dart',
-];
+/// Matches a `Response(` or `Response<...>(` construction, but not a
+/// substring occurrence like `TokenResponse(` (ADR-0017 Amendment 1 A1-D5).
+/// The negative lookbehind is the word boundary; the optional `<...>` group
+/// accepts a type argument (including nested generics like
+/// `Map<String, dynamic>`) between `Response` and the opening paren.
+final _responseConstructionPattern = RegExp(
+  r'(?<![A-Za-z0-9_])Response(<[^()]*>)?\(',
+);
+
+/// Matches an assignment (`=` or `??=`) into a `.data` member — e.g.
+/// `e.response?.data = {...}` — but not a comparison (`.data ==`) or a read
+/// into a local variable of the same name (`final data = e.response?.data;`,
+/// which has no `.data` immediately followed by `=` — the `;` blocks it).
+///
+/// This closes the second forgery route `backendErrorEnvelopeOf` is exposed
+/// to, found by code-critic (INF-20 round 1, M9): `Response.data` is a
+/// plain mutable field (`T? data;`, not `final`), so a real, already-live
+/// `DioException`'s response body can be overwritten in place and fed
+/// straight back into the parser — no `Response(` construction, no
+/// `displayMessage:`/`displayMessage =` token, and no record — needed at
+/// all. `A1-D5`'s own reasoning ("the only way to forge an envelope is to
+/// construct a fake `Response`") was **wrong**; this is the fix for that.
+final _dataAssignmentPattern = RegExp(r'\.data\s*(?:=(?!=)|\?\?=)');
 
 void main() {
   late Directory libDir;
@@ -105,14 +134,36 @@ void main() {
     );
   });
 
-  test("`displayMessage:` as a constructor argument appears only in the two "
-      'backend-envelope datasources allowlisted by ADR-0017 D2 — anywhere '
-      'else is a new, unreviewed way to put possibly-unsafe text on screen', () {
+  /// The two write forms ADR-0017 Amendment 1 AC-3 names explicitly —
+  /// `displayMessage:` (named constructor argument) and `displayMessage =`
+  /// (plain assignment, e.g. a local variable someone names the same as the
+  /// field to sneak a raw value past the colon-only pattern). Deliberately
+  /// does **not** match the bare getter read `.displayMessage` — that form
+  /// is what the two feature mappers legitimately do (D4 step 2 — relaying,
+  /// not originating).
+  bool hasDisplayMessageWriteForm(String content) =>
+      content.contains('displayMessage:') ||
+      content.contains('displayMessage =');
+
+  test('the write-form `displayMessage:`/`displayMessage =` appears in lib/ '
+      'only under lib/core/error/ (ADR-0017 Amendment 1, A1-D4 — supersedes '
+      'the file-path allowlist this test used to check: since the public '
+      'AuthException/CatalogException constructors no longer accept '
+      'displayMessage as a named argument at all, there is no legitimate '
+      "reason for either write-form to exist anywhere else in lib/). This "
+      'bans only the *write* forms, not plain `.displayMessage` reads — the '
+      'two feature mappers legitimately read it (they relay the field to '
+      "resolveErrorDisplay(), they don't originate it — D4 step 2) and live "
+      'under `presentation/`, not `core/error/`.', () {
+    const scopeDir = 'lib/core/error/';
     final offenders = <String>[];
+    final inScope = <String>[];
     for (final file in dartFiles) {
       final path = relPath(file);
-      if (_displayMessageAllowlist.contains(path)) continue;
-      if (file.readAsStringSync().contains('displayMessage:')) {
+      if (!hasDisplayMessageWriteForm(file.readAsStringSync())) continue;
+      if (path.startsWith(scopeDir)) {
+        inScope.add(path);
+      } else {
         offenders.add(path);
       }
     }
@@ -121,12 +172,170 @@ void main() {
       offenders,
       isEmpty,
       reason:
-          'พบ `displayMessage:` นอก allowlist ของ ADR-0017 D2 — '
-          'ช่องนี้เติมได้จาก envelope {error_code, message} ของ backend เท่านั้น '
-          '(สองไฟล์ที่ได้รับอนุญาต: ${_displayMessageAllowlist.join(", ")})\n'
-          'ถ้าเป็น datasource ตัวใหม่ที่คุยกับ backend จริง ๆ ให้เพิ่มเข้า '
-          '_displayMessageAllowlist ในไฟล์เทสนี้พร้อมอ้าง ADR-0017 ไม่ใช่ปิดเงียบ\n'
+          'พบรูปเขียนค่า `displayMessage:`/`displayMessage =` นอก lib/core/error/ '
+          '— ตั้งแต่ Amendment 1 ช่องนี้เติมได้ทางเดียวคือ AuthException.fromEnvelope / '
+          'CatalogException.fromEnvelope ซึ่งนิยามอยู่ใน lib/core/error/ เท่านั้น '
+          'การเห็นรูปเขียนค่านี้ที่อื่นแปลว่ามีคนพยายามตั้งค่ามันตรง ๆ อีกทางหนึ่ง\n'
           'จุดที่พบ:\n  ${offenders.join('\n  ')}',
+    );
+
+    // closed-world — ถ้า lib/core/error/ เองไม่มีรูปเขียนค่านี้เหลือเลย (เช่น
+    // เปลี่ยนชื่อฟิลด์แล้วลืมแก้เทสนี้) เคสข้างบนจะผ่านฟรีทันทีโดยไม่ได้ตรวจ
+    // อะไรจริง — ต้องยืนยันว่าขอบเขตที่อนุญาตยังมีของจริงอยู่ในนั้น
+    expect(
+      inScope,
+      isNotEmpty,
+      reason:
+          'ไม่เจอรูปเขียนค่า displayMessage แม้แต่ใน lib/core/error/ เอง — '
+          'เคสข้างบนน่าจะผ่านฟรี ไม่ได้ตรวจอะไรเลย',
+    );
+  });
+
+  test('positive/negative control for the displayMessage write-form scan '
+      'above — it must catch both a named-constructor-argument violation '
+      'and a plain-assignment violation, and it must not falsely flag the '
+      'legitimate `.displayMessage` getter read the two feature mappers '
+      'make when relaying the field to resolveErrorDisplay() (a pattern '
+      'that matched the getter form too would ban code D4 step 2 '
+      'explicitly permits)', () {
+    const namedArgumentViolation = 'displayMessage: rawSdkText,';
+    const assignmentViolation = 'final displayMessage = e.message;';
+    const legitimateGetterForm =
+        'resolveErrorDisplay(e.displayMessage, code: e.code)';
+
+    expect(
+      hasDisplayMessageWriteForm(namedArgumentViolation),
+      isTrue,
+      reason: 'ต้องจับรูปที่เป็น named constructor argument ได้จริง',
+    );
+    expect(
+      hasDisplayMessageWriteForm(assignmentViolation),
+      isTrue,
+      reason:
+          'ต้องจับรูปที่เป็น plain assignment ได้ด้วย ไม่ใช่แค่รูป named argument',
+    );
+    expect(
+      hasDisplayMessageWriteForm(legitimateGetterForm),
+      isFalse,
+      reason:
+          'ต้องไม่ false-positive กับรูปอ่านค่าผ่าน getter (e.displayMessage) '
+          'ซึ่งเป็นของถูกต้องใน mapper ทั้งสองไฟล์วันนี้',
+    );
+  });
+
+  test('no construction of a `Response(` object anywhere in lib/ (ADR-0017 '
+      'Amendment 1, A1-D2/A1-D5) — the only legal way into '
+      '`backendErrorEnvelopeOf` is a real `DioException`; assembling a fake '
+      '`Response` by hand and feeding it in would forge an envelope without '
+      'ever talking to the backend', () {
+    // Word boundary matters: lib/ has one legitimate occurrence of the
+    // literal substring `Response(` today — `token_response.dart`'s
+    // `const factory TokenResponse(` — which a naive
+    // `contains('Response(')` would flag as an offender for no reason.
+    // Must also match the generic form `Response<Map<String, dynamic>>(`,
+    // not just the bare constructor call, or a mutant that adds a type
+    // argument slips past.
+    final offenders = <String>[];
+    for (final file in dartFiles) {
+      final path = relPath(file);
+      if (_responseConstructionPattern.hasMatch(file.readAsStringSync())) {
+        offenders.add(path);
+      }
+    }
+
+    expect(
+      offenders,
+      isEmpty,
+      reason:
+          'พบการประกอบ `Response(...)` ใน lib/ — ช่องทางเดียวที่ถูกต้องเข้า '
+          'backendErrorEnvelopeOf คือ DioException จริงจาก Dio เท่านั้น\n'
+          'จุดที่พบ:\n  ${offenders.join('\n  ')}',
+    );
+  });
+
+  test('positive control for the Response( scan above — the word-boundary regex '
+      'must still catch a real offending call (with and without a type '
+      'argument), not just avoid false-flagging TokenResponse(, or it would be '
+      'a regex that matches nothing and passes for free', () {
+    expect(
+      _responseConstructionPattern.hasMatch(
+        'final r = Response(requestOptions: ro);',
+      ),
+      isTrue,
+      reason: 'ต้องจับการประกอบ Response(...) แบบไม่มี type argument ได้',
+    );
+    expect(
+      _responseConstructionPattern.hasMatch(
+        'final r = Response<Map<String, dynamic>>(requestOptions: ro);',
+      ),
+      isTrue,
+      reason: 'ต้องจับการประกอบ Response<...>(...) แบบมี type argument ได้ด้วย',
+    );
+    expect(
+      _responseConstructionPattern.hasMatch(
+        'const factory TokenResponse(String accessToken)',
+      ),
+      isFalse,
+      reason:
+          'ต้องไม่ false-positive กับ TokenResponse( ซึ่งเป็นของถูกต้องใน lib/ '
+          'วันนี้ (token_response.dart:10)',
+    );
+  });
+
+  test('no assignment into a `.data` member anywhere in lib/ (ADR-0017 '
+      'Amendment 1 A1-D2, hardened after code-critic M9) — `Response.data` '
+      'is a plain mutable field, so overwriting it on an already-live '
+      '`DioException` and feeding that same exception back into '
+      '`backendErrorEnvelopeOf` forges an envelope just as effectively as '
+      'constructing a fake `Response`, without tripping the `Response(` scan '
+      'above at all', () {
+    final offenders = <String>[];
+    for (final file in dartFiles) {
+      final path = relPath(file);
+      if (_dataAssignmentPattern.hasMatch(file.readAsStringSync())) {
+        offenders.add(path);
+      }
+    }
+
+    expect(
+      offenders,
+      isEmpty,
+      reason:
+          'พบการเขียนทับ `.data` ใน lib/ — ช่องทางเดียวที่ถูกต้องเข้า '
+          'backendErrorEnvelopeOf คือ response ของ DioException ตามที่ Dio '
+          'ส่งมาจริง ไม่ใช่ response ที่ถูกแก้ค่าไปแล้ว\n'
+          'จุดที่พบ:\n  ${offenders.join('\n  ')}',
+    );
+  });
+
+  test('positive/negative control for the `.data` assignment scan above — '
+      'must catch both `=` and `??=` forms of overwriting `.data`, and must '
+      'not false-positive on a `.data ==` comparison or on reading `.data` '
+      'into a local variable of the same name (both of which are ordinary, '
+      'legitimate code)', () {
+    expect(
+      _dataAssignmentPattern.hasMatch(
+        "e.response?.data = <String, dynamic>{'error_code': 'x'};",
+      ),
+      isTrue,
+      reason: 'ต้องจับการเขียนทับด้วย = ได้',
+    );
+    expect(
+      _dataAssignmentPattern.hasMatch("response.data ??= <String, dynamic>{};"),
+      isTrue,
+      reason: 'ต้องจับการเขียนทับด้วย ??= ได้ด้วย',
+    );
+    expect(
+      _dataAssignmentPattern.hasMatch('if (response.data == expected) {'),
+      isFalse,
+      reason: 'ต้องไม่ false-positive กับการเทียบค่าด้วย ==',
+    );
+    expect(
+      _dataAssignmentPattern.hasMatch('final data = e.response?.data;'),
+      isFalse,
+      reason:
+          'ต้องไม่ false-positive กับการอ่านค่าเข้าตัวแปรชื่อ data ซึ่งเป็นโค้ด'
+          'ปกติในไฟล์นี้เอง (backend_envelope.dart) และในหลายที่ของ lib/',
     );
   });
 
@@ -255,18 +464,70 @@ void main() {
     );
   });
 
-  test('sanity: the allowlisted datasources still exist and still construct an '
-      'exception with displayMessage — guards against the allowlist silently '
-      'protecting nothing after a rename/delete', () {
-    for (final path in _displayMessageAllowlist) {
-      final file = File(path);
-      expect(file.existsSync(), isTrue, reason: '$path หายไป — แก้ allowlist');
-      expect(
-        file.readAsStringSync(),
-        contains('displayMessage:'),
-        reason:
-            '$path ไม่มี displayMessage: อีกต่อไป — allowlist นี้ไม่จำเป็นแล้ว?',
-      );
-    }
+  test('BackendErrorEnvelope stays a class with a private constructor, not a '
+      'record (ADR-0017 Amendment 1 A1-D3) — a record shape is structurally '
+      'typed and can be forged by anyone with the right field names; a '
+      'private (`._`) constructor is the one thing that is actually '
+      "enforced by Dart's own language rules (library privacy), not by "
+      'convention. code-critic proved the record form is forgeable at GATE 3 '
+      '(INF-20 round 1, mutation M4) by switching the type and constructing '
+      'one by hand — this test locks the *declaration shape itself* so that '
+      'exact regression cannot land silently again.', () {
+    const path = 'lib/core/error/backend_envelope.dart';
+    final file = File(path);
+    expect(file.existsSync(), isTrue, reason: '$path หายไป');
+    final content = file.readAsStringSync();
+
+    expect(
+      content.contains('class BackendErrorEnvelope'),
+      isTrue,
+      reason:
+          '$path ต้องประกาศ BackendErrorEnvelope เป็น class — เปลี่ยนเป็น '
+          'typedef ของ record จะทำให้ประตูเดียวของ AC-2 กลายเป็นประตูที่ '
+          'ล็อกไม่ได้ (A1-D3)',
+    );
+    expect(
+      content.contains('BackendErrorEnvelope._('),
+      isTrue,
+      reason:
+          '$path ต้องมี constructor ที่เป็น private (._) — เป็นกลไกเดียวที่ '
+          'ทำให้ "ผลิตได้จาก backendErrorEnvelopeOf เท่านั้น" เป็นจริงจริง ๆ '
+          'ไม่ใช่แค่คำอธิบายใน doc comment',
+    );
+  });
+
+  test('positive control for the BackendErrorEnvelope shape scan above — '
+      'proves the two literal checks actually discriminate the required '
+      'class-with-private-constructor form from the record-typedef mutant '
+      'that defeated the type gate at GATE 3, rather than being vacuously '
+      'true for any file', () {
+    const recordMutantSource = '''
+import 'package:dio/dio.dart';
+
+typedef BackendErrorEnvelope = (String, String?, String?);
+
+BackendErrorEnvelope? backendErrorEnvelopeOf(DioException e) {
+  final data = e.response?.data;
+  if (data is Map && data['error_code'] is String) {
+    return (data['error_code'] as String, data['message'] as String?, null);
+  }
+  return null;
+}
+''';
+
+    expect(
+      recordMutantSource.contains('class BackendErrorEnvelope'),
+      isFalse,
+      reason:
+          'mutant ที่เปลี่ยนเป็น record ต้องไม่มี "class BackendErrorEnvelope" '
+          'เหลืออยู่ — ถ้าเทสนี้ยังเห็นว่ามี แปลว่า string check ตัวนี้ไม่ได้ '
+          'ตรวจอะไรจริง',
+    );
+    expect(
+      recordMutantSource.contains('BackendErrorEnvelope._('),
+      isFalse,
+      reason:
+          'mutant แบบเดียวกันต้องไม่มี BackendErrorEnvelope._( เหลืออยู่ด้วย',
+    );
   });
 }

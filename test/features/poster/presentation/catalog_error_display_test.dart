@@ -3,6 +3,8 @@ import 'package:posternung/core/error/catalog_exception.dart';
 import 'package:posternung/core/strings/app_strings.dart';
 import 'package:posternung/features/poster/presentation/catalog_error_display.dart';
 
+import '../../../support/backend_envelope_fixture.dart';
+
 void main() {
   group('catalogErrorDisplayMessage', () {
     test('maps network_error to this feature\'s Thai text, ignoring any '
@@ -28,9 +30,11 @@ void main() {
         "the exception's own displayMessage from the envelope (D2), not the "
         'fallback', () {
       final message = catalogErrorDisplayMessage(
-        const CatalogException(
-          code: 'POSTER_NOT_FOUND',
-          displayMessage: 'ไม่พบโปสเตอร์นี้',
+        CatalogException.fromEnvelope(
+          backendEnvelopeFixture(
+            code: 'POSTER_NOT_FOUND',
+            message: 'ไม่พบโปสเตอร์นี้',
+          ),
         ),
         fallback: 'ตัวสำรองของหน้านี้',
       );
