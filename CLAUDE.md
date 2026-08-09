@@ -115,6 +115,13 @@ flutter test --coverage
 Builds always need a flavor (`sit` / `uat` / `production`) — there is no `Runner` scheme
 any more, so `flutter build ios` without `--flavor` fails.
 
+🔴 **`--delete-conflicting-outputs` does nothing any more.** build_runner (2.15.1 as resolved
+today) prints `W These options have been removed and were ignored` on every run. The command
+above **keeps the flag because that is what `ci.yml` actually runs** — this block mirrors CI,
+not what CI ought to be. What changes is what you can rely on: **the flag will not clear a
+stale generated file.** Delete `*.g.dart`/`*.freezed.dart` yourself, or run
+`dart run build_runner clean` first. Full incident in the `project-gotchas` skill.
+
 ## General Rules
 
 - No layer skips: presentation never imports `data/`; domain never imports Flutter or `data/`.
