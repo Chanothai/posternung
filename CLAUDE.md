@@ -106,7 +106,7 @@ verification — run the same commands locally:
 
 ```bash
 flutter pub get
-dart run build_runner build --delete-conflicting-outputs
+dart run build_runner build
 dart format --output=none --set-exit-if-changed .
 flutter analyze --fatal-infos
 flutter test --coverage
@@ -114,6 +114,14 @@ flutter test --coverage
 
 Builds always need a flavor (`sit` / `uat` / `production`) — there is no `Runner` scheme
 any more, so `flutter build ios` without `--flavor` fails.
+
+🔴 **Don't add `--delete-conflicting-outputs` back.** build_runner removed the option; 2.15.1
+prints `W These options have been removed and were ignored` and carries on. It was dropped from
+`ci.yml` and from this block **in the same change**, because this block only means anything as
+long as it matches what CI actually runs. What you lose with it is a habit, not a safety net:
+**nothing clears a stale generated file for you.** On a conflicting-output error, delete the
+`*.g.dart`/`*.freezed.dart` in question or run `dart run build_runner clean` first. Full incident
+in the `project-gotchas` skill.
 
 ## General Rules
 

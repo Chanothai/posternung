@@ -28,6 +28,15 @@ Commit/push conventions for this repo. Read this before running any `git commit`
 ถ้าเป็นงานข้าม feature ทั้งหมด (เช่น dependency, CI) scope เป็น `deps`, `ci`, `config` แทน
 
 **Subject**: imperative mood, ตัวพิมพ์เล็ก, ไม่มีจุดปิดท้าย, ≤ 50 ตัวอักษร
+
+🔴 **`commitlint.config.js` คือเจ้าของกฎที่บังคับจริง ไม่ใช่บรรทัดข้างบน** — husky ยิงที่
+`commit-msg` (`npx --no -- commitlint --edit`) และ**ปฏิเสธ commit ทั้งใบ ไม่ใช่เตือน**
+· `subject-case` = **`lower-case` แบบ `always`** ⇒ บังคับ**ทั้งบรรทัด** ไม่ใช่แค่ตัวแรก
+**ชื่อ identifier แบบ camelCase จึงใส่ใน subject ไม่ได้เลย** (`route displayMessage through …`
+ตกเพราะตัว `M` ตัวเดียว) — เขียนเป็นคำธรรมดาใน subject แล้วพูดถึงชื่อ symbol ใน **body** แทน
+· `header-max-length` = **72** ⇒ **`≤ 50` ข้างบนคือข้อตกลงของทีมที่เข้มกว่าเครื่อง
+ไม่ใช่ค่าที่ hook บังคับ** อย่าอ่านว่าเป็นเส้นเดียวกัน
+· เหตุการณ์ที่ทำให้ต้องเขียนข้อนี้อยู่ในสกิล `project-gotchas` §5
 ตัวอย่างที่ถูกต้อง: `feat(onboarding): add progress dots to hero screen`
 ตัวอย่างที่ผิด: `Fixed some bugs in onboarding` / `updates`
 
