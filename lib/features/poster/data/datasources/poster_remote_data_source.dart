@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../../../../core/error/backend_envelope.dart';
 import '../../../../core/error/catalog_exception.dart';
 import '../../../../core/error/debug_log.dart';
 import '../models/paginated_posters_model.dart';
@@ -58,15 +59,17 @@ class PosterRemoteDataSourceImpl implements PosterRemoteDataSource {
       // The backend replies with a `{error_code, message, details}` envelope
       // (message already Thai) for every AppError, e.g. 404
       // `POSTER_NOT_FOUND` — this is the *only* place `displayMessage` is
-      // allowed to come from (ADR-0017 D2). `details[]` is never rendered
-      // (D3) — captured as `debugDetail` only.
-      final data = e.response?.data;
-      if (data is Map && data['error_code'] is String) {
-        throw CatalogException(
-          code: data['error_code'] as String,
-          displayMessage: data['message'] as String?,
+      // allowed to come from (ADR-0017 D2, Amendment 1 A1-D1:
+      // `CatalogException.fromEnvelope` is the only constructor able to
+      // populate it at all). `details[]` is never rendered (D3) — captured
+      // as `debugDetail` only, wrapped in `logDebugDetail()` here exactly as
+      // every other guard in this method does.
+      final envelope = backendErrorEnvelopeOf(e);
+      if (envelope != null) {
+        throw CatalogException.fromEnvelope(
+          envelope,
           debugDetail: logDebugDetail(
-            data['details']?.toString(),
+            envelope.details,
             source: 'catalog_remote_envelope',
           ),
         );

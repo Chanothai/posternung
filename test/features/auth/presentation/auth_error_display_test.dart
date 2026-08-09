@@ -3,6 +3,8 @@ import 'package:posternung/core/error/auth_exception.dart';
 import 'package:posternung/core/strings/app_strings.dart';
 import 'package:posternung/features/auth/presentation/auth_error_display.dart';
 
+import '../../../support/backend_envelope_fixture.dart';
+
 void main() {
   group('authErrorDisplay', () {
     test(
@@ -20,9 +22,11 @@ void main() {
     test("the feature's code table wins even when displayMessage is also set "
         '— ADR-0017 D4\'s step order is fixed, not "whichever is present"', () {
       final display = authErrorDisplay(
-        const AuthException(
-          code: 'wrong-password',
-          displayMessage: 'ข้อความจาก backend ที่ไม่ควรถูกใช้ตรงนี้',
+        AuthException.fromEnvelope(
+          backendEnvelopeFixture(
+            code: 'wrong-password',
+            message: 'ข้อความจาก backend ที่ไม่ควรถูกใช้ตรงนี้',
+          ),
         ),
       );
 
@@ -33,9 +37,11 @@ void main() {
         "isn't in the feature's table", () {
       // Backend AppError → `{error_code, message}` (message already Thai).
       final display = authErrorDisplay(
-        const AuthException(
-          code: 'INVALID_CREDENTIALS',
-          displayMessage: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง',
+        AuthException.fromEnvelope(
+          backendEnvelopeFixture(
+            code: 'INVALID_CREDENTIALS',
+            message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง',
+          ),
         ),
       );
 
@@ -57,7 +63,9 @@ void main() {
     test('falls back to the generic Thai message for an empty/blank '
         'displayMessage', () {
       final display = authErrorDisplay(
-        const AuthException(code: 'weird', displayMessage: '   '),
+        AuthException.fromEnvelope(
+          backendEnvelopeFixture(code: 'weird', message: '   '),
+        ),
       );
 
       expect(display.message, AppStrings.authErrorGeneric);

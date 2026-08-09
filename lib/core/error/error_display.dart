@@ -23,16 +23,21 @@ typedef ErrorDisplay = ({String message, String code});
 /// legal to render (D7), so there is no path through this function that can
 /// leak it onto a screen by accident.
 ///
-/// [displayMessage] is positional here, not named, on purpose: the D10
-/// source scan (`test/core/error_message_safety_test.dart`) looks
-/// for that field name written as a named constructor argument, to enforce
-/// that it's only ever populated from the two backend-envelope datasources
-/// (D2's allowlist). Naming this parameter the same way would make the same
-/// text pattern appear at every call site that merely *forwards* the field
-/// to this function — this file and the two feature mapper files that call
-/// it — which isn't a violation of D2 (they don't originate the value, they
-/// just relay it), but would be indistinguishable from one to a text-level
-/// scan.
+/// [displayMessage] is positional here, not named, on purpose: since
+/// Amendment 1, the D10 source scan (`test/core/error_message_safety_test.dart`)
+/// bans both write forms (`displayMessage:` and `displayMessage =`) from
+/// appearing anywhere in `lib/` outside `core/error/` — the field can no
+/// longer be set via a named constructor argument at all
+/// (`AuthException`/`CatalogException`'s public constructors don't accept
+/// it; only `.fromEnvelope()` does, from a `BackendErrorEnvelope` that only
+/// `backendErrorEnvelopeOf()` can produce). Naming *this* parameter
+/// `displayMessage:` would still make that literal write-form appear at
+/// every call site that merely *forwards* the field to this function — this
+/// file's own two feature-mapper callers, both of which live under
+/// `presentation/` — which isn't a new D2 violation (they don't originate
+/// the value, they just relay it), but would be indistinguishable from one
+/// to a text-level scan. The scan does *not* ban the plain `.displayMessage`
+/// getter read used below by those same two callers — only the write forms.
 ErrorDisplay resolveErrorDisplay(
   String? displayMessage, {
   required String code,

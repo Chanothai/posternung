@@ -17,6 +17,7 @@ import 'package:posternung/features/poster/domain/entities/poster_detail.dart';
 import 'package:posternung/features/poster/domain/entities/poster_image.dart';
 import 'package:posternung/features/poster/domain/entities/poster_status.dart';
 import 'package:posternung/features/poster/presentation/providers/poster_providers.dart';
+import '../../../../support/backend_envelope_fixture.dart';
 import '../../../../support/router_harness.dart';
 import 'package:posternung/features/poster/presentation/widgets/poster_detail_image_gallery.dart';
 import 'package:posternung/features/poster/presentation/widgets/poster_details_accordion.dart';
@@ -240,15 +241,17 @@ void main() {
       'and surfaces the backend\'s own message (Medium #7)', (tester) async {
     await tester.pumpWidget(
       wrap(
-        error: const CatalogException(
-          code: 'POSTER_NOT_FOUND',
-          // Deliberately distinct from the static
-          // `AppStrings.posterDetailNotFoundTitle`/`...Body` copy, so this
-          // test can prove the *backend's* displayMessage is what's shown,
-          // not a static string that happens to read similarly. Also proves
-          // `POSTER_NOT_FOUND` isn't in `_catalogMessages` — if it ever were
-          // added there, this test would start failing and say why.
-          displayMessage: 'ไม่พบโปสเตอร์รหัส p1 ในระบบ',
+        // Deliberately distinct from the static
+        // `AppStrings.posterDetailNotFoundTitle`/`...Body` copy, so this
+        // test can prove the *backend's* displayMessage is what's shown,
+        // not a static string that happens to read similarly. Also proves
+        // `POSTER_NOT_FOUND` isn't in `_catalogMessages` — if it ever were
+        // added there, this test would start failing and say why.
+        error: CatalogException.fromEnvelope(
+          backendEnvelopeFixture(
+            code: 'POSTER_NOT_FOUND',
+            message: 'ไม่พบโปสเตอร์รหัส p1 ในระบบ',
+          ),
         ),
       ),
     );
@@ -297,9 +300,11 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         wrap(
-          error: const CatalogException(
-            code: 'server_maintenance',
-            displayMessage: 'ระบบปิดปรับปรุงชั่วคราว',
+          error: CatalogException.fromEnvelope(
+            backendEnvelopeFixture(
+              code: 'server_maintenance',
+              message: 'ระบบปิดปรับปรุงชั่วคราว',
+            ),
           ),
         ),
       );

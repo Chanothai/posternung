@@ -11,17 +11,35 @@ Response<Map<String, dynamic>> _resp(Map<String, dynamic> data) => Response(
   requestOptions: RequestOptions(path: '/'),
 );
 
-DioException _dioError(int status, {Object? data}) => DioException(
-  requestOptions: RequestOptions(path: '/'),
-  response: Response(
+// Built through Dio's own `.badResponse`/`.connectionError` factories, not
+// the bare `DioException(...)` constructor — those factories are what
+// production code actually goes through, and they're the only thing that
+// sets `.message` to a realistic (non-null) SDK string. A bare constructor
+// leaves `.message` at its default of `null`, which used to make every
+// negative `displayMessage == null` assertion in this file vacuous: it
+// would have passed even if a mutant piped `e.message` straight into
+// `displayMessage`, because there was never a non-null `e.message` for that
+// mutant to leak in the first place (code-critic, INF-20 round 1 — M9).
+// Going through the real factory also means this fixture can't drift from
+// what Dio actually sends when the SDK's own message wording changes across
+// versions.
+DioException _dioError(int status, {Object? data}) {
+  final requestOptions = RequestOptions(path: '/');
+  return DioException.badResponse(
     statusCode: status,
-    data: data,
-    requestOptions: RequestOptions(path: '/'),
-  ),
-);
+    requestOptions: requestOptions,
+    response: Response(
+      statusCode: status,
+      data: data,
+      requestOptions: requestOptions,
+    ),
+  );
+}
 
-DioException _dioNoResponse() =>
-    DioException(requestOptions: RequestOptions(path: '/'));
+DioException _dioNoResponse() => DioException.connectionError(
+  requestOptions: RequestOptions(path: '/'),
+  reason: 'Connection refused',
+);
 
 Map<String, dynamic> _posterJson() => {
   'id': 'p1',
@@ -49,6 +67,25 @@ void main() {
   setUp(() {
     dio = MockDio();
     dataSource = PosterRemoteDataSourceImpl(dio);
+  });
+
+  // Closed-world check on the fixtures above (test-quality §4) — every
+  // `displayMessage`/`debugDetail == null` negative assertion in this file
+  // only has teeth because `_dioError`/`_dioNoResponse` carry a real,
+  // non-null `.message` for a leaking mutant to actually leak. Nothing else
+  // in this file re-verifies that; if `DioException.badResponse`/
+  // `.connectionError` ever stopped setting `.message`, or someone reverted
+  // either helper back to the bare `DioException(...)` constructor, every
+  // negative assertion below would silently go vacuous again exactly like
+  // the round-1 defect (code-critic, INF-20 round 2) — this is the one test
+  // that would say so out loud instead of staying green by accident.
+  test('fixture sanity: _dioError and _dioNoResponse both carry a non-null, '
+      'non-empty .message, as real DioExceptions from these factories '
+      'always do', () {
+    expect(_dioError(404).message, isNotNull);
+    expect(_dioError(404).message, isNotEmpty);
+    expect(_dioNoResponse().message, isNotNull);
+    expect(_dioNoResponse().message, isNotEmpty);
   });
 
   group('getPosterDetail', () {
@@ -87,7 +124,13 @@ void main() {
                 (e) => e.displayMessage,
                 'displayMessage',
                 'ไม่พบโปสเตอร์นี้',
-              ),
+              )
+              // ADR-0017 Amendment 1 AC-10, third direction — an envelope
+              // with no `details` key must give a null debugDetail, not
+              // silently fall back to something else (e.g. `e.message`,
+              // which is now realistic/non-null in this fixture and would
+              // be an easy thing to leak in by accident).
+              .having((e) => e.debugDetail, 'debugDetail', isNull),
         ),
       );
     });
@@ -100,11 +143,11 @@ void main() {
       expect(
         () => dataSource.getPosterDetail('p1'),
         throwsA(
-          isA<CatalogException>().having(
-            (e) => e.code,
-            'code',
-            'network_error',
-          ),
+          isA<CatalogException>()
+              .having((e) => e.code, 'code', 'network_error')
+              // ADR-0017 Amendment 1 A1-D6 — this branch never sees a
+              // backend envelope at all, so displayMessage must stay null.
+              .having((e) => e.displayMessage, 'displayMessage', isNull),
         ),
       );
     });
@@ -117,7 +160,25 @@ void main() {
       expect(
         () => dataSource.getPosterDetail('p1'),
         throwsA(
-          isA<CatalogException>().having((e) => e.code, 'code', 'server_error'),
+          isA<CatalogException>()
+              .having((e) => e.code, 'code', 'server_error')
+              .having((e) => e.displayMessage, 'displayMessage', isNull),
+        ),
+      );
+    });
+
+    test('maps a 4xx without an envelope to code unknown_error — this branch '
+        'had no test at all before ADR-0017 Amendment 1 (BL-99)', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(any()),
+      ).thenThrow(_dioError(400));
+
+      expect(
+        () => dataSource.getPosterDetail('p1'),
+        throwsA(
+          isA<CatalogException>()
+              .having((e) => e.code, 'code', 'unknown_error')
+              .having((e) => e.displayMessage, 'displayMessage', isNull),
         ),
       );
     });
@@ -134,13 +195,36 @@ void main() {
       expect(
         () => dataSource.getPosterDetail('p1'),
         throwsA(
-          isA<CatalogException>().having(
-            (e) => e.code,
-            'code',
-            'catalog_remote_guard_unexpected',
-          ),
+          isA<CatalogException>()
+              .having((e) => e.code, 'code', 'catalog_remote_guard_unexpected')
+              .having((e) => e.displayMessage, 'displayMessage', isNull),
         ),
       );
+    });
+
+    test("the envelope's `details` reaches debugDetail, never displayMessage "
+        '(ADR-0017 Amendment 1 AC-10) — the two must never collapse into the '
+        'same value even when a single envelope carries both', () async {
+      when(() => dio.get<Map<String, dynamic>>(any())).thenThrow(
+        _dioError(
+          404,
+          data: {
+            'error_code': 'POSTER_NOT_FOUND',
+            'message': 'ไม่พบโปสเตอร์นี้',
+            'details': {'poster_id': 'missing'},
+          },
+        ),
+      );
+
+      try {
+        await dataSource.getPosterDetail('missing');
+        fail('expected a CatalogException');
+      } on CatalogException catch (e) {
+        expect(e.displayMessage, 'ไม่พบโปสเตอร์นี้');
+        expect(e.debugDetail, isNotNull);
+        expect(e.debugDetail, isNot(e.displayMessage));
+        expect(e.debugDetail, contains('missing'));
+      }
     });
   });
 
