@@ -9,9 +9,10 @@ import 'package:posternung/core/error/catalog_exception.dart';
 import 'package:posternung/core/router/app_navigation.dart';
 import 'package:posternung/core/router/app_router.dart';
 import 'package:posternung/core/router/app_routes.dart';
+import 'package:posternung/core/router/route_state_guard.dart';
 import 'package:posternung/features/auth/domain/entities/auth_user.dart';
-import 'package:posternung/features/auth/presentation/otp_route_args.dart';
 import 'package:posternung/features/auth/presentation/providers/auth_providers.dart';
+import 'package:posternung/features/auth/presentation/providers/otp_flow_provider.dart';
 import 'package:posternung/features/auth/presentation/providers/session_provider.dart';
 import 'package:posternung/features/auth/presentation/screens/login_screen.dart';
 import 'package:posternung/features/auth/presentation/screens/otp_verification_screen.dart';
@@ -23,6 +24,7 @@ import 'package:posternung/features/poster/domain/repositories/poster_repository
 import 'package:posternung/features/poster/presentation/providers/poster_providers.dart';
 import 'package:posternung/features/poster/presentation/screens/poster_detail_screen.dart';
 
+import '../../support/otp_flow_harness.dart';
 import '../../support/router_harness.dart';
 
 class _MockPosterRepository extends Mock implements PosterRepository {}
@@ -63,11 +65,16 @@ void main() {
   /// it is how a test says which side of the gate it is about. (Riverpod 3
   /// does not export the `Override` type, so the list is built here rather
   /// than handed in.)
+  /// [otpFlow] seeds `otpFlowProvider`, which is how a test says the phone
+  /// verification flow is open. It replaces the `extra:` this helper used to
+  /// take: after Amendment 2 no route carries arguments, so there is nothing
+  /// to hand the router.
   Future<GoRouter> pumpAt(
     WidgetTester tester,
     String location, {
-    Object? extra,
+    OtpFlowState? otpFlow,
     AsyncValue<AuthUser?>? session,
+    List<RouteBase>? routes,
   }) async {
     late GoRouter router;
     await tester.pumpWidget(
@@ -75,12 +82,12 @@ void main() {
         overrides: [
           authViewModelProvider.overrideWith(_NoopAuthViewModel.new),
           posterRepositoryProvider.overrideWithValue(repository),
+          otpFlowProvider.overrideWith(() => SeededOtpFlow(otpFlow)),
           if (session != null) sessionProvider.overrideWithValue(session),
         ],
         child: routedApp(
           location: location,
-          extra: extra,
-          routes: appRoutes,
+          routes: routes ?? appRoutes,
           onRouter: (GoRouter r) => router = r,
         ),
       ),
@@ -163,14 +170,12 @@ void main() {
       expect(find.byType(RegisterScreen), findsOneWidget);
     });
 
-    testWidgets('${AppRoutes.otpPath} with its extra is the OTP screen, and '
-        'the screen gets the values that were handed to the route', (
-      tester,
-    ) async {
+    testWidgets('${AppRoutes.otpPath} with an open flow is the OTP screen, '
+        'and the screen shows the number the flow is for', (tester) async {
       await pumpAt(
         tester,
         AppRoutes.otpPath,
-        extra: const OtpRouteArgs(
+        otpFlow: const OtpFlowState(
           phoneNumber: phoneNumber,
           verificationId: verificationId,
           resendToken: resendToken,
@@ -178,12 +183,18 @@ void main() {
       );
 
       expect(find.byType(OtpVerificationScreen), findsOneWidget);
-      final OtpVerificationScreen screen = tester.widget<OtpVerificationScreen>(
-        find.byType(OtpVerificationScreen),
+      expect(
+        tester
+            .widget<OtpVerificationScreen>(find.byType(OtpVerificationScreen))
+            .phoneNumber,
+        phoneNumber,
       );
-      expect(screen.phoneNumber, phoneNumber);
-      expect(screen.verificationId, verificationId);
-      expect(screen.resendToken, resendToken);
+      // `verificationId`/`resendToken` are deliberately not readable off the
+      // widget any more — the screen reads them from the flow at the moment
+      // it uses them. That they are the *current* ones is proved where it
+      // matters, against a real submit, in
+      // `otp_verification_screen_test.dart`.
+      expect(find.text(phoneNumber), findsOneWidget);
     });
 
     testWidgets('/posters/<uuid> reaches the detail screen carrying that '
@@ -220,6 +231,10 @@ void main() {
     });
   });
 
+  // 🔴 After Amendment 2 (A2-D7) these hold *structurally*: the route carries
+  // no arguments at all, so there is nothing for a URL to leak. They are kept
+  // as a guard against the day someone puts a value back on the route — not
+  // as evidence that this round made anything safer than INF-01 left it.
   group('AC-5 — nothing secret is ever in a URL', () {
     testWidgets('standing on the OTP screen, the location holds neither the '
         'phone number, the verification id, nor the resend token — in the '
@@ -227,7 +242,7 @@ void main() {
       final GoRouter router = await pumpAt(
         tester,
         AppRoutes.otpPath,
-        extra: const OtpRouteArgs(
+        otpFlow: const OtpFlowState(
           phoneNumber: phoneNumber,
           verificationId: verificationId,
           resendToken: resendToken,
@@ -305,10 +320,10 @@ void main() {
     });
   });
 
-  group('the /otp route cannot be entered without its arguments', () {
-    testWidgets('arriving at /otp with no extra lands on home instead of '
-        'throwing — extra does not survive a process restore, and the screen '
-        'cannot exist without it', (tester) async {
+  group('a route that needs state it does not have leaves for home', () {
+    testWidgets('arriving at /otp with no flow open lands on home instead of '
+        'throwing — a deep link or a process restore both arrive this way, '
+        'and the screen cannot exist without a flow', (tester) async {
       final GoRouter router = await pumpAt(
         tester,
         AppRoutes.otpPath,
@@ -320,14 +335,18 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('arriving at /otp with the wrong kind of extra also lands on '
-        'home rather than reaching the single cast', (tester) async {
+    testWidgets('going to /otp from inside the app with no flow open lands '
+        'on home too — `go` and a cold arrival take different paths through '
+        'the router and both have to end somewhere real', (tester) async {
       final GoRouter router = await pumpAt(
         tester,
-        AppRoutes.otpPath,
-        extra: 'not-the-args-object',
+        AppRoutes.homePath,
         session: const AsyncData<AuthUser?>(null),
       );
+      expect(find.byType(LoginScreen), findsOneWidget);
+
+      router.go(AppRoutes.otpPath);
+      await tester.pumpAndSettle();
 
       expect(find.byType(OtpVerificationScreen), findsNothing);
       expect(router.state.uri.toString(), AppRoutes.homePath);
@@ -335,34 +354,38 @@ void main() {
     });
   });
 
-  group('refreshing while standing on /otp', () {
-    testWidgets('a GoRouter.refresh() does not put a crash on the screen — '
-        'it rebuilds this route with extra dropped and does NOT re-run the '
-        'redirect, so the builder has to cope on its own', (tester) async {
+  group('INF-18 AC-1 — refreshing while standing on /otp keeps the flow', () {
+    // 🔴 Arrive with `push`, never with `initialLocation`. The initial-parse
+    // path re-evaluates `redirect` and bounces politely, so a probe built
+    // that way reports "no problem" for a route that crashes in the app
+    // (`project-gotchas` §5 — this is a recorded measurement failure, not a
+    // hypothetical one).
+    testWidgets('a GoRouter.refresh() rebuilds the route with the flow still '
+        'open — the user stays on /otp and the screen still shows the number '
+        'the code was sent to', (tester) async {
       final GoRouter router = await pumpAt(
         tester,
         AppRoutes.homePath,
         session: const AsyncData<AuthUser?>(null),
-      );
-      router.push(
-        AppRoutes.otpPath,
-        extra: const OtpRouteArgs(
+        otpFlow: const OtpFlowState(
           phoneNumber: phoneNumber,
           verificationId: verificationId,
         ),
       );
+      router.push(AppRoutes.otpPath);
       await tester.pumpAndSettle();
       expect(find.byType(OtpVerificationScreen), findsOneWidget);
 
       router.refresh();
       await tester.pumpAndSettle();
 
-      // The important half: no exception reached the frame. Before this was
-      // handled, `state.extra! as OtpRouteArgs` threw "Null check operator
-      // used on a null value" right here.
       expect(tester.takeException(), isNull);
-      expect(find.byType(OtpVerificationScreen), findsNothing);
-      expect(router.state.uri.toString(), AppRoutes.homePath);
+      // Before Amendment 2 all three of these were the opposite: the route
+      // rebuilt with its `extra` dropped to null and the user was thrown out
+      // to /home in the middle of entering a code.
+      expect(find.byType(OtpVerificationScreen), findsOneWidget);
+      expect(router.state.uri.toString(), AppRoutes.otpPath);
+      expect(find.text(phoneNumber), findsOneWidget);
     });
 
     testWidgets('the same holds when a refreshListenable fires — that is the '
@@ -383,19 +406,21 @@ void main() {
             authViewModelProvider.overrideWith(_NoopAuthViewModel.new),
             posterRepositoryProvider.overrideWithValue(repository),
             sessionProvider.overrideWithValue(const AsyncData<AuthUser?>(null)),
+            otpFlowProvider.overrideWith(
+              () => SeededOtpFlow(
+                const OtpFlowState(
+                  phoneNumber: phoneNumber,
+                  verificationId: verificationId,
+                ),
+              ),
+            ),
           ],
           child: MaterialApp.router(routerConfig: router),
         ),
       );
       await tester.pumpAndSettle();
 
-      router.push(
-        AppRoutes.otpPath,
-        extra: const OtpRouteArgs(
-          phoneNumber: phoneNumber,
-          verificationId: verificationId,
-        ),
-      );
+      router.push(AppRoutes.otpPath);
       await tester.pumpAndSettle();
       expect(find.byType(OtpVerificationScreen), findsOneWidget);
 
@@ -404,7 +429,198 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
+      expect(find.byType(OtpVerificationScreen), findsOneWidget);
+      expect(router.state.uri.toString(), AppRoutes.otpPath);
+    });
+  });
+
+  group('INF-18 AC-6 — the guard is central, not something /otp owns', () {
+    // The defect BL-100 actually recorded was not the crash on `/otp`; it was
+    // that the next route to need state had nothing to inherit and no way to
+    // find out. So the proof is a *second* route going through the same
+    // helper and surviving the same refresh — if `requireRouteState` were
+    // really `/otp`'s private workaround wearing a shared name, this fails
+    // while the tests above still pass.
+    const String otherPath = '/needs-state';
+
+    List<RouteBase> tableWithSecondGuardedRoute() => <RouteBase>[
+      ...appRoutes,
+      GoRoute(
+        path: otherPath,
+        builder: (BuildContext context, GoRouterState state) => Consumer(
+          builder: (BuildContext context, WidgetRef ref, Widget? _) =>
+              requireRouteState<OtpFlowState>(
+                context,
+                ref.read(otpFlowProvider),
+                builder: (OtpFlowState flow) =>
+                    Scaffold(body: Text('second:${flow.phoneNumber}')),
+              ),
+        ),
+      ),
+    ];
+
+    testWidgets('a second route built on requireRouteState also survives a '
+        'refresh with its state intact', (tester) async {
+      final GoRouter router = await pumpAt(
+        tester,
+        AppRoutes.homePath,
+        session: const AsyncData<AuthUser?>(null),
+        routes: tableWithSecondGuardedRoute(),
+        otpFlow: const OtpFlowState(
+          phoneNumber: phoneNumber,
+          verificationId: verificationId,
+        ),
+      );
+
+      router.push(otherPath);
+      await tester.pumpAndSettle();
+      expect(find.text('second:$phoneNumber'), findsOneWidget);
+
+      router.refresh();
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('second:$phoneNumber'), findsOneWidget);
+      expect(router.state.uri.toString(), otherPath);
+    });
+
+    testWidgets('and that second route leaves for home when the state is '
+        'missing, without anyone writing a fallback for it', (tester) async {
+      final GoRouter router = await pumpAt(
+        tester,
+        AppRoutes.homePath,
+        session: const AsyncData<AuthUser?>(null),
+        routes: tableWithSecondGuardedRoute(),
+      );
+
+      router.push(otherPath);
+      await tester.pumpAndSettle();
+
+      expect(find.text('second:$phoneNumber'), findsNothing);
       expect(router.state.uri.toString(), AppRoutes.homePath);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('INF-18 AC-3 — the flow ends when the user leaves, and only then', () {
+    // Pumped through `routerProvider`, not through `routedApp`: the observer
+    // that does the clearing is installed by the provider, so a hand-built
+    // router would test a wiring the app does not have.
+    late ProviderContainer container;
+
+    Future<GoRouter> pumpOnOtp(WidgetTester tester) async {
+      late GoRouter router;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authViewModelProvider.overrideWith(_NoopAuthViewModel.new),
+            posterRepositoryProvider.overrideWithValue(repository),
+            sessionProvider.overrideWithValue(const AsyncData<AuthUser?>(null)),
+            otpFlowProvider.overrideWith(
+              () => SeededOtpFlow(
+                const OtpFlowState(
+                  phoneNumber: phoneNumber,
+                  verificationId: verificationId,
+                ),
+              ),
+            ),
+          ],
+          child: appWithRealRouter(onRouter: (GoRouter r) => router = r),
+        ),
+      );
+      await tester.pumpAndSettle();
+      container = ProviderScope.containerOf(
+        tester.element(find.byType(MaterialApp)),
+      );
+
+      router.go(AppRoutes.homePath);
+      await tester.pumpAndSettle();
+      router.push(AppRoutes.otpPath);
+      await tester.pumpAndSettle();
+      expect(find.byType(OtpVerificationScreen), findsOneWidget);
+      expect(container.read(otpFlowProvider), isNotNull);
+      return router;
+    }
+
+    testWidgets('🔴 a refresh does NOT end the flow — this is the case that '
+        'GoRoute.onExit and State.dispose() both get wrong, because both fire '
+        'on a rebuild the user never asked for', (tester) async {
+      final GoRouter router = await pumpOnOtp(tester);
+
+      router.refresh();
+      await tester.pumpAndSettle();
+
+      expect(
+        container.read(otpFlowProvider),
+        isNotNull,
+        reason: 'refresh cleared the flow the user is still standing in',
+      );
+      expect(container.read(otpFlowProvider)!.verificationId, verificationId);
+      expect(find.byType(OtpVerificationScreen), findsOneWidget);
+    });
+
+    testWidgets('backing out of /otp ends the flow', (tester) async {
+      final GoRouter router = await pumpOnOtp(tester);
+
+      router.pop();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OtpVerificationScreen), findsNothing);
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(
+        container.read(otpFlowProvider),
+        isNull,
+        reason: 'the flow outlived the screen it belongs to',
+      );
+    });
+
+    testWidgets('leaving /otp by going home — the shape a successful '
+        'verification takes — ends it too', (tester) async {
+      final GoRouter router = await pumpOnOtp(tester);
+
+      router.go(AppRoutes.homePath);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OtpVerificationScreen), findsNothing);
+      expect(container.read(otpFlowProvider), isNull);
+    });
+
+    testWidgets('popping something that was pushed *on top of* /otp leaves '
+        'the flow alone — the observer fires for every route, so without the '
+        'name check a dialog or a sheet closing would end a flow the user is '
+        'still standing in', (tester) async {
+      final GoRouter router = await pumpOnOtp(tester);
+
+      router.push(AppRoutes.registerPath);
+      await tester.pumpAndSettle();
+      expect(find.byType(RegisterScreen), findsOneWidget);
+
+      router.pop();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OtpVerificationScreen), findsOneWidget);
+      expect(
+        container.read(otpFlowProvider),
+        isNotNull,
+        reason: 'a pop of a different route ended the OTP flow',
+      );
+    });
+
+    testWidgets('clearing the flow while /otp is on screen does not move the '
+        'user — the route reads its state once at build (`read`, not '
+        '`watch`), so nothing re-guards a route the user has not left', (
+      tester,
+    ) async {
+      await pumpOnOtp(tester);
+
+      container.read(otpFlowProvider.notifier).clear();
+      await tester.pumpAndSettle();
+
+      // With a `watch` here the route rebuilds, finds no state, and sends the
+      // user to home mid-flow — the failure `requireRouteState`'s doc comment
+      // describes, and the reason that choice is not a style preference.
+      expect(find.byType(OtpVerificationScreen), findsOneWidget);
+      expect(find.byType(HomeScreen), findsNothing);
     });
   });
 

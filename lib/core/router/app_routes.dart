@@ -27,11 +27,20 @@ abstract final class AppRoutes {
   static const String registerPath = '/register';
   static const String registerName = 'register';
 
-  /// Carries nothing in the URL on purpose. `phoneNumber` is personal data
-  /// and `verificationId`/`resendToken` are what Firebase uses to confirm a
-  /// credential, so all three travel in `extra` instead (ADR-0018 D6) —
-  /// `app_router_test.dart` asserts none of them ever reaches a path or a
-  /// query string.
+  /// Carries **nothing at all** — not in the URL, and not in `extra` either.
+  ///
+  /// `phoneNumber` is personal data and `verificationId`/`resendToken` are
+  /// what Firebase uses to confirm a credential, so D6 kept all three off the
+  /// URL. ADR-0018 **Amendment 2 (A2-D2)** took the next step and moved them
+  /// out of `extra` as well, into `otpFlowProvider`: `extra` is JSON-encoded
+  /// by go_router on the way into route restoration state, so a value it
+  /// cannot encode silently became `null` and every `GoRouter.refresh()`
+  /// threw the user out of the middle of the flow.
+  ///
+  /// A route that needs state reads it through `requireRouteState`. The
+  /// negative assertions in `app_router_test.dart` and
+  /// `login_screen_test.dart` still run — they now guard against the values
+  /// coming *back*, rather than proving they stayed put.
   static const String otpPath = '/otp';
   static const String otpName = 'otp';
 

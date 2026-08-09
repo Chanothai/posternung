@@ -16,7 +16,7 @@ import '../../../../core/utils/thai_phone_number.dart';
 import '../../data/datasources/phone_sign_in_data_source.dart';
 import '../auth_error_display.dart';
 import '../auth_flow_navigation.dart';
-import '../otp_route_args.dart';
+import '../providers/otp_flow_provider.dart';
 import '../providers/auth_providers.dart';
 import '../widgets/auth_email_field.dart';
 import '../widgets/auth_error_banner.dart';
@@ -73,17 +73,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           .sendPhoneCode(phoneNumber);
       if (!mounted) return;
       if (result is SmsCodeSent) {
+        // The flow's state goes to the state layer, not to the route
+        // (ADR-0018 Amendment 2 A2-D2) — `OtpFlowState` documents why, and
+        // `start` deliberately replaces any leftover from an earlier flow
+        // wholesale rather than merging into it.
+        ref
+            .read(otpFlowProvider.notifier)
+            .start(
+              OtpFlowState(
+                phoneNumber: phoneNumber,
+                verificationId: result.verificationId,
+                resendToken: result.resendToken,
+              ),
+            );
         // `push`, so back from OTP returns here rather than replacing this
-        // screen. The three values ride in `extra` and never touch the URL
-        // (ADR-0018 D6) — `OtpRouteArgs` documents why.
-        await context.push(
-          AppRoutes.otpPath,
-          extra: OtpRouteArgs(
-            phoneNumber: phoneNumber,
-            verificationId: result.verificationId,
-            resendToken: result.resendToken,
-          ),
-        );
+        // screen. Nothing rides along: the route carries no arguments, so
+        // none of these values can reach a path or query string (D6).
+        await context.push(AppRoutes.otpPath);
         // Back from OTP without having completed it (or after a failed
         // attempt there) must not leave that screen's error banner showing
         // here — both screens watch the same authViewModelProvider.

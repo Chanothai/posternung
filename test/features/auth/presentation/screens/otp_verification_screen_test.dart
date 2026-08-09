@@ -10,11 +10,12 @@ import 'package:posternung/core/router/app_routes.dart';
 import 'package:posternung/core/strings/app_strings.dart';
 import 'package:posternung/features/auth/data/datasources/phone_sign_in_data_source.dart';
 import 'package:posternung/features/auth/domain/entities/auth_user.dart';
-import 'package:posternung/features/auth/presentation/otp_route_args.dart';
 import 'package:posternung/features/auth/presentation/providers/auth_providers.dart';
+import 'package:posternung/features/auth/presentation/providers/otp_flow_provider.dart';
 import 'package:posternung/features/auth/presentation/providers/session_provider.dart';
 import 'package:posternung/features/auth/presentation/screens/otp_verification_screen.dart';
 
+import '../../../../support/otp_flow_harness.dart';
 import '../../../../support/router_harness.dart';
 
 class FakeAuthViewModel extends AuthViewModel {
@@ -106,20 +107,21 @@ void main() {
             resendResult: resendResult,
           ),
         ),
-      ],
-      // Reached by its real path with its real `extra`, not by handing the
-      // constructor three values (ADR-0018 D9). That is also what makes the
-      // negative assertion in `app_router_test.dart` meaningful: the same
-      // route, with the same arguments, and nothing of them in the URL.
-      child: routedApp(
-        location: AppRoutes.otpPath,
-        extra: OtpRouteArgs(
-          phoneNumber: testPhoneNumber,
-          verificationId: testVerificationId,
-          resendToken: resendToken,
+        otpFlowProvider.overrideWith(
+          () => SeededOtpFlow(
+            OtpFlowState(
+              phoneNumber: testPhoneNumber,
+              verificationId: testVerificationId,
+              resendToken: resendToken,
+            ),
+          ),
         ),
-        routes: appRoutes,
-      ),
+      ],
+      // Reached by its real path with a real open flow, not by handing the
+      // constructor three values (ADR-0018 D9). The flow is seeded through
+      // `otpFlowProvider` because the route carries no arguments at all any
+      // more (Amendment 2 A2-D2).
+      child: routedApp(location: AppRoutes.otpPath, routes: appRoutes),
     );
   }
 
@@ -127,6 +129,7 @@ void main() {
     Object? confirmPhoneCodeErrorToThrow,
     void Function(String verificationId, String smsCode)? onConfirmPhoneCode,
     void Function(GoRouter router)? onRouter,
+    PhoneVerificationResult? resendResult,
   }) {
     return ProviderScope(
       overrides: [
@@ -134,11 +137,20 @@ void main() {
           () => FakeAuthViewModel(
             confirmPhoneCodeErrorToThrow: confirmPhoneCodeErrorToThrow,
             onConfirmPhoneCode: onConfirmPhoneCode,
+            resendResult: resendResult,
           ),
         ),
         // A success here ends the auth flow, which lands on
         // `AppRoutes.homePath` — and the gate there reads the session.
         sessionProvider.overrideWithValue(const AsyncData<AuthUser?>(null)),
+        otpFlowProvider.overrideWith(
+          () => SeededOtpFlow(
+            const OtpFlowState(
+              phoneNumber: testPhoneNumber,
+              verificationId: testVerificationId,
+            ),
+          ),
+        ),
       ],
       child: routedApp(
         onRouter: onRouter,
@@ -147,13 +159,7 @@ void main() {
             builder: (context) => Scaffold(
               body: Center(
                 child: ElevatedButton(
-                  onPressed: () => context.push(
-                    AppRoutes.otpPath,
-                    extra: const OtpRouteArgs(
-                      phoneNumber: testPhoneNumber,
-                      verificationId: testVerificationId,
-                    ),
-                  ),
+                  onPressed: () => context.push(AppRoutes.otpPath),
                   child: const Text('root'),
                 ),
               ),
@@ -294,31 +300,72 @@ void main() {
     expect(capturedPhoneNumber, testPhoneNumber);
   });
 
+  testWidgets('resend forwards the resendToken the open flow holds, '
+      'without which Firebase silently sends no SMS', (tester) async {
+    int? capturedResendToken;
+    await tester.pumpWidget(
+      wrap(
+        resendToken: 42,
+        onSendPhoneCode: (_, resendToken) => capturedResendToken = resendToken,
+        resendResult: SmsCodeSent('new-verification-id'),
+      ),
+    );
+
+    await tester.pump(const Duration(seconds: 30));
+
+    final resendLink = find.text(
+      '${AppStrings.authOtpResendPrompt}${AppStrings.authOtpResendAction}',
+      findRichText: true,
+    );
+    await tester.ensureVisible(resendLink);
+    await tester.tap(resendLink);
+    await tester.pump();
+
+    expect(capturedResendToken, 42);
+  });
+
   testWidgets(
-    'resend forwards the resendToken the screen was constructed with, '
-    'without which Firebase silently sends no SMS',
+    'INF-18 AC-2 — a code resent mid-flow is verified against the SMS that '
+    'was actually sent last, even after a GoRouter.refresh() rebuilds the '
+    'screen underneath the user',
     (tester) async {
-      int? capturedResendToken;
+      const String resentId = 'verification-id-from-the-second-sms';
+      String? capturedVerificationId;
+      late GoRouter router;
+
       await tester.pumpWidget(
-        wrap(
-          resendToken: 42,
-          onSendPhoneCode: (_, resendToken) =>
-              capturedResendToken = resendToken,
-          resendResult: SmsCodeSent('new-verification-id'),
+        wrapPushed(
+          onRouter: (GoRouter r) => router = r,
+          onConfirmPhoneCode: (String verificationId, String _) =>
+              capturedVerificationId = verificationId,
+          resendResult: SmsCodeSent(resentId),
         ),
       );
+      await tester.tap(find.text('root'));
+      await tester.pumpAndSettle();
 
+      // Resend: from here on, only `resentId` can verify a code.
       await tester.pump(const Duration(seconds: 30));
-
-      final resendLink = find.text(
+      final Finder resendLink = find.text(
         '${AppStrings.authOtpResendPrompt}${AppStrings.authOtpResendAction}',
         findRichText: true,
       );
       await tester.ensureVisible(resendLink);
       await tester.tap(resendLink);
-      await tester.pump();
+      await tester.pumpAndSettle();
 
-      expect(capturedResendToken, 42);
+      router.refresh();
+      await tester.pumpAndSettle();
+      expect(find.byType(OtpVerificationScreen), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), '472019');
+      await tester.pumpAndSettle();
+
+      expect(capturedVerificationId, resentId);
+      // Said the other way round, because this is the failure that would not
+      // announce itself: verifying against the *first* SMS's id returns a
+      // plain "wrong code" for a code the user copied correctly.
+      expect(capturedVerificationId, isNot(testVerificationId));
     },
   );
 }
