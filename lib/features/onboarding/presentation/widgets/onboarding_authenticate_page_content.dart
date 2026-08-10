@@ -79,7 +79,9 @@ class _CenterpieceBadge extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: SvgPicture.asset(AppImages.verifiedBadgeIcon),
+                    child: SvgPicture.asset(
+                      AppImages.questionMarkDashedCircleIcon,
+                    ),
                   ),
                 ),
               ),

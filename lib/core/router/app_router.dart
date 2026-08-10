@@ -11,7 +11,7 @@ import '../../features/auth/presentation/screens/email_verification_screen.dart'
 import '../../features/auth/presentation/screens/otp_verification_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
-import '../../features/onboarding/presentation/screens/onboarding_page_view_screen.dart';
+import '../../features/onboarding/presentation/onboarding_entry_gate.dart';
 import '../../features/poster/presentation/screens/poster_detail_screen.dart';
 import 'app_routes.dart';
 import 'route_state_guard.dart';
@@ -33,8 +33,10 @@ final List<RouteBase> appRoutes = <RouteBase>[
   GoRoute(
     path: AppRoutes.onboardingPath,
     name: AppRoutes.onboardingName,
+    // The gate, not the screen. Why this is a widget and what it costs to
+    // change that is documented once, on `OnboardingEntryGate` itself.
     builder: (BuildContext context, GoRouterState state) =>
-        const OnboardingPageViewScreen(),
+        const OnboardingEntryGate(),
   ),
   GoRoute(
     path: AppRoutes.homePath,

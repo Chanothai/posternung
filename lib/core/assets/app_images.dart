@@ -7,8 +7,14 @@ abstract final class AppImages {
   static const String arrowRight = 'assets/images/arrow_right.svg';
 
   // --- Onboarding ---
-  static const String verifiedBadgeIcon =
-      'assets/images/verified_badge_icon.svg';
+  /// The centrepiece glyph on onboarding page 2: a question mark inside a
+  /// dashed ring. Named after what the artwork *is*, not after the caption it
+  /// used to sit under: it kept a name meaning "verified badge" long after the
+  /// "ยืนยันแล้ว" label was removed under ADR-0014 D1, and a name that still
+  /// asserts the goods are certified is an invitation to put that banned
+  /// claim back on screen (BL-74).
+  static const String questionMarkDashedCircleIcon =
+      'assets/images/question_mark_dashed_circle_icon.svg';
 
   // --- Auth ---
   static const String emailIcon = 'assets/images/email_icon.svg';
