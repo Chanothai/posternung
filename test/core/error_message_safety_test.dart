@@ -464,6 +464,18 @@ void main() {
     );
   });
 
+  /// True when [source] declares `BackendErrorEnvelope` as a class with a
+  /// private (`._`) constructor — the one shape A1-D3 requires. Shared by
+  /// the real-file scan below and its positive/negative controls, on
+  /// purpose (test-quality §3.1): the previous version of this file had the
+  /// real case and its control check *separately typed-out* literals, so
+  /// relaxing one clause of the real case (e.g. dropping the `._(` check)
+  /// would have left the control green — it never re-exercised the same
+  /// logic, just a hand-copied duplicate of it.
+  bool isEnvelopeClassWithPrivateCtor(String source) =>
+      source.contains('class BackendErrorEnvelope') &&
+      source.contains('BackendErrorEnvelope._(');
+
   test('BackendErrorEnvelope stays a class with a private constructor, not a '
       'record (ADR-0017 Amendment 1 A1-D3) — a record shape is structurally '
       'typed and can be forged by anyone with the right field names; a '
@@ -479,28 +491,40 @@ void main() {
     final content = file.readAsStringSync();
 
     expect(
-      content.contains('class BackendErrorEnvelope'),
+      isEnvelopeClassWithPrivateCtor(content),
       isTrue,
       reason:
-          '$path ต้องประกาศ BackendErrorEnvelope เป็น class — เปลี่ยนเป็น '
-          'typedef ของ record จะทำให้ประตูเดียวของ AC-2 กลายเป็นประตูที่ '
-          'ล็อกไม่ได้ (A1-D3)',
-    );
-    expect(
-      content.contains('BackendErrorEnvelope._('),
-      isTrue,
-      reason:
-          '$path ต้องมี constructor ที่เป็น private (._) — เป็นกลไกเดียวที่ '
-          'ทำให้ "ผลิตได้จาก backendErrorEnvelopeOf เท่านั้น" เป็นจริงจริง ๆ '
-          'ไม่ใช่แค่คำอธิบายใน doc comment',
+          '$path ต้องประกาศ BackendErrorEnvelope เป็น class ที่มี constructor '
+          'private (._) — เปลี่ยนเป็น typedef ของ record หรือถอด constructor '
+          'private ออกจะทำให้ประตูเดียวของ AC-2 กลายเป็นประตูที่ล็อกไม่ได้ '
+          '(A1-D3)',
     );
   });
 
-  test('positive control for the BackendErrorEnvelope shape scan above — '
-      'proves the two literal checks actually discriminate the required '
-      'class-with-private-constructor form from the record-typedef mutant '
-      'that defeated the type gate at GATE 3, rather than being vacuously '
-      'true for any file', () {
+  test('positive/negative control for isEnvelopeClassWithPrivateCtor above '
+      '— proves it actually discriminates the required '
+      'class-with-private-constructor form from three different mutant '
+      'shapes, rather than being vacuously true for any file. Each mutant '
+      'below is picked to isolate one clause at a time: the record-typedef '
+      'mutant (the one that defeated the type gate at GATE 3, INF-20 round '
+      '1 mutation M4) fails *both* clauses at once, so on its own it cannot '
+      'prove either clause individually is load-bearing — the '
+      'public-constructor mutant and the private-ctor-without-class mutant '
+      'each fail exactly one clause, which is what actually proves both '
+      'clauses are independently required (found in review: an earlier '
+      'version of this control only had the record mutant plus the '
+      'public-ctor mutant, so the class-name clause was never proven '
+      'load-bearing on its own — removing it left the suite green)', () {
+    const validEnvelopeSource = '''
+class BackendErrorEnvelope {
+  const BackendErrorEnvelope._(this.code, this.displayMessage, this.details);
+
+  final String code;
+  final String? displayMessage;
+  final String? details;
+}
+''';
+
     const recordMutantSource = '''
 import 'package:dio/dio.dart';
 
@@ -515,19 +539,68 @@ BackendErrorEnvelope? backendErrorEnvelopeOf(DioException e) {
 }
 ''';
 
+    const publicCtorMutantSource = '''
+class BackendErrorEnvelope {
+  const BackendErrorEnvelope(this.code, this.displayMessage, this.details);
+
+  final String code;
+  final String? displayMessage;
+  final String? details;
+}
+''';
+
+    // `extension type` is a compile-time-only wrapper: its representation
+    // type (here, a positional record) is what actually exists at runtime,
+    // and Dart allows an unchecked `as` cast from that representation type
+    // to the extension type from *outside* the declaring library — library
+    // privacy on the extension type's own constructor does not stop that,
+    // because there is no run-time type distinct from the representation
+    // to check against. So this shape is a real escape route for A1-D3, not
+    // just a string-matching curiosity: it has `BackendErrorEnvelope._(`
+    // (satisfying the private-ctor clause in isolation) but never declares
+    // `class BackendErrorEnvelope` at all.
+    const privateCtorWithoutClassMutantSource = '''
+extension type BackendErrorEnvelope._((String, String?, String?) record) {}
+''';
+
     expect(
-      recordMutantSource.contains('class BackendErrorEnvelope'),
-      isFalse,
+      isEnvelopeClassWithPrivateCtor(validEnvelopeSource),
+      isTrue,
       reason:
-          'mutant ที่เปลี่ยนเป็น record ต้องไม่มี "class BackendErrorEnvelope" '
-          'เหลืออยู่ — ถ้าเทสนี้ยังเห็นว่ามี แปลว่า string check ตัวนี้ไม่ได้ '
-          'ตรวจอะไรจริง',
+          'source ที่เข้าเงื่อนไขครบ (class + private ctor) ต้องผ่าน — กัน '
+          'predicate ที่ return false เสมอโดยไม่ได้ตรวจอะไรจริง',
     );
     expect(
-      recordMutantSource.contains('BackendErrorEnvelope._('),
+      isEnvelopeClassWithPrivateCtor(recordMutantSource),
       isFalse,
       reason:
-          'mutant แบบเดียวกันต้องไม่มี BackendErrorEnvelope._( เหลืออยู่ด้วย',
+          'mutant ที่เปลี่ยนเป็น record ต้องไม่ผ่าน — ไม่มีทั้ง '
+          '"class BackendErrorEnvelope" และ "BackendErrorEnvelope._(" '
+          'เหลืออยู่เลย (ตกทั้งสอง clause พร้อมกัน — เคสนี้เพียงเคสเดียว '
+          'พิสูจน์ไม่ได้ว่า clause ไหนเป็นตัวที่จับได้จริง ต้องดูคู่กับสอง '
+          'เคสข้างล่างที่ตกทีละ clause)',
+    );
+    expect(
+      isEnvelopeClassWithPrivateCtor(publicCtorMutantSource),
+      isFalse,
+      reason:
+          'mutant ที่เป็น class แต่ constructor เป็น public (ไม่มี ._) ต้องไม่ '
+          'ผ่าน — มี "class BackendErrorEnvelope" อยู่ แต่ไม่มี '
+          '"BackendErrorEnvelope._(" เคสนี้จะแดงถ้ามีคนถอด clause '
+          '`.contains(\'BackendErrorEnvelope._(\')` ออกจาก predicate ร่วม '
+          'เพราะ clause "class BackendErrorEnvelope" อย่างเดียวยังเป็นจริง '
+          'อยู่สำหรับ source นี้',
+    );
+    expect(
+      isEnvelopeClassWithPrivateCtor(privateCtorWithoutClassMutantSource),
+      isFalse,
+      reason:
+          'mutant ที่มี "BackendErrorEnvelope._(" แต่ไม่มี "class '
+          'BackendErrorEnvelope" (รูป extension type ที่ห่อ record — ท่าหลบ '
+          'จริงของ A1-D3 ตามที่อธิบายไว้ในคอมเมนต์ข้างบน) ต้องไม่ผ่าน — เคสนี้ '
+          'จะแดงถ้ามีคนถอด clause `.contains(\'class BackendErrorEnvelope\')` '
+          'ออกจาก predicate ร่วม เพราะ clause "BackendErrorEnvelope._(" '
+          'อย่างเดียวยังเป็นจริงอยู่สำหรับ source นี้',
     );
   });
 }
