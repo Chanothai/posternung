@@ -285,6 +285,30 @@ void main() {
           find.text('${AppStrings.authErrorCodeLabel}OAUTH_EMAIL_NOT_VERIFIED'),
           findsNothing,
         );
+        // login_screen.dart passes `justSentEmail: false` here — no email
+        // went out as part of *this* arrival (whatever register sent could
+        // be long gone), so the resend link must be usable immediately, not
+        // artificially cooled down. A `false` → `true` mutant here would
+        // regress that, and every prior test reaching this screen via the
+        // real login-403 path only asserted "arrived", never this.
+        expect(
+          find.text(
+            '${AppStrings.authEmailVerificationResendPrompt}'
+            '${AppStrings.authEmailVerificationResendAction}',
+            findRichText: true,
+          ),
+          findsOneWidget,
+          reason:
+              'arriving from the login-403 redirect must NOT arm the '
+              'cooldown — the resend link must be tappable immediately',
+        );
+        expect(
+          find.textContaining(
+            AppStrings.authEmailVerificationResendCountdownPrefix,
+          ),
+          findsNothing,
+          reason: 'no countdown must be showing',
+        );
       },
     );
   });

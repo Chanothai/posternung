@@ -209,5 +209,30 @@ void main() {
       isTrue,
       reason: 'RegisterScreen must still be underneath, poppable by back',
     );
+    // register_screen.dart passes `justSentEmail: true` — registering just
+    // called sendEmailVerification, so the resend cooldown must arrive
+    // already armed (60s countdown, no tappable resend link yet). A
+    // `justSentEmail: true` → `false` mutant here would leave the link
+    // tappable immediately on top of the email register just sent, into
+    // Firebase's silent same-address throttle (ADR-0021 D2 row 4) — and
+    // every prior test reaching this screen via the real register→
+    // verification path only asserted "arrived", never this.
+    expect(
+      find.text(
+        '${AppStrings.authEmailVerificationResendCountdownPrefix}60'
+        '${AppStrings.authEmailVerificationResendCountdownSuffix}',
+      ),
+      findsOneWidget,
+      reason: 'arriving from register must arm the 60s cooldown',
+    );
+    expect(
+      find.text(
+        '${AppStrings.authEmailVerificationResendPrompt}'
+        '${AppStrings.authEmailVerificationResendAction}',
+        findRichText: true,
+      ),
+      findsNothing,
+      reason: 'the resend link must not be tappable yet',
+    );
   });
 }
