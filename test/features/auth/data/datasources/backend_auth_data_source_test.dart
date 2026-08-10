@@ -142,6 +142,64 @@ void main() {
       );
     });
 
+    // SCR-02 AC-4 — every error_code openapi.yaml documents for
+    // POST /auth/firebase, verified end-to-end through this datasource
+    // (not just OAUTH_TOKEN_INVALID above). All five arrive through the
+    // same {error_code, message} envelope regardless of HTTP status, so
+    // this also proves the envelope path is not accidentally special-cased
+    // to only the status this file's other tests happen to use.
+    for (final testCase in [
+      (
+        status: 403,
+        code: 'OAUTH_EMAIL_NOT_VERIFIED',
+        message: 'บัญชีนี้ยังไม่ได้ยืนยันอีเมล',
+      ),
+      (
+        status: 409,
+        code: 'OAUTH_LOGIN_CONFLICT',
+        message: 'เกิดข้อขัดแย้งระหว่างเข้าสู่ระบบ กรุณาลองใหม่อีกครั้ง',
+      ),
+      (
+        status: 429,
+        code: 'LOGIN_RATE_LIMITED',
+        message: 'พยายามเข้าสู่ระบบบ่อยเกินไป กรุณาลองใหม่ภายหลัง',
+      ),
+      (
+        status: 503,
+        code: 'OAUTH_PROVIDER_NOT_CONFIGURED',
+        message: 'ระบบยังไม่ได้ตั้งค่า Firebase login กรุณาติดต่อผู้ดูแลระบบ',
+      ),
+    ]) {
+      test('AC-4: HTTP ${testCase.status} surfaces error_code '
+          '${testCase.code} with its Thai message as displayMessage', () async {
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenThrow(
+          _dioError(
+            testCase.status,
+            data: {'error_code': testCase.code, 'message': testCase.message},
+          ),
+        );
+
+        expect(
+          () => dataSource.firebaseLogin('x'),
+          throwsA(
+            isA<AuthException>()
+                .having((e) => e.code, 'code', testCase.code)
+                .having(
+                  (e) => e.displayMessage,
+                  'displayMessage',
+                  testCase.message,
+                ),
+          ),
+        );
+      });
+    }
+
     test('maps a no-response failure to code network_error', () async {
       when(
         () => dio.post<Map<String, dynamic>>(

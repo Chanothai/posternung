@@ -1,16 +1,16 @@
 import '../entities/auth_user.dart';
 
-/// Firebase-backed auth operations (Apple + session lifecycle).
-/// Implementations must throw `AuthException` (from `core/error/`) on failure
-/// — never a package-specific exception type — or `AuthCancelledException`
-/// when the user aborts an interactive sign-in flow.
+/// Firebase sign-out plus the raw Firebase auth-state stream. Implementations
+/// must throw `AuthException` (from `core/error/`) on failure — never a
+/// package-specific exception type.
 ///
-/// Email/password and Google are NOT here — they're backend-mediated via
-/// `/auth/firebase` (see `BackendSessionNotifier`), not part of this Firebase
-/// chain. Only Apple still signs in through Firebase directly.
+/// Sign-in is deliberately NOT here — every sign-in method (email/password,
+/// register, Google, phone) is backend-mediated via `/auth/firebase` (see
+/// `BackendSessionNotifier`). Apple used to be the one exception, signing in
+/// through Firebase directly; it was removed under ADR-0021 D4 (the backend
+/// returns `401` for every non-`password`/`google.com`/`phone` provider —
+/// ADR-0004 §1 — so a client-side Apple button could only ever fail).
 abstract class AuthRepository {
-  Future<AuthUser> signInWithApple();
-
   Future<void> signOut();
 
   Stream<AuthUser?> get authStateChanges;

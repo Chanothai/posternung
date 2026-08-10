@@ -4,10 +4,11 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// Persists the `posternung-backend` JWT session (access + refresh tokens)
 /// in the platform keychain/keystore via `flutter_secure_storage`.
 ///
-/// Used by the backend (Google) auth path only — Firebase manages its own
-/// session for email/password + Apple. A future request interceptor will
-/// read the access token here to authorize backend API calls
-/// (posters/cart/etc.).
+/// Written by **every** sign-in path — Google, email/password, and phone all
+/// exchange their Firebase ID token at `/auth/firebase` and land here. Since
+/// ADR-0021 D1 this session is also the only thing `sessionProvider` counts as
+/// being signed in, so an empty store means signed out no matter what Firebase
+/// thinks. `ApiClient` reads the access token here to authorize backend calls.
 class TokenStorage {
   TokenStorage(this._storage);
 

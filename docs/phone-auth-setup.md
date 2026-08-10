@@ -95,7 +95,7 @@ Worth doing before phone auth is exposed to real, untrusted users at any scale �
 
 - **Firebase App Check** — attests that SMS requests come from the genuine app binary, not a scripted client. The strongest defense against SMS-pumping fraud beyond the region policy in step 1.
 - **A client-side resend cap** — `OtpVerificationScreen`'s resend button has a 30s countdown but no cap on how many times it can be tapped in a row. A small in-memory counter (e.g. max 3 resends per OTP session) is a cheap first line of defense before App Check is in place.
-- **Treat `web-context-cancelled` as a silent cancel**, the way `AuthViewModel._runSocial` already swallows `AuthCancelledException` for Google/Apple. Right now dismissing the reCAPTCHA Safari sheet without completing it surfaces as a visible error banner instead of just returning the user to where they were.
+- **Treat `web-context-cancelled` as a silent cancel**, the way `AuthViewModel._runSocial` already swallows `AuthCancelledException` for Google (the only social sign-in method left — see `docs/social-login-setup.md`'s banner on Apple's removal, ADR-0021 D4). Right now dismissing the reCAPTCHA Safari sheet without completing it surfaces as a visible error banner instead of just returning the user to where they were.
 
 ## Verify
 

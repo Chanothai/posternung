@@ -10,8 +10,9 @@ import 'widgets/auth_error_banner.dart';
 
 /// Gates [builder] behind auth state: shows [LoginScreen] when signed out,
 /// otherwise builds the authenticated destination. Watches `sessionProvider`,
-/// which reports authenticated if EITHER the Firebase session (email/password
-/// + Apple) or the backend JWT session (Google) has a user.
+/// which since ADR-0021 D1 reports authenticated off the **backend JWT session
+/// alone** — a Firebase session with no backend session is a half-finished
+/// sign-in, not a signed-in user, and must not advance this gate.
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key, required this.builder});
 

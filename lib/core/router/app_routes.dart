@@ -44,6 +44,14 @@ abstract final class AppRoutes {
   static const String otpPath = '/otp';
   static const String otpName = 'otp';
 
+  /// Carries **nothing at all**, same reasoning and mechanism as
+  /// [otpPath] (ADR-0021 D2, applying ADR-0018 Amendment 2 A2-D2): the
+  /// email being verified lives in `emailVerificationFlowProvider`, read
+  /// through `requireRouteState` like every other route that cannot render
+  /// without state it doesn't own.
+  static const String emailVerificationPath = '/verify-email';
+  static const String emailVerificationName = 'emailVerification';
+
   /// Name of the poster-detail path parameter, shared between the path
   /// pattern below and the router's `state.pathParameters` lookup so the two
   /// cannot drift.
@@ -65,6 +73,7 @@ abstract final class AppRoutes {
     homePath,
     registerPath,
     otpPath,
+    emailVerificationPath,
     posterDetailPath,
   ];
 
@@ -74,6 +83,7 @@ abstract final class AppRoutes {
     homeName,
     registerName,
     otpName,
+    emailVerificationName,
     posterDetailName,
   ];
 }

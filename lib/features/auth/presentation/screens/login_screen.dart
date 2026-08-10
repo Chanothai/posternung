@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/assets/app_images.dart';
 import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
+import '../../../../core/error/auth_exception.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -16,6 +17,7 @@ import '../../../../core/utils/thai_phone_number.dart';
 import '../../data/datasources/phone_sign_in_data_source.dart';
 import '../auth_error_display.dart';
 import '../auth_flow_navigation.dart';
+import '../providers/email_verification_flow_provider.dart';
 import '../providers/otp_flow_provider.dart';
 import '../providers/auth_providers.dart';
 import '../widgets/auth_email_field.dart';
@@ -53,6 +55,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   _AuthMethod _method = _AuthMethod.email;
   bool _obscurePassword = true;
 
+  /// Whichever submit action last ran — retried by the error banner's retry
+  /// button, which only ever appears for `OAUTH_LOGIN_CONFLICT` (ADR-0021
+  /// D3). Both `_submit` and `_onGooglePressed` can produce that code (both
+  /// end at the same `/auth/firebase` exchange), so the banner has to be
+  /// able to retry whichever one actually ran, not always the same one.
+  VoidCallback? _lastAction;
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -66,6 +75,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     FocusScope.of(context).unfocus();
 
     if (_method == _AuthMethod.phone) {
+      // 🔴 Deliberately does NOT set `_lastAction = _submit` here (code-critic
+      // GATE 3 round 1). A 409 on this branch can only come from
+      // `PhoneAutoVerified`'s internal exchange (`sendPhoneCode`'s
+      // `SmsCodeSent` path never exchanges at all — that happens later, on
+      // `OtpVerificationScreen`) — by the time that error surfaces, the
+      // Firebase phone-verification attempt that produced it is already
+      // spent. Retrying via `_submit()` would start an entirely new
+      // `sendCode(phoneNumber)` call with no `resendToken`, which is not
+      // "retry the failed exchange" — it is "start a new verification
+      // attempt", and Firebase's own de-dup/throttling on repeated initial
+      // sends for the same number can silently do nothing. Leaving
+      // `_lastAction` unset here means no retry button shows for this
+      // sub-case (the banner still shows the error+code) rather than
+      // wiring one that fires the wrong action. Clearing it (not just
+      // skipping the assignment) also stops a *stale* action from an
+      // earlier email/Google attempt on this same screen from leaking into
+      // a retry button shown for a phone-branch error.
+      _lastAction = null;
       final phoneNumber = thaiMobileToE164(_phoneController.text);
       if (phoneNumber == null) return;
       final result = await ref
@@ -112,12 +139,41 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
 
+    // Safe to retry via `_submit()` from scratch on any failure here — unlike
+    // the phone branch above, nothing about this call consumes state that a
+    // second attempt would need (see the comment on that branch).
+    _lastAction = _submit;
     final email = _emailController.text.trim();
     final password = _passwordController.text;
     await ref
         .read(authViewModelProvider.notifier)
         .signIn(email: email, password: password);
     if (!mounted) return;
+
+    // ADR-0021 D2, row 2: a `password`-provider login answering
+    // 403 OAUTH_EMAIL_NOT_VERIFIED is a route, not an error — this user
+    // typed the right password, what's missing is a step, not a
+    // permission. 🔴 Deliberately keyed off *this call site* (the
+    // email/password submit), not off the error code in isolation: the same
+    // code from a `google.com` exchange (theoretically possible, never
+    // expected — Google verifies email itself) falls through to the normal
+    // error banner below instead.
+    final error = ref.read(authViewModelProvider).error;
+    if (error is AuthException && error.code == oauthEmailNotVerifiedCode) {
+      ref.read(authViewModelProvider.notifier).clearError();
+      ref
+          .read(emailVerificationFlowProvider.notifier)
+          .start(
+            EmailVerificationFlowState(email: email, justSentEmail: false),
+          );
+      await context.push(AppRoutes.emailVerificationPath);
+      // Same reasoning as the OTP push above: back from verification without
+      // completing it must not leave this screen showing a stale error.
+      if (!mounted) return;
+      ref.read(authViewModelProvider.notifier).clearError();
+      return;
+    }
+
     if (!ref.read(authViewModelProvider).hasError) completeAuthFlow(context);
   }
 
@@ -133,15 +189,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _onGooglePressed() async {
     if (kIsWeb) return _showMobileOnly();
     FocusScope.of(context).unfocus();
+    _lastAction = _onGooglePressed;
     await ref.read(authViewModelProvider.notifier).signInWithGoogle();
-    if (!mounted) return;
-    if (!ref.read(authViewModelProvider).hasError) completeAuthFlow(context);
-  }
-
-  Future<void> _onApplePressed() async {
-    if (kIsWeb) return _showMobileOnly();
-    FocusScope.of(context).unfocus();
-    await ref.read(authViewModelProvider.notifier).signInWithApple();
     if (!mounted) return;
     if (!ref.read(authViewModelProvider).hasError) completeAuthFlow(context);
   }
@@ -155,13 +204,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authViewModelProvider);
-    // Sign in with Apple is hidden in the UI until native entitlements are
-    // restored (see docs/social-login-setup.md, "iOS Sign in with Apple is
-    // currently disabled at the native level"). Flip back to
-    // `!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS` (Apple
-    // sign-in is iOS-only; defaultTargetPlatform is web-safe, unlike
-    // dart:io Platform) to re-enable.
-    const showAppleButton = false;
     final display = authErrorDisplayFor(authState.error);
 
     return AuthScaffold(
@@ -177,11 +219,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         isLoading: authState.isLoading,
         errorMessage: display?.message,
         errorCode: display?.code,
+        // No code check here — `AuthErrorBanner` is the one place that
+        // decides whether a code gets a retry button at all (ADR-0021 D3,
+        // code-critic GATE 3 round 1: the same `code ==
+        // oauthLoginConflictCode` check used to be duplicated at every call
+        // site *and* inside the banner, so disarming any one of them alone
+        // never made a test fail). This screen only ever supplies *which*
+        // action retry should run.
+        onRetry: _lastAction,
         onSubmit: authState.isLoading ? null : _submit,
         onGoToRegister: _goToRegister,
         onGooglePressed: _onGooglePressed,
-        onApplePressed: _onApplePressed,
-        showAppleButton: showAppleButton,
       ),
     );
   }
@@ -200,11 +248,10 @@ class _AuthCard extends StatelessWidget {
     required this.isLoading,
     required this.errorMessage,
     required this.errorCode,
+    required this.onRetry,
     required this.onSubmit,
     required this.onGoToRegister,
     required this.onGooglePressed,
-    required this.onApplePressed,
-    required this.showAppleButton,
   });
 
   final GlobalKey<FormState> formKey;
@@ -218,11 +265,10 @@ class _AuthCard extends StatelessWidget {
   final bool isLoading;
   final String? errorMessage;
   final String? errorCode;
+  final VoidCallback? onRetry;
   final VoidCallback? onSubmit;
   final VoidCallback onGoToRegister;
   final VoidCallback onGooglePressed;
-  final VoidCallback onApplePressed;
-  final bool showAppleButton;
 
   @override
   Widget build(BuildContext context) {
@@ -257,7 +303,11 @@ class _AuthCard extends StatelessWidget {
             ],
             if (errorMessage != null) ...[
               const SizedBox(height: AppSpacing.md),
-              AuthErrorBanner(message: errorMessage!, code: errorCode),
+              AuthErrorBanner(
+                message: errorMessage!,
+                code: errorCode,
+                onRetry: onRetry,
+              ),
             ],
             const SizedBox(height: 20),
             AuthPrimaryButton(
@@ -271,10 +321,6 @@ class _AuthCard extends StatelessWidget {
             const _OrDivider(),
             const SizedBox(height: AppSpacing.xl),
             _GoogleSignInButton(onPressed: onGooglePressed),
-            if (showAppleButton) ...[
-              const SizedBox(height: AppSpacing.md),
-              _AppleSignInButton(onPressed: onApplePressed),
-            ],
             if (!isPhone) ...[
               const SizedBox(height: AppSpacing.sm),
               AuthNavLinkRow(
@@ -506,45 +552,6 @@ class _GoogleSignInButton extends StatelessWidget {
               AppStrings.authGoogleSignIn,
               style: AppTextStyles.cardSubtitle.copyWith(
                 color: AppColors.surfaceDark,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AppleSignInButton extends StatelessWidget {
-  const _AppleSignInButton({required this.onPressed});
-
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.black,
-          side: const BorderSide(color: Color(0xFF27272A)),
-          minimumSize: const Size.fromHeight(44),
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.xs),
-          ),
-          elevation: 0,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SvgPicture.asset(AppImages.appleLogo, width: 15, height: 20),
-            const SizedBox(width: AppSpacing.md),
-            Text(
-              AppStrings.authAppleSignIn,
-              style: AppTextStyles.cardSubtitle.copyWith(
-                color: AppColors.white,
               ),
             ),
           ],

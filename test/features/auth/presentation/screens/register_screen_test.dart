@@ -11,6 +11,7 @@ import 'package:posternung/core/strings/app_strings.dart';
 import 'package:posternung/features/auth/domain/entities/auth_user.dart';
 import 'package:posternung/features/auth/presentation/providers/auth_providers.dart';
 import 'package:posternung/features/auth/presentation/providers/session_provider.dart';
+import 'package:posternung/features/auth/presentation/screens/email_verification_screen.dart';
 import 'package:posternung/features/auth/presentation/screens/register_screen.dart';
 import 'package:posternung/features/auth/presentation/widgets/auth_email_field.dart';
 
@@ -42,9 +43,6 @@ class FakeAuthViewModel extends AuthViewModel {
 
   @override
   Future<void> signInWithGoogle() async {}
-
-  @override
-  Future<void> signInWithApple() async {}
 }
 
 void main() {
@@ -145,6 +143,20 @@ void main() {
         find.text('${AppStrings.authErrorCodeLabel}email-already-in-use'),
         findsOneWidget,
       );
+      // BL-109 — a literal-wording check for *this one* case, not just the
+      // constant-reference check above: `find.text(AppStrings.x)` stays
+      // green even if `AppStrings.x`'s wording silently regresses, because
+      // both sides of that comparison read the same (changed) constant.
+      // ADR-0021 D2 row 3 requires this specific message to tell the user
+      // to log in, not merely restate that the email is taken — this
+      // asserts the actual copy contains that instruction.
+      expect(
+        AppStrings.authErrorEmailAlreadyInUse,
+        contains('เข้าสู่ระบบ'),
+        reason:
+            'must tell the user to log in (ADR-0021 D2 row 3), not just '
+            'restate that the email is already taken',
+      );
     },
   );
 
@@ -169,9 +181,12 @@ void main() {
     expect(find.text('root'), findsOneWidget);
   });
 
-  testWidgets('a successful register leaves no auth screen on the stack — '
-      'it lands on the post-auth destination rather than popping one route '
-      'back to whatever pushed it (AC-6)', (tester) async {
+  testWidgets('a successful register pushes the email-verification screen — '
+      'ADR-0021 D2: registering only creates the Firebase account and sends '
+      'a verification email, it does not establish a backend session, so '
+      'the destination is "wait for verification", not home (AC-6 still '
+      'holds in the sense that RegisterScreen itself is left off the stack '
+      'once verification is pushed on top of it)', (tester) async {
     late GoRouter router;
     await tester.pumpWidget(wrapPushed(onRouter: (r) => router = r));
 
@@ -186,8 +201,13 @@ void main() {
     await tester.tap(submit);
     await tester.pumpAndSettle();
 
-    expect(find.byType(RegisterScreen), findsNothing);
-    expect(find.text('root'), findsNothing);
-    expect(router.state.uri.toString(), AppRoutes.homePath);
+    expect(find.byType(EmailVerificationScreen), findsOneWidget);
+    expect(find.text('you@example.com'), findsOneWidget);
+    expect(router.state.uri.toString(), AppRoutes.emailVerificationPath);
+    expect(
+      router.canPop(),
+      isTrue,
+      reason: 'RegisterScreen must still be underneath, poppable by back',
+    );
   });
 }
