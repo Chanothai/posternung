@@ -10,9 +10,15 @@
 abstract final class AppRoutes {
   AppRoutes._();
 
-  /// Cold-start location. Onboarding is still shown on every launch — the
-  /// "don't show it twice" half is SCR-01 AC-3 and needs persistent storage
-  /// the app does not have yet (ADR-0018 D7).
+  /// Cold-start location. What it builds is `OnboardingEntryGate`, which
+  /// decides from the session whether the intro is shown at all — the
+  /// reasoning, the branches and the deadline all live on that class.
+  ///
+  /// Recorded here only because this file used to say the opposite: the old
+  /// comment called SCR-01 AC-3 blocked on "persistent storage the app does
+  /// not have yet (ADR-0018 D7)", and `flutter_secure_storage` had been in
+  /// `pubspec.yaml` and in `core/network/token_storage.dart` the whole time
+  /// (ADR-0023 D6).
   static const String onboardingPath = '/';
   static const String onboardingName = 'onboarding';
 

@@ -44,7 +44,7 @@ void main() {
             widget is SvgPicture &&
             widget.bytesLoader is SvgAssetLoader &&
             (widget.bytesLoader as SvgAssetLoader).assetName ==
-                AppImages.verifiedBadgeIcon,
+                AppImages.questionMarkDashedCircleIcon,
       ),
       findsOneWidget,
       reason: 'ไอคอนกลางวงประหายไป — มติผู้ใช้คือถอดแค่ข้อความ ไม่ถอดไอคอน',

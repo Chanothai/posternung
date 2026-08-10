@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../theme/app_colors.dart';
+import '../widgets/app_loading_screen.dart';
 import 'app_routes.dart';
 
 /// Renders [builder] with [value] when the route has the state it needs, and
@@ -18,9 +18,10 @@ import 'app_routes.dart';
 /// case that goes wrong (go_router 17.4.0, verified — `project-gotchas` §5).
 /// So the guard has to be able to act from inside `build`, and the only way
 /// out of a `build` is to schedule the departure for the next frame and
-/// return something to show in the meantime. The placeholder is the spinner
-/// `AuthGate` shows while nothing is known yet, so an arrival with no state
-/// looks like a moment of loading rather than a flash of a broken screen.
+/// return something to show in the meantime. The placeholder is
+/// [AppLoadingScreen] — the same one `OnboardingEntryGate` shows while the
+/// stored session is being restored — so an arrival with no state looks like
+/// a moment of loading rather than a flash of a broken screen.
 ///
 /// 🔴 **Pass [value] from a `ref.read`, not a `ref.watch`.** The guard
 /// answers "can this route render right now", which is a question about the
@@ -46,17 +47,7 @@ Widget requireRouteState<T extends Object>(
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (context.mounted) context.go(fallbackPath);
     });
-    return const _RouteStatePlaceholder();
+    return const AppLoadingScreen();
   }
   return builder(value);
-}
-
-class _RouteStatePlaceholder extends StatelessWidget {
-  const _RouteStatePlaceholder();
-
-  @override
-  Widget build(BuildContext context) => const Scaffold(
-    backgroundColor: AppColors.surfaceDark,
-    body: Center(child: CircularProgressIndicator(color: AppColors.accent)),
-  );
 }
