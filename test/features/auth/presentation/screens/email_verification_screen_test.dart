@@ -114,6 +114,27 @@ void main() {
   });
 
   testWidgets(
+    'renders the spam-folder hint on its own line (SCR-02 known_gap — '
+    'Firebase\'s verification sender has no store SPF/DKIM, Gmail routes '
+    'it to spam, and the plain instructions alone read as "the system is '
+    'broken" to a user who never sees it in their inbox)',
+    (tester) async {
+      await tester.pumpWidget(wrap());
+
+      expect(
+        find.text(AppStrings.authEmailVerificationSpamHint),
+        findsOneWidget,
+      );
+      // Real-content assertion (test-quality §3 / BL-109): a
+      // `find.text(AppStrings.x)` check alone stays green even if the copy
+      // regresses to something that no longer actually points at the spam
+      // folder, since both sides read the same constant.
+      expect(AppStrings.authEmailVerificationSpamHint, contains('ขยะ'));
+      expect(AppStrings.authEmailVerificationSpamHint, contains('สแปม'));
+    },
+  );
+
+  testWidgets(
     'tapping "check status" while not verified shows the "not yet" message '
     'and stays on this screen',
     (tester) async {

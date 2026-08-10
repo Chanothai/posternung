@@ -84,6 +84,13 @@ abstract final class AppStrings {
   static const String authEmailVerificationInstructions =
       'กรุณาตรวจสอบกล่องจดหมายและกดลิงก์ยืนยัน '
       'แล้วกลับมากดตรวจสอบสถานะที่นี่';
+  // Firebase's verification sender (`noreply@<project>.firebaseapp.com`)
+  // has no store SPF/DKIM, so Gmail routes it to spam — confirmed on-device
+  // 2026-08-10 (SCR-02 known_gap). Deliberately environment-agnostic: never
+  // name the sender address here, it's flavor-specific (`sit` today) and
+  // would go stale the moment `production` builds.
+  static const String authEmailVerificationSpamHint =
+      'ถ้าไม่เห็นอีเมลในกล่องจดหมาย ให้ดูในถังจดหมายขยะ (สแปม) ด้วย';
   static const String authEmailVerificationCheckButton = 'ตรวจสอบสถานะ';
   static const String authEmailVerificationNotYetMessage =
       'ยังไม่พบการยืนยัน กรุณายืนยันอีเมลก่อน แล้วลองอีกครั้ง';

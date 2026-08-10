@@ -207,6 +207,12 @@ class _EmailVerificationCard extends StatelessWidget {
             style: AppTextStyles.cardSubtitle,
             textAlign: TextAlign.center,
           ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            AppStrings.authEmailVerificationSpamHint,
+            style: AppTextStyles.cardSubtitle,
+            textAlign: TextAlign.center,
+          ),
           if (statusMessage != null) ...[
             const SizedBox(height: AppSpacing.md),
             Text(
