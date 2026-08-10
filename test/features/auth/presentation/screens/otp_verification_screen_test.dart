@@ -264,6 +264,23 @@ void main() {
       );
       expect(capturedCodes, ['472019']);
 
+      // Assert directly on the rendered cells that the wrong digits are
+      // gone — rather than relying solely on the second enterText below,
+      // which overwrites the field either way and so cannot tell "cleared"
+      // apart from "never cleared" (test-quality §2/§3: a mutation that
+      // drops `_controller.clear()` in otp_verification_screen.dart
+      // survived every prior test here for exactly this reason). '472019'
+      // has no repeated digit, so each digit's Text lives in exactly one
+      // `_OtpCell` and a bare-digit `find.text` cannot collide with
+      // anything else this screen renders.
+      for (final digit in const ['4', '7', '2', '0', '1', '9']) {
+        expect(
+          find.text(digit),
+          findsNothing,
+          reason: 'the wrong code must be cleared from every cell',
+        );
+      }
+
       // Field was cleared on failure (not left full), so retyping a fresh
       // 6-digit code auto-submits again instead of being a no-op.
       await tester.enterText(find.byType(TextField), '111111');
@@ -301,8 +318,18 @@ void main() {
           findsOneWidget,
         );
         // The digits are still in the (invisible) capture field — not
-        // cleared like a wrong code would be. Proven behaviorally below:
-        // if it had been cleared, retry would resubmit an empty smsCode.
+        // cleared like a wrong code would be. Proven two ways: directly on
+        // the rendered cells here (the `_submit` OAUTH_LOGIN_CONFLICT
+        // branch `return`s before reaching `_controller.clear()`), and
+        // behaviorally below — if it had been cleared, retry would
+        // resubmit an empty smsCode.
+        for (final digit in const ['4', '7', '2', '0', '1', '9']) {
+          expect(
+            find.text(digit),
+            findsOneWidget,
+            reason: 'OAUTH_LOGIN_CONFLICT must NOT clear the entered code',
+          );
+        }
         final retry = find.text(AppStrings.authRetryButton);
         expect(retry, findsOneWidget);
         await tester.tap(retry);
@@ -319,8 +346,13 @@ void main() {
     );
 
     testWidgets(
-      'does NOT appear for an ordinary wrong-code failure, which still '
-      'clears the field as before',
+      // Field-clearing on an ordinary wrong-code failure is asserted
+      // directly by the 'clears the code so the user can retype' test
+      // above — this test's body only ever checked the retry button's
+      // absence, so its name no longer claims to cover clearing too
+      // (a name that claims coverage a test doesn't have is worse than no
+      // test at all).
+      'does NOT appear for an ordinary wrong-code failure',
       (tester) async {
         await tester.pumpWidget(
           wrapPushed(
