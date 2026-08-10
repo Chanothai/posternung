@@ -9,7 +9,6 @@ import '../../data/repositories/auth_repository_impl.dart';
 import '../../domain/entities/auth_user.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../data/datasources/phone_sign_in_data_source.dart';
-import '../../domain/usecases/sign_in_with_apple.dart';
 import '../../domain/usecases/sign_out.dart';
 import 'backend_session_provider.dart';
 
@@ -27,10 +26,6 @@ final authRepositoryProvider = Provider<AuthRepository>(
 
 final authStateChangesProvider = StreamProvider<AuthUser?>(
   (ref) => ref.watch(authRepositoryProvider).authStateChanges,
-);
-
-final signInWithAppleProvider = Provider(
-  (ref) => SignInWithApple(ref.watch(authRepositoryProvider)),
 );
 
 final signOutProvider = Provider(
@@ -101,8 +96,31 @@ class AuthViewModel extends AsyncNotifier<void> {
     );
   }
 
-  Future<void> signInWithApple() =>
-      _runSocial(() => ref.read(signInWithAppleProvider)());
+  /// Resends the verification email to the currently pending Firebase
+  /// account (ADR-0021 D2). `state.hasError` after this means the resend
+  /// itself failed — the caller must not treat that as "not verified yet".
+  Future<void> resendVerificationEmail() async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(
+      () => ref.read(backendSessionProvider.notifier).resendVerificationEmail(),
+    );
+  }
+
+  /// Checks whether the pending account's email is verified now, and — if
+  /// so — completes the deferred `/auth/firebase` exchange
+  /// (ADR-0021 D2). Returns `false` for "not verified yet", which is not an
+  /// error; check `state.hasError` separately for an actual failure (e.g.
+  /// the reload or the exchange itself failing).
+  Future<bool> checkEmailVerifiedAndContinue() async {
+    state = const AsyncLoading();
+    bool verified = false;
+    state = await AsyncValue.guard(() async {
+      verified = await ref
+          .read(backendSessionProvider.notifier)
+          .checkEmailVerifiedAndContinue();
+    });
+    return verified;
+  }
 
   /// Drops a stale error left in `state` — e.g. a failed OTP attempt whose
   /// banner must not still be showing once the user backs out to
@@ -128,8 +146,8 @@ class AuthViewModel extends AsyncNotifier<void> {
     });
   }
 
-  /// Social sign-in can be aborted by the user (native account picker /
-  /// Apple sheet). That surfaces as `AuthCancelledException`, which is not a
+  /// Social sign-in can be aborted by the user (the native account picker).
+  /// That surfaces as `AuthCancelledException`, which is not a
   /// failure — reset to idle silently rather than showing an error. Can't
   /// use `AsyncValue.guard` here because it would capture the cancellation
   /// as an error state.

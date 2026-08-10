@@ -34,12 +34,15 @@ final backendAuthDataSourceProvider = Provider<BackendAuthDataSource>(
   (ref) => BackendAuthDataSourceImpl(ref.watch(dioProvider)),
 );
 
-/// The backend JWT session for every Firebase-mediated sign-in
-/// (email/password, register, Google, phone) — each signs in with Firebase,
-/// then exchanges the Firebase ID token at `/auth/firebase`. Holds the current
-/// [AuthUser] or `null` when there's no backend session. Firebase also keeps
-/// its own session as a side effect (used by Apple); `sessionProvider` merges
-/// the two.
+/// The backend JWT session for every sign-in method (email/password,
+/// register, Google, phone) — each signs in with Firebase first, then
+/// exchanges the Firebase ID token at `/auth/firebase`. Holds the current
+/// [AuthUser] or `null` when there's no backend session. This is the app's
+/// only definition of "logged in" (ADR-0021 D1) — `sessionProvider` is a
+/// thin alias over this notifier, not a merge with anything else. Firebase
+/// also keeps its own session as a side effect of every sign-in call here,
+/// but it is an intermediate step toward the exchange below, not a second
+/// source of truth.
 class BackendSessionNotifier extends AsyncNotifier<AuthUser?> {
   @override
   Future<AuthUser?> build() {
@@ -119,31 +122,49 @@ class BackendSessionNotifier extends AsyncNotifier<AuthUser?> {
     await _exchangeAndPublish(idToken);
   }
 
-  /// Firebase account creation → Firebase ID token → `/auth/firebase`. The
-  /// backend find-or-creates its own user record on first exchange.
+  /// Firebase account creation, followed by a verification email
+  /// (ADR-0021 D2). Deliberately does **not** exchange with the backend —
+  /// the `password` provider requires `email_verified=true`
+  /// (ADR-0004 §4), so exchanging right after creation would always 403.
+  /// The exchange happens later, from [checkEmailVerifiedAndContinue], once
+  /// the user has actually verified.
   ///
-  /// If the exchange fails the Firebase account is deleted again. Firebase has
-  /// already created *and signed in* the account by that point, so leaving it
-  /// puts the app in a state that contradicts what the user is being told: the
-  /// register screen shows an error, but the address is now taken (the retry
-  /// gets `email-already-in-use`) and `sessionProvider` reports authenticated
-  /// off the Firebase half alone, so `AuthGate` advances behind the banner.
-  /// Registration either completes on both halves or leaves nothing behind.
+  /// 🔴 No rollback on failure any more (ADR-0021 D2, reversing the previous
+  /// behavior documented below): an unverified Firebase account left behind
+  /// mid-flow is a normal, expected state now, not orphaned garbage — the
+  /// backend find-or-creates on the eventual exchange either way (ADR-0004
+  /// §3 layer 4), and deleting it out from under a user who is mid-way
+  /// through checking their inbox would silently invalidate the
+  /// verification link `sendEmailVerification` just sent.
   Future<void> registerWithEmailPassword({
     required String email,
     required String password,
   }) async {
     final emailPassword = ref.read(emailPasswordSignInDataSourceProvider);
-    final idToken = await emailPassword.register(
-      email: email,
-      password: password,
-    );
-    try {
-      await _exchangeAndPublish(idToken);
-    } catch (_) {
-      await emailPassword.deleteCurrentUser();
-      rethrow;
-    }
+    await emailPassword.register(email: email, password: password);
+    await emailPassword.sendEmailVerification();
+  }
+
+  /// Resends the verification email to the currently signed-in (but not yet
+  /// verified) Firebase user (ADR-0021 D2). The 60-second app-side cooldown
+  /// is the UI's job (`EmailVerificationScreen`) — Firebase throttles resend
+  /// requests silently, so without a cooldown a tap here can look like
+  /// nothing happened with no way to tell why.
+  Future<void> resendVerificationEmail() =>
+      ref.read(emailPasswordSignInDataSourceProvider).sendEmailVerification();
+
+  /// Reloads the Firebase user and, if their email is verified now,
+  /// exchanges a fresh (force-refreshed) ID token at `/auth/firebase` to
+  /// establish the backend session — the step ADR-0021 D2 gates on
+  /// `email_verified`. Returns whether the email is verified: `false` means
+  /// "not yet", which the caller must not treat as an error.
+  Future<bool> checkEmailVerifiedAndContinue() async {
+    final emailPassword = ref.read(emailPasswordSignInDataSourceProvider);
+    final verified = await emailPassword.reloadAndCheckEmailVerified();
+    if (!verified) return false;
+    final idToken = await emailPassword.currentIdToken();
+    await _exchangeAndPublish(idToken);
+    return true;
   }
 
   /// Starts phone verification. Returns the result so the caller (e.g.

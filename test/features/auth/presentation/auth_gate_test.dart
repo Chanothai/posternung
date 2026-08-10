@@ -8,6 +8,7 @@ import 'package:posternung/core/strings/app_strings.dart';
 import 'package:posternung/features/auth/domain/entities/auth_user.dart';
 import 'package:posternung/features/auth/presentation/auth_gate.dart';
 import 'package:posternung/features/auth/presentation/providers/auth_providers.dart';
+import 'package:posternung/features/auth/presentation/providers/backend_session_provider.dart';
 import 'package:posternung/features/auth/presentation/providers/session_provider.dart';
 import 'package:posternung/features/auth/presentation/screens/login_screen.dart';
 
@@ -109,4 +110,49 @@ void main() {
       );
     },
   );
+
+  group('ADR-0021 D1 regression — Firebase-only must not advance the gate', () {
+    /// Fake `BackendSessionNotifier` reporting a fixed user without touching
+    /// storage/network — same pattern as `session_provider_test.dart`.
+    testWidgets(
+      'a Firebase session with no backend session shows LoginScreen, not the '
+      "caller's destination — this exercises the real sessionProvider (not "
+      'an override of it), proving the composition end-to-end rather than '
+      "just sessionProvider's own unit test",
+      (tester) async {
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              authStateChangesProvider.overrideWith(
+                (ref) => Stream.value(
+                  const AuthUser(uid: 'fb-1', email: 'fb@b.com'),
+                ),
+              ),
+              backendSessionProvider.overrideWith(
+                () => _FixedBackendSession(null),
+              ),
+              authViewModelProvider.overrideWith(_NoopAuthViewModel.new),
+            ],
+            child: MaterialApp(
+              home: AuthGate(
+                builder: (_) => const Text('AUTHENTICATED-DESTINATION'),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byType(LoginScreen), findsOneWidget);
+        expect(find.text('AUTHENTICATED-DESTINATION'), findsNothing);
+      },
+    );
+  });
+}
+
+class _FixedBackendSession extends BackendSessionNotifier {
+  _FixedBackendSession(this._user);
+  final AuthUser? _user;
+
+  @override
+  Future<AuthUser?> build() async => _user;
 }

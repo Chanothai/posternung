@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/auth_gate.dart';
+import '../../features/auth/presentation/email_verification_flow_observer.dart';
 import '../../features/auth/presentation/otp_flow_observer.dart';
+import '../../features/auth/presentation/providers/email_verification_flow_provider.dart';
 import '../../features/auth/presentation/providers/otp_flow_provider.dart';
+import '../../features/auth/presentation/screens/email_verification_screen.dart';
 import '../../features/auth/presentation/screens/otp_verification_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
@@ -68,6 +71,25 @@ final List<RouteBase> appRoutes = <RouteBase>[
     ),
   ),
   GoRoute(
+    path: AppRoutes.emailVerificationPath,
+    name: AppRoutes.emailVerificationName,
+    // Same shape as `/otp` above (ADR-0021 D2 applying ADR-0018 Amendment 2
+    // A2-D2): carries no arguments, reads its state from
+    // `emailVerificationFlowProvider` via `requireRouteState`.
+    builder: (BuildContext context, GoRouterState state) => Consumer(
+      builder: (BuildContext context, WidgetRef ref, Widget? _) =>
+          requireRouteState<EmailVerificationFlowState>(
+            context,
+            ref.read(emailVerificationFlowProvider),
+            builder: (EmailVerificationFlowState flow) =>
+                EmailVerificationScreen(
+                  email: flow.email,
+                  justSentEmail: flow.justSentEmail,
+                ),
+          ),
+    ),
+  ),
+  GoRoute(
     path: AppRoutes.posterDetailPath,
     name: AppRoutes.posterDetailName,
     builder: (BuildContext context, GoRouterState state) => PosterDetailScreen(
@@ -87,7 +109,10 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
     // An observer rather than a route or widget callback because those also
     // fire on a `refresh()` that never took the user anywhere — the reasoning
     // and the evidence are in `OtpFlowObserver`.
-    observers: <NavigatorObserver>[OtpFlowObserver(ref)],
+    observers: <NavigatorObserver>[
+      OtpFlowObserver(ref),
+      EmailVerificationFlowObserver(ref),
+    ],
   );
   ref.onDispose(router.dispose);
   return router;

@@ -10,6 +10,23 @@ import '../../../core/strings/app_strings.dart';
 /// [message] plus the raw [code] (rendered on a second, muted line).
 typedef AuthErrorDisplay = ErrorDisplay;
 
+/// Backend `error_code`s this feature branches its *behavior* on, not just
+/// its display text (ADR-0021 D2/D3) — named here, next to the rest of this
+/// feature's code table, so there is one place that knows what a backend
+/// auth error code means:
+///
+/// - [oauthEmailNotVerifiedCode] — on the `password`-provider **login**
+///   path this is a route, not an error banner: the screen sends the user
+///   to `EmailVerificationScreen` instead of rendering it (D2, row 2).
+///   🔴 The same code can in principle come back from a *Google* exchange
+///   too, but that case is left as an ordinary error banner — Google
+///   verifies email itself, so a `google.com` 403 here would mean something
+///   is already wrong, not "go finish verifying".
+/// - [oauthLoginConflictCode] — the one code whose error banner gets a
+///   "retry" button (D3); every other code does not.
+const oauthEmailNotVerifiedCode = 'OAUTH_EMAIL_NOT_VERIFIED';
+const oauthLoginConflictCode = 'OAUTH_LOGIN_CONFLICT';
+
 /// Maps an [AuthException] to a user-facing display via the shared
 /// three-step algorithm (ADR-0017 D4/D9 — see `core/error/error_display.dart`
 /// for the algorithm itself; this file owns only the auth-specific table
@@ -88,7 +105,7 @@ const _authMessages = <String, String>{
   'missing-client-identifier': AppStrings.authErrorMissingClientIdentifier,
   'captcha-check-failed': AppStrings.authErrorCaptchaCheckFailed,
   'credential-already-in-use': AppStrings.authErrorCredentialAlreadyInUse,
-  // Social (Google/Apple) — fires only when the Firebase project is set to
+  // Social (Google) — fires only when the Firebase project is set to
   // "one account per email address".
   'account-exists-with-different-credential':
       AppStrings.authErrorAccountExistsWithDifferentCredential,

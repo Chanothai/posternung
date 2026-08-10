@@ -15,7 +15,9 @@ abstract final class AppImages {
   static const String lockIcon = 'assets/images/lock_icon.svg';
   static const String eyeIcon = 'assets/images/eye_icon.svg';
   static const String googleLogo = 'assets/images/google_logo.svg';
-  static const String appleLogo = 'assets/images/apple_logo.svg';
+  // `appleLogo` removed under ADR-0021 D4 — Sign in with Apple was deleted
+  // end-to-end. The svg asset itself is left in assets/images/ untouched;
+  // only the button that referenced this constant is gone.
 
   // --- Home ---
   static const String heartIcon = 'assets/images/heart_icon.svg';

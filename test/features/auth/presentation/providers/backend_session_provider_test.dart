@@ -182,16 +182,17 @@ void main() {
 
   group('registerWithEmailPassword', () {
     test(
-      'creates the Firebase account, exchanges the id_token, publishes user',
+      'creates the Firebase account and sends a verification email — does '
+      'NOT exchange with the backend (ADR-0021 D2: the password provider '
+      'requires email_verified=true, so exchanging here would always 403)',
       () async {
         when(() => storage.readAccessToken()).thenAnswer((_) async => null);
         when(
           () => emailPassword.register(email: 'new@b.com', password: 'pw'),
         ).thenAnswer((_) async => 'id-tok');
-        when(() => backend.firebaseLogin('id-tok')).thenAnswer(
-          (_) async => const TokenResponse(accessToken: 'a', refreshToken: 'r'),
-        );
-        when(() => backend.getMe('a')).thenAnswer((_) async => _user());
+        when(
+          () => emailPassword.sendEmailVerification(),
+        ).thenAnswer((_) async {});
 
         final container = makeContainer();
         await container.read(backendSessionProvider.future);
@@ -199,42 +200,108 @@ void main() {
             .read(backendSessionProvider.notifier)
             .registerWithEmailPassword(email: 'new@b.com', password: 'pw');
 
-        expect(container.read(backendSessionProvider).value!.uid, 'u1');
-        verify(
-          () => storage.save(accessToken: 'a', refreshToken: 'r'),
-        ).called(1);
+        verify(() => emailPassword.sendEmailVerification()).called(1);
+        verifyNever(() => backend.firebaseLogin(any()));
+        // No half-registered session — still logged out.
+        expect(container.read(backendSessionProvider).value, isNull);
+        verifyNever(
+          () => storage.save(
+            accessToken: any(named: 'accessToken'),
+            refreshToken: any(named: 'refreshToken'),
+          ),
+        );
       },
     );
 
-    test('deletes the Firebase account again if the exchange fails, and '
-        'still surfaces the original error', () async {
+    test(
+      'propagates a sendEmailVerification failure without attempting any '
+      'exchange — ADR-0021 D2 removed the rollback entirely (there is no '
+      'longer a deleteCurrentUser to call at all): an unverified Firebase '
+      'account left behind mid-flow is normal now, not orphaned garbage',
+      () async {
+        when(() => storage.readAccessToken()).thenAnswer((_) async => null);
+        when(
+          () => emailPassword.register(email: 'new@b.com', password: 'pw'),
+        ).thenAnswer((_) async => 'id-tok');
+        when(
+          () => emailPassword.sendEmailVerification(),
+        ).thenThrow(const AuthException(code: 'email_password_unexpected'));
+
+        final container = makeContainer();
+        await container.read(backendSessionProvider.future);
+
+        await expectLater(
+          container
+              .read(backendSessionProvider.notifier)
+              .registerWithEmailPassword(email: 'new@b.com', password: 'pw'),
+          throwsA(isA<AuthException>()),
+        );
+
+        verifyNever(() => backend.firebaseLogin(any()));
+      },
+    );
+  });
+
+  group('resendVerificationEmail', () {
+    test('resends via the data source', () async {
       when(() => storage.readAccessToken()).thenAnswer((_) async => null);
       when(
-        () => emailPassword.register(email: 'new@b.com', password: 'pw'),
-      ).thenAnswer((_) async => 'id-tok');
-      when(
-        () => backend.firebaseLogin('id-tok'),
-      ).thenThrow(const AuthException(code: 'network_error'));
-      when(() => emailPassword.deleteCurrentUser()).thenAnswer((_) async {});
+        () => emailPassword.sendEmailVerification(),
+      ).thenAnswer((_) async {});
 
       final container = makeContainer();
       await container.read(backendSessionProvider.future);
+      await container
+          .read(backendSessionProvider.notifier)
+          .resendVerificationEmail();
 
-      await expectLater(
-        container
-            .read(backendSessionProvider.notifier)
-            .registerWithEmailPassword(email: 'new@b.com', password: 'pw'),
-        throwsA(isA<AuthException>()),
-      );
+      verify(() => emailPassword.sendEmailVerification()).called(1);
+    });
+  });
 
-      verify(() => emailPassword.deleteCurrentUser()).called(1);
-      // No half-registered session — the app must not read as logged in.
-      verifyNever(
-        () => storage.save(
-          accessToken: any(named: 'accessToken'),
-          refreshToken: any(named: 'refreshToken'),
-        ),
+  group('checkEmailVerifiedAndContinue', () {
+    test('returns false and does NOT exchange when the email is not verified '
+        'yet — this is not an error, it is "not yet"', () async {
+      when(() => storage.readAccessToken()).thenAnswer((_) async => null);
+      when(
+        () => emailPassword.reloadAndCheckEmailVerified(),
+      ).thenAnswer((_) async => false);
+
+      final container = makeContainer();
+      await container.read(backendSessionProvider.future);
+      final verified = await container
+          .read(backendSessionProvider.notifier)
+          .checkEmailVerifiedAndContinue();
+
+      expect(verified, isFalse);
+      verifyNever(() => emailPassword.currentIdToken());
+      verifyNever(() => backend.firebaseLogin(any()));
+      expect(container.read(backendSessionProvider).value, isNull);
+    });
+
+    test('when verified, exchanges a force-refreshed id token and publishes '
+        'the session, returning true', () async {
+      when(() => storage.readAccessToken()).thenAnswer((_) async => null);
+      when(
+        () => emailPassword.reloadAndCheckEmailVerified(),
+      ).thenAnswer((_) async => true);
+      when(
+        () => emailPassword.currentIdToken(),
+      ).thenAnswer((_) async => 'fresh-id-tok');
+      when(() => backend.firebaseLogin('fresh-id-tok')).thenAnswer(
+        (_) async => const TokenResponse(accessToken: 'a', refreshToken: 'r'),
       );
+      when(() => backend.getMe('a')).thenAnswer((_) async => _user());
+
+      final container = makeContainer();
+      await container.read(backendSessionProvider.future);
+      final verified = await container
+          .read(backendSessionProvider.notifier)
+          .checkEmailVerifiedAndContinue();
+
+      expect(verified, isTrue);
+      expect(container.read(backendSessionProvider).value!.uid, 'u1');
+      verify(() => storage.save(accessToken: 'a', refreshToken: 'r')).called(1);
     });
   });
 

@@ -73,6 +73,10 @@ done
 
 ใช้ simulator tool: `screenshot` → `tap`/`swipe`/`text` → `screenshot` ยืนยันผล
 
+🔴 **tool ตัวนี้ไม่มีในทุกเซสชัน — เช็คก่อนวางแผน** ถ้าไม่มี ยังทำได้ด้วย `xcrun simctl io …
+screenshot` + `cliclick` แต่ต้อง calibrate พิกัดเอง และมีกับดักเรื่อง "คลิกลงหน้าต่างผิดเครื่อง"
+ที่ไม่มี error ให้เห็นเลย → **วิธีและค่าที่ calibrate ได้อยู่ในสกิล `project-gotchas` §8**
+
 - **พิกัดเป็น point ไม่ใช่ pixel** — ค่าที่ tool คืนตอน attach คือขนาดจริงที่ต้องใช้
   (เช่น 402×874) อย่าเอาพิกัดจากภาพ screenshot ที่ resolution สูงกว่ามาใช้ตรงๆ
 - **screenshot ก่อนแตะทุกครั้ง** อย่าจำว่าหน้าจออยู่สถานะไหน

@@ -12,6 +12,7 @@ import 'package:posternung/features/auth/data/datasources/phone_sign_in_data_sou
 import 'package:posternung/features/auth/domain/entities/auth_user.dart';
 import 'package:posternung/features/auth/presentation/providers/auth_providers.dart';
 import 'package:posternung/features/auth/presentation/providers/session_provider.dart';
+import 'package:posternung/features/auth/presentation/screens/email_verification_screen.dart';
 import 'package:posternung/features/auth/presentation/screens/login_screen.dart';
 import 'package:posternung/features/auth/presentation/screens/otp_verification_screen.dart';
 import 'package:posternung/features/auth/presentation/screens/register_screen.dart';
@@ -20,13 +21,31 @@ import 'package:posternung/features/auth/presentation/widgets/auth_email_field.d
 import '../../../../support/router_harness.dart';
 
 class FakeAuthViewModel extends AuthViewModel {
-  FakeAuthViewModel({this.errorToThrow, this.confirmPhoneCodeErrorToThrow});
+  FakeAuthViewModel({
+    this.errorToThrow,
+    this.confirmPhoneCodeErrorToThrow,
+    this.signInErrorToThrow,
+    this.signInWithGoogleErrorToThrow,
+  });
 
   final Object? errorToThrow;
 
   /// Set to make [confirmPhoneCode] fail, for exercising the OTP screen's
   /// error banner (which shares this same provider with [LoginScreen]).
   final Object? confirmPhoneCodeErrorToThrow;
+
+  /// Set to make [signIn] fail — as `state = AsyncError(...)`, mirroring what
+  /// `AsyncValue.guard` does in the real view model, not a `throw` (see
+  /// `add-feature-slice` skill §3: a throw here would skip the state
+  /// transition `LoginScreen._submit` reads from).
+  final Object? signInErrorToThrow;
+
+  /// Set to make [signInWithGoogle] fail the same way.
+  final Object? signInWithGoogleErrorToThrow;
+
+  /// How many times [signIn] ran — used to prove the D3 retry button
+  /// actually re-invokes the action rather than just re-rendering.
+  int signInCallCount = 0;
 
   @override
   FutureOr<void> build() {
@@ -36,10 +55,13 @@ class FakeAuthViewModel extends AuthViewModel {
   }
 
   @override
-  Future<void> signIn({
-    required String email,
-    required String password,
-  }) async {}
+  Future<void> signIn({required String email, required String password}) async {
+    signInCallCount++;
+    final error = signInErrorToThrow;
+    state = error != null
+        ? AsyncError(error, StackTrace.current)
+        : const AsyncData(null);
+  }
 
   @override
   Future<void> signUp({
@@ -48,10 +70,12 @@ class FakeAuthViewModel extends AuthViewModel {
   }) async {}
 
   @override
-  Future<void> signInWithGoogle() async {}
-
-  @override
-  Future<void> signInWithApple() async {}
+  Future<void> signInWithGoogle() async {
+    final error = signInWithGoogleErrorToThrow;
+    state = error != null
+        ? AsyncError(error, StackTrace.current)
+        : const AsyncData(null);
+  }
 
   @override
   Future<PhoneVerificationResult?> sendPhoneCode(
@@ -77,16 +101,23 @@ void main() {
   Widget wrap({
     Object? errorToThrow,
     Object? confirmPhoneCodeErrorToThrow,
+    Object? signInErrorToThrow,
+    Object? signInWithGoogleErrorToThrow,
     void Function(GoRouter router)? onRouter,
+    void Function(FakeAuthViewModel viewModel)? onViewModel,
   }) {
     return ProviderScope(
       overrides: [
-        authViewModelProvider.overrideWith(
-          () => FakeAuthViewModel(
+        authViewModelProvider.overrideWith(() {
+          final viewModel = FakeAuthViewModel(
             errorToThrow: errorToThrow,
             confirmPhoneCodeErrorToThrow: confirmPhoneCodeErrorToThrow,
-          ),
-        ),
+            signInErrorToThrow: signInErrorToThrow,
+            signInWithGoogleErrorToThrow: signInWithGoogleErrorToThrow,
+          );
+          onViewModel?.call(viewModel);
+          return viewModel;
+        }),
         // Signed out — which is the only state in which the gate at
         // `/home` renders the screen this file is about.
         sessionProvider.overrideWithValue(const AsyncData<AuthUser?>(null)),
@@ -189,6 +220,130 @@ void main() {
       expect(find.text('The password is invalid.'), findsNothing);
     },
   );
+
+  group('ADR-0021 D2 — password-provider 403 OAUTH_EMAIL_NOT_VERIFIED is a '
+      'route, not an error', () {
+    testWidgets(
+      '🔴 the SAME code from the Google button does NOT redirect — Google '
+      'verifies email itself, so this would mean something else is wrong; '
+      'it must fall through to the ordinary error banner',
+      (tester) async {
+        await tester.pumpWidget(
+          wrap(
+            signInWithGoogleErrorToThrow: const AuthException(
+              code: 'OAUTH_EMAIL_NOT_VERIFIED',
+            ),
+          ),
+        );
+
+        final googleButton = find.text(AppStrings.authGoogleSignIn);
+        await tester.ensureVisible(googleButton);
+        await tester.tap(googleButton);
+        await tester.pumpAndSettle();
+
+        expect(find.byType(EmailVerificationScreen), findsNothing);
+        expect(find.byType(LoginScreen), findsOneWidget);
+        expect(
+          find.text('${AppStrings.authErrorCodeLabel}OAUTH_EMAIL_NOT_VERIFIED'),
+          findsOneWidget,
+          reason: 'must show as an ordinary error banner, not redirect',
+        );
+      },
+    );
+
+    testWidgets(
+      'navigates to the email-verification screen carrying the email that '
+      'was submitted, instead of showing an error banner, and clears the '
+      'view-model error along the way',
+      (tester) async {
+        late GoRouter router;
+        await tester.pumpWidget(
+          wrap(
+            signInErrorToThrow: const AuthException(
+              code: 'OAUTH_EMAIL_NOT_VERIFIED',
+            ),
+            onRouter: (r) => router = r,
+          ),
+        );
+
+        await tester.enterText(
+          find.byType(TextFormField).first,
+          'unverified@example.com',
+        );
+        await tester.enterText(find.byType(TextFormField).last, 'password123');
+        final submit = find.text(AppStrings.authSubmitLogin);
+        await tester.ensureVisible(submit);
+        await tester.tap(submit);
+        await tester.pumpAndSettle();
+
+        expect(find.byType(EmailVerificationScreen), findsOneWidget);
+        expect(find.text('unverified@example.com'), findsOneWidget);
+        expect(router.state.uri.toString(), AppRoutes.emailVerificationPath);
+        // Not left showing as an error banner underneath — the code proves
+        // that if this ever renders LoginScreen again the banner is gone.
+        expect(
+          find.text('${AppStrings.authErrorCodeLabel}OAUTH_EMAIL_NOT_VERIFIED'),
+          findsNothing,
+        );
+      },
+    );
+  });
+
+  group('ADR-0021 D3 — the error banner\'s retry button is tied to '
+      'OAUTH_LOGIN_CONFLICT, not to any other code', () {
+    testWidgets('appears for OAUTH_LOGIN_CONFLICT and re-runs the action '
+        'that produced it', (tester) async {
+      late FakeAuthViewModel viewModel;
+      await tester.pumpWidget(
+        wrap(
+          signInErrorToThrow: const AuthException(code: 'OAUTH_LOGIN_CONFLICT'),
+          onViewModel: (vm) => viewModel = vm,
+        ),
+      );
+
+      await tester.enterText(find.byType(TextFormField).first, 'a@b.com');
+      await tester.enterText(find.byType(TextFormField).last, 'password123');
+      final submit = find.text(AppStrings.authSubmitLogin);
+      await tester.ensureVisible(submit);
+      await tester.tap(submit);
+      await tester.pumpAndSettle();
+
+      expect(viewModel.signInCallCount, 1);
+      final retry = find.text(AppStrings.authRetryButton);
+      expect(retry, findsOneWidget);
+
+      await tester.ensureVisible(retry);
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+
+      expect(
+        viewModel.signInCallCount,
+        2,
+        reason:
+            'the retry button must re-run the failed action, not just '
+            're-render the same state',
+      );
+    });
+
+    testWidgets(
+      'does NOT appear for a different code, even with an action to retry',
+      (tester) async {
+        await tester.pumpWidget(
+          wrap(signInErrorToThrow: const AuthException(code: 'wrong-password')),
+        );
+
+        await tester.enterText(find.byType(TextFormField).first, 'a@b.com');
+        await tester.enterText(find.byType(TextFormField).last, 'password123');
+        final submit = find.text(AppStrings.authSubmitLogin);
+        await tester.ensureVisible(submit);
+        await tester.tap(submit);
+        await tester.pumpAndSettle();
+
+        expect(find.text(AppStrings.authErrorWrongPassword), findsOneWidget);
+        expect(find.text(AppStrings.authRetryButton), findsNothing);
+      },
+    );
+  });
 
   group('phone method', () {
     testWidgets(

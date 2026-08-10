@@ -12,8 +12,10 @@ import 'package:posternung/core/router/app_routes.dart';
 import 'package:posternung/core/router/route_state_guard.dart';
 import 'package:posternung/features/auth/domain/entities/auth_user.dart';
 import 'package:posternung/features/auth/presentation/providers/auth_providers.dart';
+import 'package:posternung/features/auth/presentation/providers/email_verification_flow_provider.dart';
 import 'package:posternung/features/auth/presentation/providers/otp_flow_provider.dart';
 import 'package:posternung/features/auth/presentation/providers/session_provider.dart';
+import 'package:posternung/features/auth/presentation/screens/email_verification_screen.dart';
 import 'package:posternung/features/auth/presentation/screens/login_screen.dart';
 import 'package:posternung/features/auth/presentation/screens/otp_verification_screen.dart';
 import 'package:posternung/features/auth/presentation/screens/register_screen.dart';
@@ -24,6 +26,7 @@ import 'package:posternung/features/poster/domain/repositories/poster_repository
 import 'package:posternung/features/poster/presentation/providers/poster_providers.dart';
 import 'package:posternung/features/poster/presentation/screens/poster_detail_screen.dart';
 
+import '../../support/email_verification_flow_harness.dart';
 import '../../support/otp_flow_harness.dart';
 import '../../support/router_harness.dart';
 
@@ -73,6 +76,7 @@ void main() {
     WidgetTester tester,
     String location, {
     OtpFlowState? otpFlow,
+    EmailVerificationFlowState? emailVerificationFlow,
     AsyncValue<AuthUser?>? session,
     List<RouteBase>? routes,
   }) async {
@@ -83,6 +87,9 @@ void main() {
           authViewModelProvider.overrideWith(_NoopAuthViewModel.new),
           posterRepositoryProvider.overrideWithValue(repository),
           otpFlowProvider.overrideWith(() => SeededOtpFlow(otpFlow)),
+          emailVerificationFlowProvider.overrideWith(
+            () => SeededEmailVerificationFlow(emailVerificationFlow),
+          ),
           if (session != null) sessionProvider.overrideWithValue(session),
         ],
         child: routedApp(
@@ -195,6 +202,31 @@ void main() {
       // matters, against a real submit, in
       // `otp_verification_screen_test.dart`.
       expect(find.text(phoneNumber), findsOneWidget);
+    });
+
+    testWidgets('${AppRoutes.emailVerificationPath} with an open flow is the '
+        'email-verification screen, showing the email the flow is for '
+        '(ADR-0021 D2)', (tester) async {
+      const email = 'someone@example.com';
+      await pumpAt(
+        tester,
+        AppRoutes.emailVerificationPath,
+        emailVerificationFlow: const EmailVerificationFlowState(
+          email: email,
+          justSentEmail: false,
+        ),
+      );
+
+      expect(find.byType(EmailVerificationScreen), findsOneWidget);
+      expect(
+        tester
+            .widget<EmailVerificationScreen>(
+              find.byType(EmailVerificationScreen),
+            )
+            .email,
+        email,
+      );
+      expect(find.text(email), findsOneWidget);
     });
 
     testWidgets('/posters/<uuid> reaches the detail screen carrying that '
@@ -351,6 +383,136 @@ void main() {
       expect(find.byType(OtpVerificationScreen), findsNothing);
       expect(router.state.uri.toString(), AppRoutes.homePath);
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'arriving at ${AppRoutes.emailVerificationPath} with no flow open '
+      'lands on home too — same guard, same reasoning (ADR-0021 D2 reuses '
+      'ADR-0018 Amendment 2 A2-D3)',
+      (tester) async {
+        final GoRouter router = await pumpAt(
+          tester,
+          AppRoutes.emailVerificationPath,
+          session: const AsyncData<AuthUser?>(null),
+        );
+
+        expect(find.byType(EmailVerificationScreen), findsNothing);
+        expect(router.state.uri.toString(), AppRoutes.homePath);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  group(
+    'ADR-0021 D2 — refreshing while standing on /verify-email keeps the flow',
+    () {
+      const email = 'someone@example.com';
+
+      testWidgets(
+        'a GoRouter.refresh() rebuilds the route with the flow still open',
+        (tester) async {
+          final GoRouter router = await pumpAt(
+            tester,
+            AppRoutes.homePath,
+            session: const AsyncData<AuthUser?>(null),
+            emailVerificationFlow: const EmailVerificationFlowState(
+              email: email,
+              justSentEmail: false,
+            ),
+          );
+          router.push(AppRoutes.emailVerificationPath);
+          await tester.pumpAndSettle();
+          expect(find.byType(EmailVerificationScreen), findsOneWidget);
+
+          router.refresh();
+          await tester.pumpAndSettle();
+
+          expect(tester.takeException(), isNull);
+          expect(find.byType(EmailVerificationScreen), findsOneWidget);
+          expect(router.state.uri.toString(), AppRoutes.emailVerificationPath);
+          expect(find.text(email), findsOneWidget);
+        },
+      );
+    },
+  );
+
+  group('ADR-0021 D2 — the email-verification flow ends when the user leaves, '
+      'and only then', () {
+    const email = 'someone@example.com';
+    late ProviderContainer container;
+
+    Future<GoRouter> pumpOnEmailVerification(WidgetTester tester) async {
+      late GoRouter router;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authViewModelProvider.overrideWith(_NoopAuthViewModel.new),
+            posterRepositoryProvider.overrideWithValue(repository),
+            sessionProvider.overrideWithValue(const AsyncData<AuthUser?>(null)),
+            emailVerificationFlowProvider.overrideWith(
+              () => SeededEmailVerificationFlow(
+                const EmailVerificationFlowState(
+                  email: email,
+                  justSentEmail: false,
+                ),
+              ),
+            ),
+          ],
+          child: appWithRealRouter(onRouter: (GoRouter r) => router = r),
+        ),
+      );
+      await tester.pumpAndSettle();
+      container = ProviderScope.containerOf(
+        tester.element(find.byType(MaterialApp)),
+      );
+
+      router.go(AppRoutes.homePath);
+      await tester.pumpAndSettle();
+      router.push(AppRoutes.emailVerificationPath);
+      await tester.pumpAndSettle();
+      expect(find.byType(EmailVerificationScreen), findsOneWidget);
+      expect(container.read(emailVerificationFlowProvider), isNotNull);
+      return router;
+    }
+
+    testWidgets('a refresh does NOT end the flow', (tester) async {
+      final GoRouter router = await pumpOnEmailVerification(tester);
+
+      router.refresh();
+      await tester.pumpAndSettle();
+
+      expect(
+        container.read(emailVerificationFlowProvider),
+        isNotNull,
+        reason: 'refresh cleared the flow the user is still standing in',
+      );
+      expect(find.byType(EmailVerificationScreen), findsOneWidget);
+    });
+
+    testWidgets('backing out ends the flow', (tester) async {
+      final GoRouter router = await pumpOnEmailVerification(tester);
+
+      router.pop();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EmailVerificationScreen), findsNothing);
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(
+        container.read(emailVerificationFlowProvider),
+        isNull,
+        reason: 'the flow outlived the screen it belongs to',
+      );
+    });
+
+    testWidgets('leaving by going home — the shape a successful check '
+        'takes — ends it too', (tester) async {
+      final GoRouter router = await pumpOnEmailVerification(tester);
+
+      router.go(AppRoutes.homePath);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EmailVerificationScreen), findsNothing);
+      expect(container.read(emailVerificationFlowProvider), isNull);
     });
   });
 

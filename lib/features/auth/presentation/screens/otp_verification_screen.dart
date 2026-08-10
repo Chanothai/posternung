@@ -9,6 +9,7 @@ import '../../../../core/assets/app_images.dart';
 import '../../../../core/design_system/app_dimens.dart';
 import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
+import '../../../../core/error/auth_exception.dart';
 import '../../../../core/router/app_navigation.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -145,11 +146,21 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
         .confirmPhoneCode(verificationId: verificationId, smsCode: code);
     if (!mounted) return;
     if (ref.read(authViewModelProvider).hasError) {
-      // Wrong code: clear the input so the user can retype without manually
-      // deleting 6 digits first, and re-focus so the keyboard is still up.
+      _isSubmitting = false;
+      final error = ref.read(authViewModelProvider).error;
+      // 🔴 `OAUTH_LOGIN_CONFLICT` is the one code whose failure was NOT a
+      // wrong code (ADR-0021 D3) — the SMS digits verified fine; the race
+      // is entirely on the backend exchange after that. Clearing the field
+      // here would both lose what the user correctly typed and make the
+      // retry button below submit an empty `smsCode` (an immediate,
+      // unrelated failure) instead of actually retrying the exchange that
+      // failed. Every other code genuinely means "wrong code" — clear and
+      // let the user retype without manually deleting 6 digits first.
+      if (error is AuthException && error.code == oauthLoginConflictCode) {
+        return;
+      }
       // Clearing fires `_onCodeChanged` (length 0, no re-submit) which also
       // repaints the cells with the new error styling.
-      _isSubmitting = false;
       _controller.clear();
       _focusNode.requestFocus();
       return;
@@ -195,6 +206,16 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                       isLoading: authState.isLoading,
                       errorMessage: display?.message,
                       errorCode: display?.code,
+                      // No code check here — `AuthErrorBanner` alone
+                      // decides whether a code gets a retry button
+                      // (ADR-0021 D3, code-critic GATE 3 round 1). `confirm
+                      // PhoneCode` → `_exchangeAndPublish`
+                      // (`backend_session_provider.dart`) can 409 on this
+                      // screen exactly like every other exchange call site,
+                      // so it needs the same wiring the other auth screens
+                      // have — this screen was the one D3 missed the first
+                      // time round.
+                      onRetry: _submit,
                       secondsRemaining: _secondsRemaining,
                       onResend: _onResend,
                     ),
@@ -260,6 +281,7 @@ class _OtpCard extends StatelessWidget {
     required this.isLoading,
     required this.errorMessage,
     required this.errorCode,
+    required this.onRetry,
     required this.secondsRemaining,
     required this.onResend,
   });
@@ -271,6 +293,7 @@ class _OtpCard extends StatelessWidget {
   final bool isLoading;
   final String? errorMessage;
   final String? errorCode;
+  final VoidCallback? onRetry;
   final int secondsRemaining;
   final VoidCallback onResend;
 
@@ -314,7 +337,11 @@ class _OtpCard extends StatelessWidget {
           ),
           if (errorMessage != null) ...[
             const SizedBox(height: AppSpacing.md),
-            AuthErrorBanner(message: errorMessage!, code: errorCode),
+            AuthErrorBanner(
+              message: errorMessage!,
+              code: errorCode,
+              onRetry: onRetry,
+            ),
           ],
           // No submit button — verification fires automatically once all 6
           // digits are entered (see `_onCodeChanged`). This is the only

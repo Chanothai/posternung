@@ -55,7 +55,9 @@ abstract final class AppStrings {
   static const String authSubmitLogin = 'เข้าสู่ระบบ';
   static const String authOrDivider = 'หรือดำเนินการต่อด้วย';
   static const String authGoogleSignIn = 'เข้าสู่ระบบด้วย Google';
-  static const String authAppleSignIn = 'เข้าสู่ระบบด้วย Apple';
+  // `authAppleSignIn` removed under ADR-0021 D4 — Sign in with Apple was
+  // deleted end-to-end, not just hidden (see `docs/social-login-setup.md`
+  // for the App Store condition that brings it back).
   static const String authTogglePromptRegister = 'มีบัญชีอยู่แล้ว? ';
   static const String authTogglePromptLogin = 'ยังไม่มีบัญชี? ';
   static const String authMobileOnlyMessage = 'รองรับเฉพาะบนมือถือ';
@@ -73,6 +75,25 @@ abstract final class AppStrings {
   static const String authOtpResendCountdownPrefix = 'ส่งรหัสอีกครั้งได้ใน ';
   static const String authOtpResendCountdownSuffix = ' วินาที';
 
+  // --- Auth: email verification (ADR-0021 D2) — reached after register, or
+  // after a `password`-provider login whose backend exchange answered
+  // 403 OAUTH_EMAIL_NOT_VERIFIED. No Figma spec exists for this screen.
+  static const String authEmailVerificationHeading = 'ยืนยันอีเมลของคุณ';
+  static const String authEmailVerificationSubtitlePrefix =
+      'เราได้ส่งอีเมลยืนยันไปที่';
+  static const String authEmailVerificationInstructions =
+      'กรุณาตรวจสอบกล่องจดหมายและกดลิงก์ยืนยัน '
+      'แล้วกลับมากดตรวจสอบสถานะที่นี่';
+  static const String authEmailVerificationCheckButton = 'ตรวจสอบสถานะ';
+  static const String authEmailVerificationNotYetMessage =
+      'ยังไม่พบการยืนยัน กรุณายืนยันอีเมลก่อน แล้วลองอีกครั้ง';
+  static const String authEmailVerificationResendPrompt = 'ไม่ได้รับอีเมล? ';
+  static const String authEmailVerificationResendAction = 'ส่งอีเมลอีกครั้ง';
+  static const String authEmailVerificationResendCountdownPrefix =
+      'ส่งอีเมลอีกครั้งได้ใน ';
+  static const String authEmailVerificationResendCountdownSuffix = ' วินาที';
+  static const String authEmailVerificationBackToLoginPrompt = 'เปลี่ยนใจ? ';
+
   // --- Auth error display (friendly Thai message + raw code) ---
   // Shown on the login screen when sign-in fails. The raw error code is
   // rendered on a second line prefixed with authErrorCodeLabel; the message
@@ -80,6 +101,9 @@ abstract final class AppStrings {
   // straight from the backend's already-Thai `{error_code, message}` envelope.
   static const String authErrorCodeLabel = 'รหัสข้อผิดพลาด: ';
   static const String authErrorGeneric = 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง';
+  // ADR-0021 D3 — the one code whose error banner gets a button
+  // (AuthErrorBanner gates this on `code`, not on which screen shows it).
+  static const String authRetryButton = 'ลองใหม่';
   static const String authErrorNetwork =
       'เชื่อมต่อเครือข่ายไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ต';
   static const String authErrorServer =
@@ -95,7 +119,11 @@ abstract final class AppStrings {
   // login attempts and too-many SMS sends.
   static const String authErrorTooManyRequests =
       'ทำรายการบ่อยเกินไป กรุณาลองใหม่ภายหลัง';
-  static const String authErrorEmailAlreadyInUse = 'อีเมลนี้ถูกใช้สมัครแล้ว';
+  // ADR-0021 D2 — this address already has an account (verified or not); the
+  // fix is to log in with it, not create a second one, so the message points
+  // there instead of just stating the fact.
+  static const String authErrorEmailAlreadyInUse =
+      'อีเมลนี้มีบัญชีอยู่แล้ว กรุณาเข้าสู่ระบบแทน';
   static const String authErrorWeakPassword = 'รหัสผ่านคาดเดาง่ายเกินไป';
   static const String authErrorOperationNotAllowed =
       'ยังไม่เปิดใช้งานวิธีเข้าสู่ระบบนี้';
@@ -114,7 +142,7 @@ abstract final class AppStrings {
       'ยืนยันตัวตนไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
   static const String authErrorCredentialAlreadyInUse =
       'หมายเลขนี้ถูกใช้กับบัญชีอื่นแล้ว';
-  // Firebase (social — Google/Apple) codes → Thai.
+  // Firebase (social — Google) codes → Thai.
   static const String authErrorAccountExistsWithDifferentCredential =
       'อีเมลนี้เคยสมัครไว้ด้วยวิธีอื่นแล้ว กรุณาเข้าสู่ระบบด้วยวิธีเดิม';
 

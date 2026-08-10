@@ -32,7 +32,14 @@ class GoogleSignInDataSourceImpl implements GoogleSignInDataSource {
     try {
       final account = await GoogleSignIn.instance.authenticate();
       final googleIdToken = account.authentication.idToken;
-      if (googleIdToken == null) {
+      // Empty string, not just null — the same trap documented on every
+      // other provider in this feature (`getIdToken()` can resolve to `''`,
+      // which used to sail through and get POSTed as `{"id_token": ""}`,
+      // tripping the backend's Pydantic `min_length=1` with a 422 that
+      // looked like any other failure). This datasource used to check
+      // `== null` only, on *both* the Google token below and the Firebase
+      // one further down.
+      if (googleIdToken == null || googleIdToken.isEmpty) {
         throw const AuthException(code: 'missing_id_token');
       }
 
@@ -41,7 +48,7 @@ class GoogleSignInDataSourceImpl implements GoogleSignInDataSource {
         credential,
       );
       final firebaseIdToken = await userCredential.user?.getIdToken();
-      if (firebaseIdToken == null) {
+      if (firebaseIdToken == null || firebaseIdToken.isEmpty) {
         throw const AuthException(code: 'missing_id_token');
       }
       return firebaseIdToken;
@@ -59,6 +66,20 @@ class GoogleSignInDataSourceImpl implements GoogleSignInDataSource {
       throw AuthException(
         code: e.code,
         debugDetail: logDebugDetail(e.message, source: 'google_signin'),
+      );
+    } on AuthException {
+      rethrow;
+    } catch (e) {
+      // Same trailing guard every other data source in this feature has
+      // (`add-feature-slice` skill's "error with no code" gotcha) — this one
+      // used to be missing it, so anything besides
+      // GoogleSignInException/FirebaseAuthException (a plugin-channel
+      // failure, say) escaped uncaught and reached the UI as a bare object
+      // with no code to display. `code` is fixed, never composed from
+      // `e.runtimeType` (ADR-0017 D6); the type still goes to `debugDetail`.
+      throw AuthException(
+        code: 'google_signin_unexpected',
+        debugDetail: logDebugDetail(e.toString(), source: 'google_signin'),
       );
     }
   }

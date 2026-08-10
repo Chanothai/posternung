@@ -57,9 +57,6 @@ class FakeAuthViewModel extends AuthViewModel {
   Future<void> signInWithGoogle() async {}
 
   @override
-  Future<void> signInWithApple() async {}
-
-  @override
   Future<PhoneVerificationResult?> sendPhoneCode(
     String phoneNumber, {
     int? resendToken,
@@ -274,6 +271,74 @@ void main() {
       expect(capturedCodes, ['472019', '111111']);
     },
   );
+
+  group('ADR-0021 D3 — the error banner\'s retry button (code-critic GATE 3 '
+      'round 1: this screen was the one D3 missed the first time round)', () {
+    testWidgets(
+      'appears for OAUTH_LOGIN_CONFLICT, keeps the entered code (unlike '
+      'every other error) since it was not wrong, and re-runs confirmPhoneCode '
+      'with that same code on tap',
+      (tester) async {
+        final capturedCodes = <String>[];
+        await tester.pumpWidget(
+          wrapPushed(
+            confirmPhoneCodeErrorToThrow: const AuthException(
+              code: 'OAUTH_LOGIN_CONFLICT',
+            ),
+            onConfirmPhoneCode: (_, code) => capturedCodes.add(code),
+          ),
+        );
+
+        await tester.tap(find.text('root'));
+        await tester.pumpAndSettle();
+
+        await tester.enterText(find.byType(TextField), '472019');
+        await tester.pumpAndSettle();
+
+        expect(capturedCodes, ['472019']);
+        expect(
+          find.text('${AppStrings.authErrorCodeLabel}OAUTH_LOGIN_CONFLICT'),
+          findsOneWidget,
+        );
+        // The digits are still in the (invisible) capture field — not
+        // cleared like a wrong code would be. Proven behaviorally below:
+        // if it had been cleared, retry would resubmit an empty smsCode.
+        final retry = find.text(AppStrings.authRetryButton);
+        expect(retry, findsOneWidget);
+        await tester.tap(retry);
+        await tester.pumpAndSettle();
+
+        expect(
+          capturedCodes,
+          ['472019', '472019'],
+          reason:
+              'retry must resubmit the same (correct) code, not an '
+              'empty one',
+        );
+      },
+    );
+
+    testWidgets(
+      'does NOT appear for an ordinary wrong-code failure, which still '
+      'clears the field as before',
+      (tester) async {
+        await tester.pumpWidget(
+          wrapPushed(
+            confirmPhoneCodeErrorToThrow: const AuthException(
+              code: 'invalid-verification-code',
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('root'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), '472019');
+        await tester.pumpAndSettle();
+
+        expect(find.text(AppStrings.authRetryButton), findsNothing);
+      },
+    );
+  });
 
   testWidgets('tapping resend after the countdown calls sendPhoneCode again', (
     tester,

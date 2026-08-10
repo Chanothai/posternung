@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/router/app_navigation.dart';
+import '../../../../core/router/app_routes.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../auth_error_display.dart';
-import '../auth_flow_navigation.dart';
 import '../providers/auth_providers.dart';
+import '../providers/email_verification_flow_provider.dart';
 import '../widgets/auth_email_field.dart';
 import '../widgets/auth_error_banner.dart';
 import '../widgets/auth_nav_link_row.dart';
@@ -18,7 +20,7 @@ import '../widgets/auth_primary_button.dart';
 import '../widgets/auth_scaffold.dart';
 
 /// Register screen — email/password account creation, split out of
-/// [LoginScreen]. Same theme as login, but no Google/Apple buttons: social
+/// [LoginScreen]. Same theme as login, but no Google button: social
 /// sign-in already creates an account on first use, so it has no separate
 /// "register" step.
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -53,7 +55,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         .signUp(email: email, password: password);
 
     if (!mounted) return;
-    if (!ref.read(authViewModelProvider).hasError) completeAuthFlow(context);
+    if (ref.read(authViewModelProvider).hasError) return;
+
+    // ADR-0021 D2 — a successful signUp only creates the Firebase account
+    // and sends a verification email; it does not establish a backend
+    // session (the `password` provider 403s on an unverified email), so the
+    // destination here is the verification screen, not `completeAuthFlow`.
+    ref
+        .read(emailVerificationFlowProvider.notifier)
+        .start(EmailVerificationFlowState(email: email, justSentEmail: true));
+    await context.push(AppRoutes.emailVerificationPath);
+    // Same reasoning as every other push-then-clear in this feature: back
+    // from verification without completing it must not leave this screen
+    // showing a stale error.
+    if (!mounted) return;
+    ref.read(authViewModelProvider.notifier).clearError();
   }
 
   void _toggleObscurePassword() =>
