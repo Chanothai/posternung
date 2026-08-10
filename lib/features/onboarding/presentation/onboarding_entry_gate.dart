@@ -44,18 +44,32 @@ import 'screens/onboarding_page_view_screen.dart';
 ///   like every other auth screen (ADR-0017 / INF-20). This gate must not
 ///   grow a second, parallel way to say the same thing.
 ///
-/// 🔴 **`error` is not the offline path, despite the name.** Verified on
-/// riverpod 3.3.2: when an `AsyncNotifier.build()` throws, Riverpod retries
-/// it on its own, and while that ladder runs the state is
-/// `AsyncLoading(hasError: true)` — not `AsyncError`. `.when` reports that as
-/// `loading`, so a restore that keeps failing never reaches `error:` at all;
-/// it sits in `loading` until the retries stop. What actually gets an offline
-/// user into the app is therefore the D8 deadline, not this branch — the
-/// branch is for a session that has failed terminally. Both roads are
-/// covered separately in `onboarding_session_entry_test.dart`, and they are
-/// separate on purpose: a single test would pass on whichever one happened to
-/// win. (`AuthGate` has the same shape and the same blind spot at `/home`;
-/// that is pre-existing and out of this round's scope.)
+/// 🔴 **`error` is not the offline path, despite the name — and neither is
+/// the deadline.** Measured on a device 2026-08-11, wi-fi and data both off
+/// with a valid token stored: the user reaches the intro **1362 ms** after
+/// the first frame, well inside the 2 s deadline, and the log shows exactly
+/// one `/auth/me` attempt — no `/auth/refresh`, no retries. The road taken is
+/// `data:`, not `error:` and not the timer.
+///
+/// That is [BackendSessionNotifier] doing its job: `_restore()` catches
+/// `network_error`/`server_error` and returns `null` rather than rethrowing,
+/// deliberately leaving the tokens on disk for a later launch. `build()`
+/// therefore never throws, so none of what follows is even reached on this
+/// path.
+///
+/// What follows is still true, and is why `error:` stays thin: when an
+/// `AsyncNotifier.build()` *does* throw, riverpod 3.3.2 retries it on its own,
+/// and while that ladder runs the state is `AsyncLoading(hasError: true)` —
+/// not `AsyncError`. `.when` reports that as `loading`, so a restore that
+/// keeps failing sits in `loading` until the retries stop. `error:` is for a
+/// session that has failed terminally, which is a narrower case than its name
+/// suggests. (`AuthGate` has the same shape and the same blind spot at
+/// `/home`; pre-existing, tracked as a gap on SCR-02.)
+///
+/// The deadline earns its keep on a different case than the one it was
+/// written for: **slow but successful**. Both roads are covered separately in
+/// `onboarding_session_entry_test.dart`, on purpose — a single test would
+/// pass on whichever one happened to win.
 class OnboardingEntryGate extends ConsumerStatefulWidget {
   const OnboardingEntryGate({super.key});
 
