@@ -4,6 +4,7 @@ import 'package:posternung/core/catalog/poster_condition_grade.dart';
 import 'package:posternung/core/strings/app_strings.dart';
 import 'package:posternung/features/poster/domain/entities/poster_detail.dart';
 import 'package:posternung/features/poster/domain/entities/poster_image.dart';
+import 'package:posternung/features/poster/domain/entities/poster_image_kind.dart';
 import 'package:posternung/features/poster/domain/entities/poster_status.dart';
 import 'package:posternung/features/poster/presentation/widgets/poster_detail_image_gallery.dart';
 
@@ -38,6 +39,34 @@ void main() {
           sortOrder: i,
         ),
     ],
+    createdAt: DateTime.utc(2024),
+    posterType: null,
+    releaseRegion: null,
+    releaseDateText: null,
+    releaseDate: null,
+    copyrightYear: null,
+    sizeFormat: null,
+    year: null,
+    restorationStatus: null,
+    restorationNote: null,
+  );
+
+  PosterDetail posterWithImages(List<PosterImage> images) => PosterDetail(
+    id: 'p1',
+    title: 'Blade Runner',
+    price: '450.00',
+    status: PosterStatus.available,
+    conditionGrade: PosterConditionGrade.veryGood,
+    eraDecade: 1982,
+    studio: 'Warner Bros',
+    primaryImageUrl: null,
+    tmdbId: 78,
+    size: '27x41 in',
+    description: 'US theatrical one-sheet.',
+    isAuthenticated: true,
+    authenticityNote: 'Verified by in-house expert.',
+    provenance: 'Estate collection, Los Angeles.',
+    images: images,
     createdAt: DateTime.utc(2024),
     posterType: null,
     releaseRegion: null,
@@ -256,5 +285,180 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.widget<PageView>(find.byType(PageView)).controller?.page, 1);
+  });
+
+  group('ADR-0026 Amendment §A-D9 — the gallery actually calls '
+      'orderPosterGalleryImages, not just a function that exists unused', () {
+    // Reads the URL `Image.network` for the *first* rendered page — this
+    // is what proves the ordering function is wired into `build()` and
+    // not just unit-tested in isolation (code-critic's mutation "M4":
+    // reverting `build()` to sort inline would leave this red while
+    // `poster_gallery_order_test.dart` stays green).
+    String firstRenderedImageUrl(WidgetTester tester) {
+      final image = tester.widgetList<Image>(find.byType(Image)).first;
+      return (image.image as NetworkImage).url;
+    }
+
+    testWidgets(
+      'a wrong primary (isPrimary: true, kind: BACK) does not lead the '
+      'carousel — the real FRONT image renders first instead',
+      (tester) async {
+        const wrongPrimary = PosterImage(
+          id: 'wrong-primary',
+          url: 'https://example.invalid/wrong-primary.jpg',
+          isPrimary: true,
+          kind: PosterImageKind.back,
+          sortOrder: 100,
+        );
+        const front = PosterImage(
+          id: 'front',
+          url: 'https://example.invalid/front.jpg',
+          isPrimary: false,
+          kind: PosterImageKind.front,
+          sortOrder: 0,
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: SizedBox(
+                  width: 300,
+                  child: PosterDetailImageGallery(
+                    poster: posterWithImages([wrongPrimary, front]),
+                    zoomController: PosterGalleryZoomController(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(tester.takeException(), isNull);
+        expect(
+          firstRenderedImageUrl(tester),
+          'https://example.invalid/front.jpg',
+        );
+        // The wrongly-primaried image is demoted, never dropped (D6
+        // beats D9's old wording) — closed-world: both images still
+        // build into the carousel.
+        final pageView = tester.widget<PageView>(find.byType(PageView));
+        expect(
+          (pageView.childrenDelegate as SliverChildBuilderDelegate).childCount,
+          2,
+        );
+      },
+    );
+
+    testWidgets('no FRONT image at all: every image still shows in a real '
+        'carousel — no placeholder is shown when there are real images to '
+        'display (D6 wins over the literal old D9 wording)', (tester) async {
+      const back = PosterImage(
+        id: 'back',
+        url: 'https://example.invalid/back.jpg',
+        isPrimary: false,
+        kind: PosterImageKind.back,
+        sortOrder: 100,
+      );
+      const defect = PosterImage(
+        id: 'defect',
+        url: 'https://example.invalid/defect.jpg',
+        isPrimary: false,
+        kind: PosterImageKind.defect,
+        sortOrder: 200,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 300,
+                child: PosterDetailImageGallery(
+                  poster: posterWithImages([defect, back]),
+                  zoomController: PosterGalleryZoomController(),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(PageView), findsOneWidget);
+      expect(firstRenderedImageUrl(tester), 'https://example.invalid/back.jpg');
+      // Both images are built into the real carousel (not the
+      // no-image `_ImagePlaceholder` path, which never builds a
+      // `PageView` at all — see `build()`'s `urls.isEmpty` branch) —
+      // closed-world: exactly 2 items, none dropped.
+      final pageView = tester.widget<PageView>(find.byType(PageView));
+      expect(
+        (pageView.childrenDelegate as SliverChildBuilderDelegate).childCount,
+        2,
+      );
+    });
+
+    // H-1: the "wrong primary" case above always had its real FRONT image
+    // already sort_order-first (sortOrder: 0), so it never actually
+    // exercised rule 2b's hoist — it only exercised rule 2a's isPrimary
+    // check. This one puts the real FRONT *behind* a BACK image by
+    // sort_order, which is the only shape that proves the widget's build()
+    // actually hoists, not just that it sorts by sort_order.
+    testWidgets(
+      'a FRONT image that sorts behind a BACK image by sort_order is still '
+      'the first page rendered — proves the hoist, not just the sort',
+      (tester) async {
+        const backLeadsBySortOrder = PosterImage(
+          id: 'back-leads-by-sort-order',
+          url: 'https://example.invalid/back-leads.jpg',
+          isPrimary: false,
+          kind: PosterImageKind.back,
+          sortOrder: 5,
+        );
+        const frontTrailsBySortOrder = PosterImage(
+          id: 'front-trails-by-sort-order',
+          url: 'https://example.invalid/front-trails.jpg',
+          isPrimary: false,
+          kind: PosterImageKind.front,
+          sortOrder: 50,
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: SizedBox(
+                  width: 300,
+                  child: PosterDetailImageGallery(
+                    poster: posterWithImages([
+                      backLeadsBySortOrder,
+                      frontTrailsBySortOrder,
+                    ]),
+                    zoomController: PosterGalleryZoomController(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(tester.takeException(), isNull);
+        expect(
+          firstRenderedImageUrl(tester),
+          'https://example.invalid/front-trails.jpg',
+          reason:
+              'plain sort_order order renders BACK first — the hoist '
+              'must move FRONT to lead regardless',
+        );
+        final pageView = tester.widget<PageView>(find.byType(PageView));
+        expect(
+          (pageView.childrenDelegate as SliverChildBuilderDelegate).childCount,
+          2,
+        );
+      },
+    );
   });
 }
