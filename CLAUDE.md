@@ -144,7 +144,27 @@ When Claude presents an implementation plan (plan mode or otherwise), render it 
 - **blue** — modified files
 - **green** — added files
 
-Don't produce a polished markdown plan document as an additional user-facing deliverable alongside the HTML — the HTML artifact is the plan.
+🔴 **A GATE of `/feature` ships BOTH — the HTML artifact and a `.md` file with equivalent
+content, never one or the other** (owner's decision 2026-08-15). The `.md` lives at
+`../workspace/docs/status/gates/<id>-gate<N>.md` next to the `.html` of the same name; that
+folder is gitignored and is deleted once the ticket closes, because it is nobody's source of
+truth — decisions live in `docs/adr/`, scope and gaps in `screens.yaml`, debt in `BACKLOG.md`.
+Write the `.md` as full equivalent content, not a summary: the AC table, real run output,
+`known_gaps`, and the registry changes must all be there, so the story can be reassembled
+without opening the HTML.
+
+**Why both:** the HTML reads better while deciding, but it can't be grepped, can't be diffed,
+and can't be opened from another machine or pasted into another tool.
+
+‹✏️ Corrected 2026-08-16 at GATE 1 of `/feature INF-29`. This paragraph used to read *"Don't
+produce a polished markdown plan document as an additional user-facing deliverable alongside
+the HTML — the HTML artifact is the plan"*, which contradicted the 2026-08-15 decision head-on
+and had been doing so at every GATE since. The file is what agents read; a file that says the
+opposite of what the owner asked for is worse than no rule at all.›
+
+Outside a `/feature` GATE — a one-off plan in plan mode, an ad-hoc proposal — the HTML artifact
+alone is still the right answer. The `.md` requirement is about the GATE record, not about
+every plan.
 
 ## Scoped files index
 
