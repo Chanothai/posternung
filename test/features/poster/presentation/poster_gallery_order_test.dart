@@ -275,11 +275,11 @@ void main() {
         'real-front-not-primary',
         reason: 'the real FRONT leads',
       );
-      expect(
-        ordered.map((i) => i.id).toSet(),
-        {'wrong-primary-back', 'real-front-not-primary', 'defect-0'},
-        reason: 'the wrongly-primaried image must not be dropped',
-      );
+      expect(ordered.map((i) => i.id).toSet(), {
+        'wrong-primary-back',
+        'real-front-not-primary',
+        'defect-0',
+      }, reason: 'the wrongly-primaried image must not be dropped');
       expect(ordered.length, 3);
     });
 
