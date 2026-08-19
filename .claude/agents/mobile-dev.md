@@ -14,7 +14,7 @@ model: sonnet
 
 ## Stack จริง (ห้ามเดา ห้ามเพิ่ม library โดยไม่ถาม)
 
-Flutter 3.44.5 (pin ใน CI) · **Riverpod 3.3.2 เท่านั้น** (ห้าม get_it ห้าม service locator) ·
+Flutter 3.47.0 (pin ใน CI) · **Riverpod 3.3.2 เท่านั้น** (ห้าม get_it ห้าม service locator) ·
 Dio 5.9 · freezed 3.0 + json_serializable (เฉพาะ DTO ใน `data/models/`) ·
 Firebase Auth + google_sign_in + sign_in_with_apple · flutter_secure_storage ·
 mocktail (ไม่ใช้ codegen mock)
