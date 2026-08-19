@@ -13,8 +13,10 @@ is already shared: SCR-03's screen state lives in `features/home/` but reads
 ```
 domain/
   entities/       # PosterDetail, PosterSummary, PaginatedPosters,
-                  # PosterImage, PosterStatus (+
-                  # posterStatusFromApi). PosterConditionGrade itself is
+                  # PosterImage, PosterStatus (+ posterStatusFromApi),
+                  # PosterImageKind (ADR-0026 D1 — FRONT/BACK/DEFECT + the
+                  # posterImageKindFromApi degrade-to-null mapper, same
+                  # pattern as posterStatusFromApi). PosterConditionGrade itself is
                   # NOT here — it lives in core/catalog/ so the shared
                   # core/widgets/condition_grade_indicator.dart can be typed
                   # against it without core importing features/ (see
@@ -67,6 +69,19 @@ presentation/
                   # ต้องเป็น `e.displayMessage` เท่านั้น — slot นั้นเป็น
                   # positional จึงมีเทสสแกนคุมไว้แยกต่างหาก
                   # (`test/core/error_message_safety_test.dart`).
+  poster_gallery_order.dart
+                  # orderPosterGalleryImages() — a pure function, not a
+                  # widget, so it sits directly under presentation/ rather
+                  # than presentation/widgets/ (that folder is for
+                  # feature-local widgets, per the root CLAUDE.md — same
+                  # precedent as catalog_error_display.dart above). Sorts
+                  # PosterDetail.images by sort_order and hoists the FRONT
+                  # image to lead (ADR-0026 Amendment §A-D9 (2)); never
+                  # drops an image, never sorts by kind. Called from
+                  # widgets/poster_detail_image_gallery.dart's `_urls`
+                  # getter — see that function's own doc comment for the
+                  # full rule set and the 2026-08-16 dev-DB measurement that
+                  # confirms it's currently a no-op on real data.
   providers/      # poster_providers.dart — DI chain (datasource →
                   # repository → usecases: getPosterDetailProvider,
                   # getPostersProvider) + PosterDetailViewModel, an

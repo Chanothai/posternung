@@ -9,6 +9,7 @@ import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../domain/entities/poster_detail.dart';
+import '../poster_gallery_order.dart';
 
 /// AC-1: a zoomable image carousel — `InteractiveViewer` (framework-native
 /// pinch-to-zoom, no new dependency per ADR-0005) inside a `PageView`, plus
@@ -199,16 +200,14 @@ class _PosterDetailImageGalleryState extends State<PosterDetailImageGallery>
     _animateZoomTo(_zoomedInMatrix(focus ?? centre));
   }
 
-  /// Sorted by `sort_order`, primary first when `sort_order` ties — falls
-  /// back to a single-item list built from `primary_image_url` when
+  /// Ordered by [orderPosterGalleryImages] (ADR-0026 Amendment §A-D9 (2)) —
+  /// falls back to a single-item list built from `primary_image_url` when
   /// `images` is empty but that field is set (both being empty/null is the
-  /// "no image at all" case handled by [build]).
+  /// "no image at all" case handled by [build]). On real data this is
+  /// identical to the old plain `(isPrimary, sortOrder)` sort it replaced —
+  /// see that function's doc comment for why.
   List<String> get _urls {
-    final images = [...widget.poster.images]
-      ..sort((a, b) {
-        if (a.isPrimary != b.isPrimary) return a.isPrimary ? -1 : 1;
-        return a.sortOrder.compareTo(b.sortOrder);
-      });
+    final images = orderPosterGalleryImages(widget.poster.images);
     if (images.isNotEmpty) return images.map((i) => i.url).toList();
     final primary = widget.poster.primaryImageUrl;
     return primary == null ? const [] : [primary];
