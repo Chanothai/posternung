@@ -6,7 +6,9 @@ description: >
   กดหน้าจอ, แล้วเก็บกวาด. ใช้ skill นี้เมื่อจะ reproduce บั๊กบนอุปกรณ์จริง, ต้องพิสูจน์ว่า
   งานที่แก้ไปใช้ได้จริงไม่ใช่แค่ unit test เขียว, ต้องทดสอบปุ่ม back ของ Android,
   ผู้ใช้ขอให้ "ลองบนเครื่อง"/"รันดูหน่อย", หรือเจอ Xcode build failed / concurrent builds /
-  emulator บูตไม่ขึ้น / build ค้างไม่มี output — ใช้แม้ผู้ใช้จะไม่พูดคำว่า skill
+  emulator บูตไม่ขึ้น / build ค้างไม่มี output / **`ADB exited with exit code 1` หรือ
+  `INSTALL_FAILED_USER_RESTRICTED` ตอนลงเครื่อง Xiaomi-MIUI** — ใช้แม้ผู้ใช้จะไม่พูดคำว่า skill
+  · 🔴 ใช้เมื่อผู้ใช้บอกว่า "build ไม่ได้" ด้วย เพราะข้อความของขั้น *ติดตั้ง* อ่านเหมือน build พัง (§8)
 ---
 
 # รันและ verify บนอุปกรณ์จริง (PosterNung)
@@ -115,6 +117,8 @@ ps aux | grep "flutter run --flavor sit -d <udid>" | grep -v grep | awk '{print 
 | กด "ถัดไป"/"ข้าม" แล้วหน้าจอไม่ขยับ | hit-test บนพื้น gradient ไม่ติด | swipe แทน (§4) |
 | แอปเปิดมาเข้า Home เลยทั้งที่ยังไม่ล็อกอิน | token เก่ายังอยู่ใน secure storage → `_restore()` ยิง `/auth/me` สำเร็จ | ไม่ใช่บั๊ก ถ้าจะเทสต์ล็อกอินใหม่ต้อง sign out ก่อน |
 | `timeout 90 flutter ...` ไม่ทำงาน | macOS ไม่มี `timeout` (เป็นของ GNU coreutils) | ใช้ timeout ของ Bash tool แทน |
+| `flutter run` จบด้วย **`Error: ADB exited with exit code 1`** + `INSTALL_FAILED_USER_RESTRICTED: Install canceled by user` | 🔴 **ไม่ใช่ build พัง — build สำเร็จไปแล้ว** (`✓ Built app-sit-debug.apk` ขึ้นก่อนหน้า) ที่ล้มคือขั้น *ติดตั้ง* · MIUI เด้ง dialog ขออนุญาตทุกครั้งที่ `adb install` ถ้าจอล็อกอยู่ตอนนั้นมันยกเลิกเอง ⇒ คำว่า "canceled by user" แปลว่า **ระบบยกเลิกแทน** ไม่ได้แปลว่าคนกดยกเลิก | §8 |
+| `adb shell settings put ...` ตอบ `SecurityException: requires android.permission.WRITE_SECURE_SETTINGS` **ทั้งที่ `dumpsys package com.android.shell` เขียนว่า `WRITE_SECURE_SETTINGS: granted=true`** | 🔴 **MIUI ซ้อนด่านของตัวเองทับ permission ของ AOSP** — permission ถูก grant จริงแต่ MIUI ปฏิเสธการเขียนอยู่ดีเมื่อ *USB debugging (Security settings)* ปิด | §8 · 🔴 **ห้ามใช้ `dumpsys` เป็นหลักฐานว่าเขียน secure settings ได้บนเครื่อง Xiaomi** — มันตอบ granted=true ทั้งที่เขียนไม่ได้ |
 
 ## 7. Android emulator
 
@@ -203,6 +207,110 @@ emulator กิน RAM หลาย GB บนเครื่องที่ swap
 
 Apple Sign-In · gesture back (ปัดขอบจอ ไม่ใช่ปุ่ม back) · พฤติกรรม ATS/keychain ·
 ทุกอย่างที่ AC เขียนว่า iOS ตรง ๆ — **งานพวกนี้ยังติด INF-16 อยู่จริง**
+
+## 8. Android เครื่องจริงที่เป็น Xiaomi / MIUI — ด่านที่ไม่เหมือนเครื่องอื่น
+
+‹บันทึก 2026-09-10 · เจอจริงบน **Redmi Note 9 (`M2003J15SC`) · MIUI `V13.0.2.0.SJOMIXM` · Android 12**›
+
+**อาการที่ผู้ใช้เห็น** คือข้อความที่อ่านแล้วเข้าใจว่า build พัง:
+
+```
+Error: ADB exited with exit code 1
+adb: failed to install .../app-sit-debug.apk:
+  Failure [INSTALL_FAILED_USER_RESTRICTED: Install canceled by user]
+Error launching application on M2003J15SC.
+```
+
+🔴 **build ไม่ได้พัง** — บรรทัด `✓ Built build/app/outputs/flutter-apk/app-sit-debug.apk`
+ขึ้นไปก่อนหน้านั้นแล้ว · รอบที่เจอจริง ตรวจครบทุกเส้นแล้วเขียวหมด:
+`flutter build apk --flavor sit` · `flutter build ios --flavor sit` (ทั้ง device และ
+`--simulator`) · `analyze --fatal-infos` · `flutter test` · `dart format` — **exit 0 ทั้งหมด**
+
+**อย่าเริ่มไล่จากโค้ดหรือ Gradle** ให้แยกสองขั้นออกจากกันก่อนเสมอ:
+
+```bash
+flutter build apk --flavor sit --debug          # ขั้น build — ถ้าผ่าน ปัญหาไม่ได้อยู่ที่นี่
+adb install -r -t build/app/outputs/flutter-apk/app-sit-debug.apk   # ขั้น install
+```
+
+### 8.1 ทำไมมันล้มเป็นระยะ ไม่ใช่ทุกครั้ง
+
+MIUI เด้ง dialog ขออนุญาตติดตั้งบนหน้าจอมือถือทุกครั้งที่ `adb install`
+**ถ้าจอดับ/ล็อกอยู่ตอนนั้น dialog ถูกยกเลิกอัตโนมัติ** แล้วคืนค่า `INSTALL_FAILED_USER_RESTRICTED`
+
+ตัวเร่งที่ทำให้เกิดซ้ำ ๆ คือค่านี้:
+
+```bash
+adb shell settings get global stay_on_while_plugged_in    # 0 = จอดับเองแม้เสียบสายอยู่
+```
+
+Gradle build กิน **13–70 วินาที** — นานพอให้จอดับไปแล้วก่อน `adb install` จะยิง
+⇒ **build นานเท่าไร โอกาสตกยิ่งสูง** และมันดูเหมือนสุ่มทั้งที่ไม่สุ่ม
+
+รอบที่เจอจริง: สั่ง `adb install` ซ้ำตอนจอเปิดอยู่ **โดยไม่ได้แก้ค่าอะไรบนเครื่องเลย →
+`Success` ทันที** — นั่นคือหลักฐานว่าไม่ใช่ปัญหาของ APK
+
+### 8.2 🔴 แก้ผ่าน adb ไม่ได้ และ `dumpsys` จะโกหกคุณ
+
+```bash
+adb shell settings put global stay_on_while_plugged_in 7
+# → java.lang.SecurityException: Permission denial:
+#   writing to settings requires:android.permission.WRITE_SECURE_SETTINGS
+```
+
+แต่:
+
+```bash
+adb shell dumpsys package com.android.shell | grep WRITE_SECURE_SETTINGS
+# → android.permission.WRITE_SECURE_SETTINGS: granted=true
+```
+
+**สองอย่างนี้ขัดกันและทั้งคู่พูดจริง** — permission ถูก grant ในระดับ AOSP จริง แต่ MIUI
+มีด่านของตัวเองซ้อนอยู่บน `SettingsProvider` ซึ่งผูกกับตัวเลือก
+*USB debugging (Security settings)* ที่ปิดอยู่
+
+🔴 **บทเรียนที่ใช้ได้กว้างกว่าเคสนี้: บนเครื่อง Xiaomi ห้ามใช้ `dumpsys` ยืนยันว่า adb
+ทำอะไรได้** — ต้องลองทำจริงแล้วดูผล การอ่านสถานะ permission ให้คำตอบที่ผิด
+
+### 8.3 ต้องกดบนมือถือ — เปิดหน้าให้เร็วด้วย intent
+
+```bash
+adb shell am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS
+```
+
+ในหน้านั้นเปิดสามอย่าง (ถ้ายังไม่เห็นเมนู: **การตั้งค่า → เกี่ยวกับโทรศัพท์ → กด MIUI
+version 7 ครั้ง**):
+
+| ตัวเลือก | แก้อะไร | ต้องมี Mi account ไหม |
+|---|---|---|
+| **เปิดหน้าจอค้างไว้** (Stay awake) | ตัวเร่งของ §8.1 — จอไม่ดับระหว่างบิลด์ | ไม่ต้อง |
+| **ติดตั้งผ่าน USB** (Install via USB) | ทำให้ `adb install` ไม่ต้องรอคนกด | ต้อง |
+| **USB debugging (Security settings)** | ปลดด่าน §8.2 · หลังเปิดแล้ว `adb shell settings put` ถึงจะทำงาน | ต้อง |
+
+เปิด *USB debugging (Security settings)* แล้วค่อยตั้งค่าที่เหลือด้วย adb ได้:
+
+```bash
+adb shell settings put global stay_on_while_plugged_in 7   # 7 = AC + USB + wireless · 0 = ปิด
+```
+
+### 8.4 ยืนยันว่าติดตั้งและเปิดได้จริง (ไม่ต้องเชื่อ `flutter run`)
+
+```bash
+adb shell pm list packages | grep posternung        # → package:com.frameshine.posternung.sit
+ACT=$(adb shell cmd package resolve-activity --brief \
+        -c android.intent.category.LAUNCHER com.frameshine.posternung.sit | tail -1)
+adb shell am start -n "$ACT"
+adb shell pidof com.frameshine.posternung.sit       # มี pid = แอปรันอยู่จริง
+```
+
+### 8.5 🔴 ทำไมเรื่องนี้สำคัญกับงานวัดผล
+
+`INF-40` ขั้น 2 และขั้น 6 ต้องรัน **cold start 20 รอบติดกัน** บนเครื่องนี้
+ถ้าจอดับกลางชุด รอบนั้นจะตกด้วยเหตุผลที่ **ไม่เกี่ยวกับสิ่งที่กำลังวัด** และแยกจาก
+"ตกเพราะ gate ตัดสินผิด" ไม่ได้เลยจาก log ⇒ **ต้องตั้ง §8.3 ให้ครบก่อนเริ่มนับ ไม่ใช่ระหว่างนับ**
+
+⚠️ และ **ห้าม `pm clear` ตลอดงานวัด** — รอบก่อนล้างไปแล้วสร้าง session ใหม่ไม่ได้เลย
+ทำให้ 4 เคสวัดไม่ได้ทั้งหมด (`project-gotchas` §8)
 
 ## เมื่อไหร่ควรอ่านต่อ
 
