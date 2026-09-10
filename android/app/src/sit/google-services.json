@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "533903881255-7c2re56cf6f77f053g9u76s85polomd7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.frameshine.posternung.sit",
+            "certificate_hash": "1bfd2ddefc5ee32fb0eb6d08158af85160fb025a"
+          }
+        },
+        {
           "client_id": "533903881255-5p17hb4knslqvno0htnc6t8rl8o4ooel.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -29,6 +37,13 @@
             {
               "client_id": "533903881255-5p17hb4knslqvno0htnc6t8rl8o4ooel.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "533903881255-bra0e4fdu2l7kba1hknq105uli8rb3vc.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.frameshine.posternung.sit"
+              }
             }
           ]
         }
