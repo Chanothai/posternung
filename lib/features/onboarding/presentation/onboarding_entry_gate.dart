@@ -110,14 +110,27 @@ class OnboardingEntryGate extends ConsumerStatefulWidget {
 
 /// Public only so a widget test can read [debugDeadlineIsActive].
 ///
-/// 🔴 INF-40 step 3. The alternative was a test that pumps past the deadline
-/// and asserts no `deadline_fired` line — **that test passes with the fix
-/// removed**, because in a widget test go_router disposes route `/` within
-/// the transition (~300 ms) and `dispose()` cancels the timer long before it
-/// could fire at 2 s. On a real device route `/` was still alive at t=2001 on
-/// every signed-in cold start, so the trace-only test would have been green
-/// on a defect that reproduces 20/20 in the field (`test-quality` §2 — a
-/// green that comes from the scenario never occurring proves nothing).
+/// 🔴 INF-40 step 3. The first test written for this pumped past the deadline
+/// and asserted that no `deadline_fired` line appeared — and **it passed with
+/// the fix removed**, so it proved nothing and was replaced by the invariant
+/// read below.
+///
+/// ‹🔴 Corrected 2026-09-15 by `code-critic`. This paragraph used to explain
+/// that failure as *"in a widget test go_router disposes route `/` within the
+/// transition (~300 ms) and `dispose()` cancels the timer long before it could
+/// fire at 2 s"* — stated as a general fact about widget tests, **which is
+/// false**, and the same sentence had already been copied into the `BL-130`
+/// row of `BACKLOG.md`. `onboarding_session_entry_test.dart` proves the
+/// opposite about 60 lines away: give the session until 1900 ms to answer and
+/// route `/` is still alive at t=2000, `deadline_fired mounted=true` really
+/// fires, and a behavioural test of exactly this defect is possible — that
+/// test exists and is green.›
+///
+/// What was actually true is narrower: **that** harness answered the session
+/// immediately, so `/` was disposed within the transition and the timer went
+/// with it. The scenario the assertion was about never occurred, which is the
+/// shape `test-quality` §2 warns about — a green that comes from the setup,
+/// not from the system.
 class OnboardingEntryGateState extends ConsumerState<OnboardingEntryGate> {
   Timer? _deadline;
 
