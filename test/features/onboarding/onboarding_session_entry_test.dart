@@ -460,35 +460,53 @@ void main() {
   );
 
   testWidgets(
-    'a restore that keeps failing (offline) — Riverpod 3 retries it in the '
-    'background, so the session never even reaches `error`: it stays '
-    'undecided, and what gets the user in is the D8 deadline',
+    'a restore that keeps failing (offline) reaches the user immediately — '
+    'the session lands on `error` and the gate decides there, without '
+    'spending the D8 deadline on a question already answered',
     (WidgetTester tester) async {
       final (GoRouter router, _) = await coldStart(
         tester,
         () async => throw const AuthException(code: 'network_error'),
       );
 
-      await tester.pump(const Duration(milliseconds: 1900));
-      expect(
-        find.byType(AppLoadingScreen),
-        findsOneWidget,
-        reason:
-            'this is the state the retry ladder actually leaves the app in — '
-            'if it is no longer a spinner here, the shape this test is about '
-            'has changed and the gate needs re-reading, not this number',
-      );
+      await tester.pump();
 
-      await tester.pump(const Duration(milliseconds: 200));
-
+      // 🔴 Rewritten 2026-09-15 with ADR-0036 **D2** (INF-40 step 4), which
+      // this test predicted in its own words: *"if it is no longer a spinner
+      // here, the shape this test is about has changed and the gate needs
+      // re-reading, not this number."* The shape changed.
+      //
+      // Before: `backendSessionProvider` retried a failing `build()` on
+      // Riverpod 3's own backoff ladder, so state stayed
+      // `AsyncLoading(error: …, retrying: true)` and the gate sat on a
+      // spinner until D8's 2s deadline fired. The user got in *via the
+      // deadline*, and the 1900/200 ms split below used to measure that.
+      //
+      // After: retry is off, the failure is a failure at once, and the gate
+      // takes its `error:` branch on the very next frame.
+      //
+      // 🔴 **This is the gate getting tighter, not looser** (INF-40 AC-6).
+      // The old path reached onboarding by *giving up on waiting*; this one
+      // reaches it by *knowing the session failed*. Nothing about the
+      // signed-in path moved, and no assertion here was weakened — the wait
+      // that was removed was a wait for an answer already in hand.
       expect(find.byType(OnboardingPageViewScreen), findsOneWidget);
       expect(
         find.byType(AppLoadingScreen),
         findsNothing,
         reason:
-            'the user is still watching a spinner with no network — the '
-            'complaint D8 was added to answer',
+            'a session that has already failed must not be shown as still '
+            'loading — the ~38s retry ladder that made it look that way is '
+            'exactly what ADR-0036 D2 turned off',
       );
+      expect(router.state.uri.toString(), AppRoutes.onboardingPath);
+
+      // And it really was the error branch, not the deadline: walking past
+      // D8's 2s must change nothing at all.
+      await tester.pump(
+        OnboardingEntryGate.sessionDeadline + const Duration(milliseconds: 200),
+      );
+      expect(find.byType(OnboardingPageViewScreen), findsOneWidget);
       expect(router.state.uri.toString(), AppRoutes.onboardingPath);
     },
   );

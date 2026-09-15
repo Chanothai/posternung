@@ -115,6 +115,15 @@ abstract final class AppStrings {
       'เชื่อมต่อเครือข่ายไม่สำเร็จ กรุณาตรวจสอบอินเทอร์เน็ต';
   static const String authErrorServer =
       'เซิร์ฟเวอร์ขัดข้อง กรุณาลองใหม่ภายหลัง';
+  // ADR-0036 D3 — shown by `AuthGate` when the session is still *pending*
+  // past its own 5s deadline: nothing has failed yet, so there is no error
+  // code to render and no `authErrorDisplayFor` mapping to reach for. The
+  // wording deliberately describes waiting, not failure, because the request
+  // really is still in flight — `api_client.dart`'s `receiveTimeout` is 20s
+  // and the session may still answer, in which case the user goes to /home
+  // (D3.1). It must not read as "you are signed out".
+  static const String authSessionSlowMessage =
+      'ใช้เวลานานกว่าปกติ กรุณาตรวจสอบอินเทอร์เน็ตของคุณ';
   // Firebase (email/password) codes → Thai.
   static const String authErrorInvalidEmail = 'อีเมลไม่ถูกต้อง';
   static const String authErrorUserDisabled = 'บัญชีนี้ถูกระงับการใช้งาน';

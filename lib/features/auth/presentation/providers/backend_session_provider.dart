@@ -283,4 +283,28 @@ class BackendSessionNotifier extends AsyncNotifier<AuthUser?> {
 final backendSessionProvider =
     AsyncNotifierProvider<BackendSessionNotifier, AuthUser?>(
       BackendSessionNotifier.new,
+      // 🔴 ADR-0036 **D2** — no automatic retry.
+      //
+      // Riverpod 3 retries a `build()` that throws on its own, with a
+      // backoff ladder that reached **~38 seconds** on the failing session
+      // path. Through the whole ladder the state is
+      // `AsyncLoading(error: …, retrying: true)` — **not** `AsyncError` — so
+      // any `.when()` that checks `isLoading` first keeps returning the
+      // spinner. The user sits in front of a spinner for over half a minute
+      // while the app already knows the session failed.
+      //
+      // This is the convention this repo already set, not a new policy:
+      // `poster_providers.dart:84` and `home_posters_provider.dart:167` both
+      // disable it, for this same reason.
+      //
+      // Wanted consequence, not a side effect: a `PlatformException` out of
+      // `flutter_secure_storage` now reaches the screen directly instead of
+      // vanishing into the ladder. Whether storage-unreadable *should* read
+      // as "error" or as "not signed in" is deliberately still open
+      // (ADR-0036 **OD-3**) — seeing it beats losing it either way.
+      //
+      // 🔴 This is **not** an app-wide `retry:` policy. `ProviderScope(retry:)`
+      // stays unset; that one belongs to INF-05/BL-58 per ADR-0023 D8.1, and
+      // INF-05 may absorb this line when it lands.
+      retry: (retryCount, error) => null,
     );

@@ -58,14 +58,26 @@ import 'screens/onboarding_page_view_screen.dart';
 /// therefore never throws, so none of what follows is even reached on this
 /// path.
 ///
-/// What follows is still true, and is why `error:` stays thin: when an
-/// `AsyncNotifier.build()` *does* throw, riverpod 3.3.2 retries it on its own,
-/// and while that ladder runs the state is `AsyncLoading(hasError: true)` —
-/// not `AsyncError`. `.when` reports that as `loading`, so a restore that
-/// keeps failing sits in `loading` until the retries stop. `error:` is for a
-/// session that has failed terminally, which is a narrower case than its name
-/// suggests. (`AuthGate` has the same shape and the same blind spot at
-/// `/home`; pre-existing, tracked as a gap on SCR-02.)
+/// 🔴 **‹Rewritten 2026-09-15 · ADR-0036 D2 · INF-40 step 4› The paragraph
+/// that stood here described a retry ladder that no longer runs.** It read:
+/// *"when an `AsyncNotifier.build()` does throw, riverpod 3.3.2 retries it on
+/// its own, and while that ladder runs the state is
+/// `AsyncLoading(hasError: true)` — not `AsyncError`. `.when` reports that as
+/// `loading`, so a restore that keeps failing sits in `loading` until the
+/// retries stop."* That was accurate, and it was the mechanism behind the
+/// ~38-second spinner at `/home` (symptom ③ of INF-40).
+///
+/// `backendSessionProvider` now sets `retry: (_, _) => null`, so a `build()`
+/// that throws reaches `AsyncError` on the next frame and `error:` below is
+/// taken straight away. A failing restore now lands the reader on the intro
+/// *immediately* instead of after the 2 s deadline — earlier than before, and
+/// for a better reason: because the session is known to have failed, not
+/// because waiting was given up on.
+///
+/// `AuthGate` no longer shares the blind spot either: it decides its error
+/// branch from `hasError` before `.when()` sees the state (ADR-0036 **D1**),
+/// and carries its own 5 s deadline for the *pending-forever* case (**D3**),
+/// which is the one thing `hasError` cannot see.
 ///
 /// The deadline earns its keep on a different case than the one it was
 /// written for: **slow but successful**. Both roads are covered separately in

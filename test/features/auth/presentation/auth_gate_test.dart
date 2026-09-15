@@ -112,7 +112,7 @@ void main() {
     },
   );
 
-  group('INF-40 step 5 (skipped until step 4 — ADR-0036 D1/D3/D3.1)', () {
+  group('INF-40 step 5 — ADR-0036 D1/D3/D3.1/D4', () {
     testWidgets(
       'INF-40 step 5 (ข) — AC-4(ข)/ADR-0036 D1: AuthGate must not read '
       'riverpod\'s own AsyncLoading(error:, retrying: true) ladder as a '
@@ -126,7 +126,6 @@ void main() {
             authViewModelProvider.overrideWith(_NoopAuthViewModel.new),
           ],
         );
-        addTearDown(container.dispose);
 
         await tester.pumpWidget(
           UncontrolledProviderScope(
@@ -154,10 +153,17 @@ void main() {
           findsOneWidget,
         );
         expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        // 🔴 Tear this fixture down inside the test, not in `addTearDown`.
+        // Retry is left **on** here on purpose — that is the whole point of
+        // `_retryingSessionProvider` — so riverpod has a backoff timer armed
+        // at all times, and `testWidgets` asserts no timer outlives the tree
+        // *before* `addTearDown` callbacks run. Disposing the container here
+        // cancels it. Pumping the timer out instead would only arm the next
+        // rung of the ladder, forever.
+        await tester.pumpWidget(const SizedBox.shrink());
+        container.dispose();
       },
-      // `testWidgets`'s `skip` is `bool?`, not a message — the reason:
-      // INF-40 ขั้น 3/4 ยังไม่ทำ — ปลด skip พร้อมกับการแก้.
-      skip: true,
     );
 
     testWidgets(
@@ -190,18 +196,16 @@ void main() {
         // riverpod's own retry ladder entirely, so this test isolates the
         // one variable ADR-0036 D3.1 is actually about: a session that
         // shows an error, sits past the gate's own deadline, and *then*
-        // resolves to a real user. `ADR-0036`'s own literal, 5 s, is
-        // deliberately not referenced as `AuthGate.sessionErrorDeadline`
-        // here — that constant does not exist in code yet, and referencing
-        // it directly would be a compile error breaking every test in this
-        // file, not just this skipped one.
+        // resolves to a real user.
         container
             .read(backendSessionProvider.notifier)
             .state = AsyncError<AuthUser?>(
           const AuthException(code: 'network_error'),
           StackTrace.current,
         );
-        await tester.pump(const Duration(milliseconds: 5000));
+        await tester.pump(
+          AuthGate.sessionErrorDeadline + const Duration(milliseconds: 500),
+        );
 
         container.read(backendSessionProvider.notifier).state =
             const AsyncData<AuthUser?>(AuthUser(uid: 'u1', email: 'a@b.co'));
@@ -211,7 +215,145 @@ void main() {
         expect(find.text('AUTHENTICATED-DESTINATION'), findsOneWidget);
         expect(find.byType(AuthErrorBanner), findsNothing);
       },
-      skip: true,
+    );
+    testWidgets(
+      'ADR-0036 D3 — a session that is still pending past the gate\'s own '
+      'deadline stops being a spinner and says so, with a way out',
+      (tester) async {
+        final container = ProviderContainer(
+          overrides: [
+            backendSessionProvider.overrideWith(_CountingNeverSession.new),
+            authViewModelProvider.overrideWith(_NoopAuthViewModel.new),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              home: AuthGate(
+                builder: (_) => const Text('AUTHENTICATED-DESTINATION'),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // Nothing has failed and nothing will — this is the "hangs but never
+        // throws" case, which `hasError` (D1) cannot see at all. Until the
+        // deadline the spinner is the honest answer.
+        expect(find.byType(CircularProgressIndicator), findsOneWidget);
+        expect(find.text(AppStrings.authSessionSlowMessage), findsNothing);
+
+        await tester.pump(
+          AuthGate.sessionErrorDeadline + const Duration(milliseconds: 1),
+        );
+
+        expect(find.text(AppStrings.authSessionSlowMessage), findsOneWidget);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(
+          find.widgetWithText(FilledButton, AppStrings.authSubmitLogin),
+          findsOneWidget,
+          reason: 'D4 — the way out is a way to sign in, and it must be there',
+        );
+
+        // 🔴 D3.1 — non-destructive. The deadline may show a message and
+        // nothing else: no signOut, no invalidate, no token clear, and the
+        // request still in flight. A rebuilt notifier would mean the gate
+        // threw the session away and started over, which is precisely the
+        // "slow network quietly becomes a logout" failure D3.1 forbids.
+        expect(
+          (container.read(backendSessionProvider.notifier)
+                  as _CountingNeverSession)
+              .buildCount,
+          1,
+          reason:
+              'the session notifier must not have been rebuilt — the deadline '
+              'changes what is on screen, never the session itself',
+        );
+      },
+    );
+
+    testWidgets(
+      'ADR-0036 D4 — the way out goes to LoginScreen, and the banner still '
+      'has no retry button (ADR-0021 D3 is untouched, not amended)',
+      (tester) async {
+        await tester.pumpWidget(
+          wrap(
+            session: AsyncError<AuthUser?>(
+              const AuthException(code: 'network_error'),
+              StackTrace.current,
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.byType(AuthErrorBanner), findsOneWidget);
+        expect(
+          find.widgetWithText(TextButton, AppStrings.authRetryButton),
+          findsNothing,
+          reason:
+              'ADR-0021 D3 ties the retry button to the 409 code; a session '
+              'error carries no HTTP code, so the rule never covered it and '
+              'nothing here may grow one (see ADR-0036 OD-2)',
+        );
+
+        await tester.tap(
+          find.widgetWithText(FilledButton, AppStrings.authSubmitLogin),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byType(LoginScreen), findsOneWidget);
+        expect(find.byType(AuthErrorBanner), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'ADR-0036 D3.1 — taking the way out does not strand a session that '
+      'arrives afterwards: the destination still wins',
+      (tester) async {
+        final container = ProviderContainer(
+          overrides: [
+            backendSessionProvider.overrideWith(_CountingNeverSession.new),
+            authViewModelProvider.overrideWith(_NoopAuthViewModel.new),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              home: AuthGate(
+                builder: (_) => const Text('AUTHENTICATED-DESTINATION'),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(
+          AuthGate.sessionErrorDeadline + const Duration(milliseconds: 1),
+        );
+        await tester.tap(
+          find.widgetWithText(FilledButton, AppStrings.authSubmitLogin),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(LoginScreen), findsOneWidget);
+
+        container.read(backendSessionProvider.notifier).state =
+            const AsyncData<AuthUser?>(AuthUser(uid: 'u1', email: 'a@b.co'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('AUTHENTICATED-DESTINATION'),
+          findsOneWidget,
+          reason:
+              'the reader pressed "sign in" because they could not get in; '
+              'the moment they can, keeping them on the login screen is the '
+              'same failure D3.1 describes, just reached by a different door',
+        );
+      },
     );
   });
 
@@ -288,4 +430,21 @@ class _RetryingSessionNotifier extends AsyncNotifier<AuthUser?> {
 class _NeverResolvingSession extends BackendSessionNotifier {
   @override
   Future<AuthUser?> build() => Completer<AuthUser?>().future;
+}
+
+/// Same "never answers" shape, plus a count of how many times `build()` ran.
+///
+/// The count is what makes ADR-0036 **D3.1** testable at all: "the deadline
+/// did not sign anyone out" is hard to assert directly, but every destructive
+/// option D3.1 forbids — `invalidate()`, `signOut()`, dropping the listener —
+/// ends in the notifier being rebuilt. A count that stays at 1 rules the whole
+/// family out at once.
+class _CountingNeverSession extends BackendSessionNotifier {
+  int buildCount = 0;
+
+  @override
+  Future<AuthUser?> build() {
+    buildCount++;
+    return Completer<AuthUser?>().future;
+  }
 }
