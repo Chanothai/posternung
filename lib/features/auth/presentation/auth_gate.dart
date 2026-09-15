@@ -46,12 +46,17 @@ class AuthGate extends ConsumerStatefulWidget {
   static const Duration sessionErrorDeadline = Duration(seconds: 5);
 
   @override
-  ConsumerState<AuthGate> createState() => AuthGateState();
+  ConsumerState<AuthGate> createState() => _AuthGateState();
 }
 
-/// Public only so a widget test can read [debugDeadlineIsActive] — the same
-/// reason, and the same shape, as `OnboardingEntryGateState`.
-class AuthGateState extends ConsumerState<AuthGate> {
+/// ‹🔴 Made private again 2026-09-15 by `code-critic`. It was briefly public,
+/// with a `@visibleForTesting debugDeadlineIsActive` getter, "so a widget test
+/// can read it" — **no test ever did.** `OnboardingEntryGateState` earns that
+/// exception because a test really does read its invariant and mutation (ก)
+/// dies because of it; this one bought nothing and widened `lib/`'s public
+/// surface on a claim that was untrue the day it was written. What this gate's
+/// deadline does is already covered behaviourally by the D3 / D3.1 tests.›
+class _AuthGateState extends ConsumerState<AuthGate> {
   Timer? _deadline;
 
   /// Whether the wait has already run past [AuthGate.sessionErrorDeadline].
@@ -72,11 +77,6 @@ class AuthGateState extends ConsumerState<AuthGate> {
   /// session that lands after the deadline still gets you in — holds whether
   /// or not this was pressed.
   bool _showLogin = false;
-
-  /// The invariant INF-40's deadline tests read, at the one instant it can be
-  /// read: while the gate is still mounted.
-  @visibleForTesting
-  bool get debugDeadlineIsActive => _deadline?.isActive ?? false;
 
   @override
   void initState() {
