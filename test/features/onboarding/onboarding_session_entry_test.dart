@@ -289,13 +289,11 @@ void main() {
       isNot(contains(onboardingControllerProvider)),
       reason:
           'the deadline fired a second decision after gate_go_home and '
-          'sent the user back to onboarding — the exact BL-130 shape. '
-          'Fixed by step 3 (_deadline?.cancel() in the same '
-          'addPostFrameCallback that calls context.go()), not yet done.',
+          'sent the user back to onboarding — the exact BL-130 shape, '
+          'closed by step 3: _deadline?.cancel() in the same '
+          'addPostFrameCallback that calls context.go()',
     );
-    // `testWidgets`'s `skip` is `bool?`, not a message — the reason lives
-    // here instead: INF-40 ขั้น 3/4 ยังไม่ทำ — ปลด skip พร้อมกับการแก้.
-  }, skip: true);
+  });
 
   testWidgets(
     'a valid token that answers *after* the deadline — the user gets the '
