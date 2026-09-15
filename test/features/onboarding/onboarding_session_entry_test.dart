@@ -251,6 +251,52 @@ void main() {
     },
   );
 
+  testWidgets('INF-40 step 5 (ก) — AC-4(ก): the deadline timer must not fire a '
+      'second decision after the gate has already decided to go home '
+      '(BL-130) — the exact 7/20 race the instrument was built to see', (
+    WidgetTester tester,
+  ) async {
+    final Completer<AuthUser?> justBeforeDeadline = Completer<AuthUser?>();
+    final (GoRouter router, _ProviderInitProbe probe) = await coldStart(
+      tester,
+      () => justBeforeDeadline.future,
+    );
+
+    // Harness self-check (owner's requirement, GATE plan §3(ก)) — if this
+    // doesn't find the gate, nothing below proves anything and the result
+    // must be reported as "cannot be proven this way", not as a pass.
+    expect(find.byType(OnboardingEntryGate), findsOneWidget);
+
+    // The session answers 100 ms before the 2 s deadline — close enough
+    // that the MaterialPage transition to /home is still in flight (gate
+    // still mounted) when the deadline timer fires, which is the race
+    // BL-130 recorded (gate_decision dest=home → gate_go_home →
+    // ~330-670 ms later, deadline_fired mounted=true).
+    await tester.pump(const Duration(milliseconds: 1900));
+    justBeforeDeadline.complete(signedIn);
+
+    // Cross the 2000 ms line in small steps rather than one big pump, so
+    // both the completed future's rebuild and the timer's callback get a
+    // chance to interleave instead of being coalesced into one frame.
+    for (int i = 0; i < 4; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pumpAndSettle();
+
+    expect(router.state.uri.toString(), AppRoutes.homePath);
+    expect(
+      probe.initialised,
+      isNot(contains(onboardingControllerProvider)),
+      reason:
+          'the deadline fired a second decision after gate_go_home and '
+          'sent the user back to onboarding — the exact BL-130 shape. '
+          'Fixed by step 3 (_deadline?.cancel() in the same '
+          'addPostFrameCallback that calls context.go()), not yet done.',
+    );
+    // `testWidgets`'s `skip` is `bool?`, not a message — the reason lives
+    // here instead: INF-40 ขั้น 3/4 ยังไม่ทำ — ปลด skip พร้อมกับการแก้.
+  }, skip: true);
+
   testWidgets(
     'a valid token that answers *after* the deadline — the user gets the '
     'intro rather than being yanked out of it, and that session is still '

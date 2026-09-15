@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/diagnostics/startup_trace.dart';
 import '../../../../core/error/auth_exception.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/session_expiry.dart';
@@ -52,6 +53,9 @@ class BackendSessionNotifier extends AsyncNotifier<AuthUser?> {
     // drop back to the login screen without a manual signOut() call.
     ref.listen(sessionExpiryProvider, (previous, next) {
       if (previous != null && next != previous) {
+        // INF-40 step 1: trace only — fired on the same branch that flips
+        // state, not on every provider tick.
+        StartupTrace.sessionExpiryFired();
         state = const AsyncData(null);
       }
     });
@@ -64,28 +68,55 @@ class BackendSessionNotifier extends AsyncNotifier<AuthUser?> {
   /// failure means the access token is bad → try a single `/auth/refresh`
   /// before clearing.
   Future<AuthUser?> _restore() async {
+    // INF-40 step 1: trace only, from here to every `return` below — see
+    // `StartupTrace.restoreEnd`'s doc comment for why there is no `status=`
+    // field (round 2 correction — a field that could only ever be `null`
+    // was worse than no field at all).
+    final startMs = StartupTrace.restoreStart();
     final storage = ref.read(tokenStorageProvider);
     final backend = ref.read(backendAuthDataSourceProvider);
 
     final accessToken = await storage.readAccessToken();
-    if (accessToken == null) return null;
+    if (accessToken == null) {
+      StartupTrace.restoreEnd(
+        outcome: RestoreOutcome.nullNoToken,
+        elapsed: Duration(milliseconds: StartupTrace.elapsedMs() - startMs),
+      );
+      return null;
+    }
 
     try {
+      StartupTrace.authMeSent(attempt: AuthMeAttempt.first);
       final user = await backend.getMe(accessToken);
+      StartupTrace.restoreEnd(
+        outcome: RestoreOutcome.user,
+        elapsed: Duration(milliseconds: StartupTrace.elapsedMs() - startMs),
+      );
       return user.toEntity();
     } on AuthException catch (e) {
-      if (e.code == 'network_error' || e.code == 'server_error') return null;
-      return _refreshAndRetry(storage, backend);
+      if (e.code == 'network_error' || e.code == 'server_error') {
+        StartupTrace.restoreEnd(
+          outcome: RestoreOutcome.nullInfra,
+          elapsed: Duration(milliseconds: StartupTrace.elapsedMs() - startMs),
+        );
+        return null;
+      }
+      return _refreshAndRetry(storage, backend, startMs);
     }
   }
 
   Future<AuthUser?> _refreshAndRetry(
     TokenStorage storage,
     BackendAuthDataSource backend,
+    int startMs,
   ) async {
     final refreshToken = await storage.readRefreshToken();
     if (refreshToken == null) {
       await storage.clear();
+      StartupTrace.restoreEnd(
+        outcome: RestoreOutcome.nullCleared,
+        elapsed: Duration(milliseconds: StartupTrace.elapsedMs() - startMs),
+      );
       return null;
     }
     try {
@@ -94,10 +125,19 @@ class BackendSessionNotifier extends AsyncNotifier<AuthUser?> {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
       );
+      StartupTrace.authMeSent(attempt: AuthMeAttempt.retry);
       final user = await backend.getMe(tokens.accessToken);
+      StartupTrace.restoreEnd(
+        outcome: RestoreOutcome.user,
+        elapsed: Duration(milliseconds: StartupTrace.elapsedMs() - startMs),
+      );
       return user.toEntity();
     } on AuthException {
       await storage.clear();
+      StartupTrace.restoreEnd(
+        outcome: RestoreOutcome.nullCleared,
+        elapsed: Duration(milliseconds: StartupTrace.elapsedMs() - startMs),
+      );
       return null;
     }
   }

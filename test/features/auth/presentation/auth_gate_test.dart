@@ -11,6 +11,7 @@ import 'package:posternung/features/auth/presentation/providers/auth_providers.d
 import 'package:posternung/features/auth/presentation/providers/backend_session_provider.dart';
 import 'package:posternung/features/auth/presentation/providers/session_provider.dart';
 import 'package:posternung/features/auth/presentation/screens/login_screen.dart';
+import 'package:posternung/features/auth/presentation/widgets/auth_error_banner.dart';
 
 /// A no-op stand-in for the real `AuthViewModel` — `LoginScreen` (rendered by
 /// `AuthGate`'s `data: null` branch) reads `authViewModelProvider`, and the
@@ -111,6 +112,109 @@ void main() {
     },
   );
 
+  group('INF-40 step 5 (skipped until step 4 — ADR-0036 D1/D3/D3.1)', () {
+    testWidgets(
+      'INF-40 step 5 (ข) — AC-4(ข)/ADR-0036 D1: AuthGate must not read '
+      'riverpod\'s own AsyncLoading(error:, retrying: true) ladder as a '
+      'plain spinner — it must show the error banner instead',
+      (tester) async {
+        final container = ProviderContainer(
+          overrides: [
+            sessionProvider.overrideWith(
+              (ref) => ref.watch(_retryingSessionProvider),
+            ),
+            authViewModelProvider.overrideWith(_NoopAuthViewModel.new),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              home: AuthGate(
+                builder: (_) => const Text('AUTHENTICATED-DESTINATION'),
+              ),
+            ),
+          ),
+        );
+        // Let the throwing build() reject and riverpod's own retry ladder
+        // pick it up — this produces the *real*
+        // `AsyncLoading(error:, retrying: true)` (element.dart:758-789),
+        // not a hand-built one: `AsyncLoading._` is private and
+        // `AsyncError(retrying:)`/`copyWithPrevious` are `@internal`, so
+        // constructing that shape by hand does not compile at all (GATE 1
+        // plan §3(ข)).
+        await tester.pump();
+        await tester.pump();
+
+        expect(find.byType(AuthErrorBanner), findsOneWidget);
+        expect(
+          find.text('${AppStrings.authErrorCodeLabel}unhandled_error'),
+          findsOneWidget,
+        );
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+      },
+      // `testWidgets`'s `skip` is `bool?`, not a message — the reason:
+      // INF-40 ขั้น 3/4 ยังไม่ทำ — ปลด skip พร้อมกับการแก้.
+      skip: true,
+    );
+
+    testWidgets(
+      'INF-40 step 5 (ค) — ADR-0036 D3.1: a session that resolves after '
+      'the gate\'s own error deadline must still land on the destination, '
+      'not stay latched on the error page (a latch here would recreate '
+      'the BL-130 shape at a second gate)',
+      (tester) async {
+        final container = ProviderContainer(
+          overrides: [
+            backendSessionProvider.overrideWith(_NeverResolvingSession.new),
+            authViewModelProvider.overrideWith(_NoopAuthViewModel.new),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              home: AuthGate(
+                builder: (_) => const Text('AUTHENTICATED-DESTINATION'),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // Manually driving `.state` (not `build()` throwing) sidesteps
+        // riverpod's own retry ladder entirely, so this test isolates the
+        // one variable ADR-0036 D3.1 is actually about: a session that
+        // shows an error, sits past the gate's own deadline, and *then*
+        // resolves to a real user. `ADR-0036`'s own literal, 5 s, is
+        // deliberately not referenced as `AuthGate.sessionErrorDeadline`
+        // here — that constant does not exist in code yet, and referencing
+        // it directly would be a compile error breaking every test in this
+        // file, not just this skipped one.
+        container
+            .read(backendSessionProvider.notifier)
+            .state = AsyncError<AuthUser?>(
+          const AuthException(code: 'network_error'),
+          StackTrace.current,
+        );
+        await tester.pump(const Duration(milliseconds: 5000));
+
+        container.read(backendSessionProvider.notifier).state =
+            const AsyncData<AuthUser?>(AuthUser(uid: 'u1', email: 'a@b.co'));
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pump();
+
+        expect(find.text('AUTHENTICATED-DESTINATION'), findsOneWidget);
+        expect(find.byType(AuthErrorBanner), findsNothing);
+      },
+      skip: true,
+    );
+  });
+
   group('ADR-0021 D1 regression — Firebase-only must not advance the gate', () {
     /// Fake `BackendSessionNotifier` reporting a fixed user without touching
     /// storage/network — same pattern as `session_provider_test.dart`.
@@ -155,4 +259,33 @@ class _FixedBackendSession extends BackendSessionNotifier {
 
   @override
   Future<AuthUser?> build() async => _user;
+}
+
+// --- INF-40 step 5 (ข) fixtures ---
+
+/// A tiny provider whose `build()` throws, with retry left at riverpod's
+/// default (on) — the one way to produce a *real*
+/// `AsyncLoading(error:, retrying: true)` for `AuthGate` to react to (GATE 1
+/// plan §3(ข): the shape cannot be constructed by hand).
+final _retryingSessionProvider =
+    AsyncNotifierProvider<_RetryingSessionNotifier, AuthUser?>(
+      _RetryingSessionNotifier.new,
+    );
+
+class _RetryingSessionNotifier extends AsyncNotifier<AuthUser?> {
+  @override
+  Future<AuthUser?> build() async {
+    throw Exception('boom');
+  }
+}
+
+// --- INF-40 step 5 (ค) fixture ---
+
+/// `build()` never resolves or throws — this test drives `state` by hand
+/// (via `container.read(backendSessionProvider.notifier).state = ...`) so
+/// the scenario is isolated from riverpod's own retry ladder entirely,
+/// which is what test (ข) above exercises instead.
+class _NeverResolvingSession extends BackendSessionNotifier {
+  @override
+  Future<AuthUser?> build() => Completer<AuthUser?>().future;
 }
