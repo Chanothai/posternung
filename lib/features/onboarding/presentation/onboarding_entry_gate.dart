@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/diagnostics/startup_trace.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/widgets/app_loading_screen.dart';
 import '../../auth/presentation/providers/session_provider.dart';
@@ -57,14 +58,26 @@ import 'screens/onboarding_page_view_screen.dart';
 /// therefore never throws, so none of what follows is even reached on this
 /// path.
 ///
-/// What follows is still true, and is why `error:` stays thin: when an
-/// `AsyncNotifier.build()` *does* throw, riverpod 3.3.2 retries it on its own,
-/// and while that ladder runs the state is `AsyncLoading(hasError: true)` —
-/// not `AsyncError`. `.when` reports that as `loading`, so a restore that
-/// keeps failing sits in `loading` until the retries stop. `error:` is for a
-/// session that has failed terminally, which is a narrower case than its name
-/// suggests. (`AuthGate` has the same shape and the same blind spot at
-/// `/home`; pre-existing, tracked as a gap on SCR-02.)
+/// 🔴 **‹Rewritten 2026-09-15 · ADR-0036 D2 · INF-40 step 4› The paragraph
+/// that stood here described a retry ladder that no longer runs.** It read:
+/// *"when an `AsyncNotifier.build()` does throw, riverpod 3.3.2 retries it on
+/// its own, and while that ladder runs the state is
+/// `AsyncLoading(hasError: true)` — not `AsyncError`. `.when` reports that as
+/// `loading`, so a restore that keeps failing sits in `loading` until the
+/// retries stop."* That was accurate, and it was the mechanism behind the
+/// ~38-second spinner at `/home` (symptom ③ of INF-40).
+///
+/// `backendSessionProvider` now sets `retry: (_, _) => null`, so a `build()`
+/// that throws reaches `AsyncError` on the next frame and `error:` below is
+/// taken straight away. A failing restore now lands the reader on the intro
+/// *immediately* instead of after the 2 s deadline — earlier than before, and
+/// for a better reason: because the session is known to have failed, not
+/// because waiting was given up on.
+///
+/// `AuthGate` no longer shares the blind spot either: it decides its error
+/// branch from `hasError` before `.when()` sees the state (ADR-0036 **D1**),
+/// and carries its own 5 s deadline for the *pending-forever* case (**D3**),
+/// which is the one thing `hasError` cannot see.
 ///
 /// The deadline earns its keep on a different case than the one it was
 /// written for: **slow but successful**. Both roads are covered separately in
@@ -92,10 +105,20 @@ class OnboardingEntryGate extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<OnboardingEntryGate> createState() =>
-      _OnboardingEntryGateState();
+      OnboardingEntryGateState();
 }
 
-class _OnboardingEntryGateState extends ConsumerState<OnboardingEntryGate> {
+/// Public only so a widget test can read [debugDeadlineIsActive].
+///
+/// 🔴 INF-40 step 3. The alternative was a test that pumps past the deadline
+/// and asserts no `deadline_fired` line — **that test passes with the fix
+/// removed**, because in a widget test go_router disposes route `/` within
+/// the transition (~300 ms) and `dispose()` cancels the timer long before it
+/// could fire at 2 s. On a real device route `/` was still alive at t=2001 on
+/// every signed-in cold start, so the trace-only test would have been green
+/// on a defect that reproduces 20/20 in the field (`test-quality` §2 — a
+/// green that comes from the scenario never occurring proves nothing).
+class OnboardingEntryGateState extends ConsumerState<OnboardingEntryGate> {
   Timer? _deadline;
 
   /// Latched, never unset for the life of this mount.
@@ -109,10 +132,20 @@ class _OnboardingEntryGateState extends ConsumerState<OnboardingEntryGate> {
   /// come out the other side.
   bool _stoppedWaiting = false;
 
+  /// Whether the give-up-waiting timer is still armed — the invariant INF-40
+  /// AC-2 is about, readable at the one instant it can be checked: the frame
+  /// the gate decides, before the router takes the route away.
+  @visibleForTesting
+  bool get debugDeadlineIsActive => _deadline?.isActive ?? false;
+
   @override
   void initState() {
     super.initState();
+    StartupTrace.gateInit();
     _deadline = Timer(OnboardingEntryGate.sessionDeadline, () {
+      // INF-40 step 1: trace only — reports `mounted` at this instant, does
+      // not change what happens next (see below).
+      StartupTrace.deadlineFired(mounted: mounted);
       // 🔴 Flipping this flag is the **whole** of what the deadline does.
       // Nothing here cancels the in-flight restore, invalidates the provider
       // or signs anyone out (D8.2) — giving up on waiting is not giving up
@@ -133,23 +166,78 @@ class _OnboardingEntryGateState extends ConsumerState<OnboardingEntryGate> {
   Widget build(BuildContext context) {
     final session = ref.watch(sessionProvider);
 
-    if (_stoppedWaiting) return const OnboardingPageViewScreen();
+    if (_stoppedWaiting) {
+      // INF-40 step 1: trace only — same early return as before, just named.
+      StartupTrace.gateDecision(
+        dest: GateDecisionDestination.onboarding,
+        via: GateDecisionVia.deadline,
+      );
+      return const OnboardingPageViewScreen();
+    }
 
     return session.when(
       data: (user) {
-        if (user == null) return const OnboardingPageViewScreen();
+        if (user == null) {
+          StartupTrace.gateDecision(
+            dest: GateDecisionDestination.onboarding,
+            via: GateDecisionVia.dataNull,
+          );
+          return const OnboardingPageViewScreen();
+        }
+        StartupTrace.gateDecision(
+          dest: GateDecisionDestination.home,
+          via: GateDecisionVia.dataUser,
+        );
         // Same escape hatch, and the same reason, as `requireRouteState`:
         // the decision is only knowable inside `build`, and the only way out
         // of a `build` is to schedule the departure for the next frame and
         // show something meanwhile. What it shows is the loading screen, so
         // the user never sees a frame of the intro they are being spared.
         WidgetsBinding.instance.addPostFrameCallback((_) {
+          // INF-40 step 1: trace only — fired before the existing
+          // `context.mounted` check, carrying that exact value.
+          StartupTrace.gateGoHome(mounted: context.mounted);
+          // 🔴 INF-40 step 3 (AC-2) — the gate has now made its decision, so
+          // the deadline has nothing left to decide. Without this line the
+          // timer still fires ~2s in, flips `_stoppedWaiting`, and `build()`
+          // hands back `OnboardingPageViewScreen` **on top of a user who is
+          // already at `/home`** — measured on a real device at every single
+          // cold start of the signed-in path, not occasionally.
+          //
+          // It survives only because route `/` happens to be disposed first
+          // most of the time, which no contract anywhere guarantees; the day
+          // `/` outlives the frame (a `StatefulShellRoute`, say) the intro
+          // flashes over `/home`, which is what ADR-0023 **D4** forbids
+          // outright.
+          //
+          // 🔴 **Cancelling here and nowhere else is deliberate.** Doing the
+          // same on the `user == null` branch would look tidier in the trace
+          // and would be a real bug: `_stoppedWaiting` is what stops a
+          // session that lands *after* the reader started onboarding from
+          // yanking them out of it (D8.2). Kill the timer on that branch and
+          // that protection goes with it.
+          //
+          // 🔴 And it is the **only** mechanism — no `_decided` latch beside
+          // it. Two overlapping guards would each keep AC-4's mutation (a)
+          // green on its own, which would leave this ticket closed by a test
+          // that proves nothing (`test-quality` §2).
+          _deadline?.cancel();
           if (context.mounted) context.go(AppRoutes.homePath);
         });
         return const AppLoadingScreen();
       },
       loading: () => const AppLoadingScreen(),
-      error: (_, _) => const OnboardingPageViewScreen(),
+      error: (_, _) {
+        // INF-40 step 1 (round 2 correction): this is the terminal-failure
+        // branch, not session expiry — see `GateDecisionVia.sessionError`'s
+        // doc comment in `startup_trace.dart` for why round 1 had this
+        // backwards.
+        StartupTrace.gateDecision(
+          dest: GateDecisionDestination.onboarding,
+          via: GateDecisionVia.sessionError,
+        );
+        return const OnboardingPageViewScreen();
+      },
     );
   }
 }

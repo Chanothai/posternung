@@ -77,7 +77,7 @@ Until these exist, SIT/UAT builds simply show the default (production) icon.
 
 ## 6. Backend API base URL
 
-`lib/core/config/api_base_url_resolver.dart`'s `apiBaseUrlFor(Environment)` holds the base URL per environment. **Production** resolves to the stable domain `https://api.posternung.com` by default — no override needed. **SIT** defaults to `http://172.20.10.12:8000` — a developer's LAN IP running `posternung-backend` locally (the `posternung-sit-app` container publishing port 8000), since SIT has no deployed backend of its own. **UAT** has no backend deployed yet (empty default); wire it here once it does.
+`lib/core/config/api_base_url_resolver.dart`'s `apiBaseUrlFor(Environment)` holds the base URL per environment. **Production** resolves to the stable domain `https://api.posternung.com` by default — no override needed. **SIT has no default at all** (empty) and *requires* the override — it used to default to `http://172.20.10.12:8000`, one developer's LAN IP, and that address quietly stopped existing. A stale IP is worse than none: sign-in completes against Firebase (public cloud, works on mobile data), then `POST /auth/firebase` goes nowhere and `AuthGate` keeps showing the login screen per ADR-0021 D1 — the user sees *"I signed in and nothing happened"*. An empty base URL surfaces as a plain `network_error` immediately instead. ‹changed 2026-09-10› **On a USB-connected physical device use `adb reverse tcp:8000 tcp:8000` + `http://127.0.0.1:8000`** — the only thing that works when the phone has no Wi-Fi. See skill `debug-auth-failure` §4. **UAT** has no backend deployed yet (empty default); wire it here once it does.
 
 **The SIT default is one developer's machine, not a shared value** — a real device can't use `127.0.0.1` (that resolves to the device itself, not your Mac), and the IP changes with the network. Override it for your own setup instead of editing the hardcoded default:
 
@@ -106,7 +106,7 @@ flutter run --flavor production --dart-define=API_BASE_URL=https://your-tunnel-u
 
 ### VS Code
 
-A `.vscode/launch.json` with `posternung (sit)` / `(uat)` / `(production)` run configurations is already set up locally (gitignored). Pick one from the **Run and Debug** panel dropdown, or from the terminal:
+A `.vscode/launch.json` with one configuration per flavor and per backend target (USB device via `adb reverse`, Wi-Fi device, Android emulator, iOS simulator, profile, and a release+`STARTUP_TRACE` build) is set up locally. 🔴 **It is gitignored, so nothing guarantees it exists** — it had gone missing once while this line still claimed it was there ‹2026-09-10›; recreate it from the targets table above if the Run and Debug dropdown is empty. Pick one from the **Run and Debug** panel dropdown, or from the terminal:
 
 ```bash
 flutter run --flavor sit -t lib/main.dart
