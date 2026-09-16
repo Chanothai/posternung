@@ -164,10 +164,14 @@ abstract final class AppStrings {
 
   // --- Home ---
   static const String homeSectionAllPosters = 'โปสเตอร์ทั้งหมด';
+  // `homeNav*` moved off home-only meaning under SCR-07 B7 — they now label
+  // `core/widgets/app_bottom_nav_bar.dart`'s 3 tabs, shared by Home, the
+  // orders placeholder, and Profile. Names kept as `homeNav*` (not renamed
+  // to `navHome`/`navProfile`) because they still read correctly and a
+  // rename would be pure churn — see `core/CLAUDE.md`'s note on genuinely
+  // shared wording keeping one constant across features.
   static const String homeNavHome = 'หน้าหลัก';
-  static const String homeNavSearch = 'ค้นหา';
-  static const String homeNavWishlist = 'รายการที่ชอบ';
-  static const String homeNavCart = 'ตะกร้าสินค้า';
+  static const String homeNavOrders = 'คำสั่งซื้อของฉัน';
   static const String homeNavProfile = 'โปรไฟล์';
   static const String homeBrandTitle = 'หน้าหลัก';
   static const String homeSearchPlaceholder =
@@ -260,6 +264,10 @@ abstract final class AppStrings {
       'มีชิ้นเดียว ของหายากที่เมื่อขายแล้วจะไม่กลับมาอีก';
   static const String posterDetailReservedNotice =
       'ขณะนี้มีผู้อื่นกำลังจองโปสเตอร์ชิ้นนี้อยู่';
+  // SCR-07 B3 — shown on `available` and `reserved` alike (ADR-0037 D4,
+  // AC-15); never disabled based on `status`. See
+  // `poster/presentation/widgets/poster_buy_now_button.dart`.
+  static const String posterDetailBuyNowButtonLabel = 'ซื้อเลย';
   static const String posterDetailSoldTitle = 'โปสเตอร์ชิ้นนี้ถูกซื้อไปแล้ว';
   static const String posterDetailSoldBody =
       'ของชิ้นนี้มีเพียงชิ้นเดียวและมีผู้ซื้อไปเรียบร้อยแล้วระหว่างที่คุณกำลังดูอยู่';
@@ -326,4 +334,161 @@ abstract final class AppStrings {
       'IMP Awards เป็นคลังภาพโปสเตอร์ที่เราใช้ค้นแบบ ไม่ใช่เว็บไซต์ของเรา';
   static const String externalLinkDialogCancelCta = 'ยกเลิก';
   static const String externalLinkDialogConfirmCta = 'เปิดลิงก์';
+
+  // --- Orders (SCR-07 B7) ---
+  // Placeholder only — `OrdersPlaceholderScreen` has no `GET /orders` call
+  // behind it yet. SCR-09 replaces this with the real list; A4-D1 is
+  // explicit that `OrderCreatedView` must never route here, since a screen
+  // saying "no orders yet" right after placing one would read as the order
+  // not existing.
+  static const String ordersPlaceholderTitle = 'ยังไม่มีคำสั่งซื้อ';
+  static const String ordersPlaceholderBody =
+      'คำสั่งซื้อของคุณจะแสดงที่นี่เมื่อพร้อมใช้งาน';
+
+  // --- Profile (SCR-07 B7) ---
+  // `profilePhoneLoginLabel` is what a phone-authenticated user sees in
+  // place of an identity line — `AuthUser` carries no phone number, and
+  // A4-D2 #5 forbids adding one just to show it here (ADR-0020 D9, no new
+  // PII surface).
+  static const String profilePhoneLoginLabel = 'เข้าสู่ระบบด้วยเบอร์โทร';
+  static const String profileSignOutButton = 'ออกจากระบบ';
+  static const String profileSignOutConfirmTitle = 'ยืนยันการออกจากระบบ';
+  static const String profileSignOutConfirmBody = 'ต้องการออกจากระบบใช่หรือไม่';
+  static const String profileSignOutConfirmCancel = 'ยกเลิก';
+  static const String profileSignOutConfirmConfirm = 'ออกจากระบบ';
+
+  // --- Checkout (SCR-07 B1/B2/B4/B5) ---
+
+  static const String checkoutCountdownLabel = 'เหลือเวลาก่อนการจองหมดอายุ';
+
+  static const String checkoutSummaryTitle = 'สรุปรายการ';
+  static const String checkoutSummaryProductPriceLabel = 'ราคาสินค้า';
+  static const String checkoutSummaryShippingFeeLabel = 'ค่าจัดส่ง';
+
+  /// F3 — a fixed literal, not `formatThbPrice('0')`: `PosterDetail` (all
+  /// `CheckoutOrderSummary` has before an order exists) carries no
+  /// `shipping_fee` field in the contract at all (`docs/api/openapi.yaml`),
+  /// so there is nothing from the backend to format here. Tied to SCR-07's
+  /// registry `known_gaps` AC-3 (no per-listing shipping calculation in
+  /// Closed Beta) — the day a real shipping fee exists, this constant is
+  /// what has to go, not just its call site.
+  static const String checkoutSummaryShippingFeeFree = '฿0';
+
+  /// AC-3 — 🔴 exact wording locked 2026-09-15 by the owner. Do not paraphrase.
+  static const String checkoutSummaryShippingNote =
+      'ค่าส่งรวมในราคาแล้ว โปสเตอร์ส่งในท่อแข็งหรือแฟ้มแข็งแบบแบน '
+      'ตามสภาพและขนาดของใบนั้น';
+
+  static const String checkoutFormSectionTitle = 'ที่อยู่จัดส่ง';
+  static const String checkoutFormRecipientNameLabel = 'ชื่อผู้รับ';
+  static const String checkoutFormRecipientPhoneLabel = 'เบอร์โทรผู้รับ';
+  static const String checkoutFormAddressLineLabel = 'ที่อยู่';
+  static const String checkoutFormSubDistrictLabel = 'ตำบล/แขวง';
+  static const String checkoutFormDistrictLabel = 'อำเภอ/เขต';
+  static const String checkoutFormProvinceLabel = 'จังหวัด';
+  static const String checkoutFormPostalCodeLabel = 'รหัสไปรษณีย์';
+  static const String checkoutFormOptionalSuffix = ' (ไม่บังคับ)';
+  static const String checkoutFormRequiredError = 'กรุณากรอกข้อมูลนี้ให้ครบ';
+
+  static const String checkoutPrivacyLinkText =
+      'อ่านประกาศเกี่ยวกับความเป็นส่วนตัว';
+
+  static const String checkoutSubmitButtonLabel = 'ยืนยันคำสั่งซื้อ';
+  static const String checkoutRetryButtonLabel = 'ลองใหม่อีกครั้ง';
+
+  static const String checkoutReservationLostTitle = 'การจองนี้ใช้ไม่ได้แล้ว';
+  static const String checkoutReservationLostBackCta = 'กลับไปหน้าโปสเตอร์';
+
+  // --- Checkout — orders error table (SCR-07 AC-4/AC-9/AC-10, GATE 1 §4) ---
+  static const String checkoutErrorReservationNotFound =
+      'การจองนี้ใช้ไม่ได้แล้ว กรุณากดซื้อเลยใหม่';
+  static const String checkoutErrorReservationExpired =
+      'การจองหมดเวลาแล้ว ถ้ายังว่างกดซื้อเลยใหม่ได้';
+  static const String checkoutErrorReservationUsed = 'การจองนี้ถูกใช้ไปแล้ว';
+  static const String checkoutErrorPosterGoneAtOrder = 'โปสเตอร์นี้ไม่ว่างแล้ว';
+  static const String checkoutErrorValidation =
+      'กรุณาตรวจสอบข้อมูลที่อยู่อีกครั้ง';
+
+  // --- Checkout — reserve error table (prepared for B3, not called yet) ---
+  static const String checkoutErrorBuyerIsSeller =
+      'คุณเป็นผู้ขายของรายการนี้ จึงซื้อเองไม่ได้';
+  static const String checkoutErrorAlreadyReserved =
+      'มีผู้จองตัดหน้าไปเมื่อสักครู่';
+  static const String checkoutErrorPosterReservedUntilPrefix =
+      'มีผู้จองโปสเตอร์นี้อยู่ถึง ';
+  static const String checkoutErrorPosterReservedUntilSuffix =
+      ' น. ลองใหม่หลังจากนั้นได้';
+  static const String checkoutErrorPosterSoldOut = 'โปสเตอร์นี้ไม่ว่างแล้ว';
+  static const String checkoutErrorReservationLimitExceededPrefix =
+      'คุณมีรายการที่จองค้างอยู่ครบ ';
+  static const String checkoutErrorReservationLimitExceededSuffix =
+      ' รายการแล้ว ต้องรอให้รายการเดิมหมดเวลาก่อน';
+  static const String checkoutErrorRateLimitedPrefix =
+      'คุณกดจองถี่เกินไป กรุณารออีก ';
+  static const String checkoutErrorRateLimitedSuffix = ' วินาที';
+
+  // --- Checkout — OrderCreated (SCR-07 `ADR-0037` A4-D1, owner's exact
+  // wording — "ห้ามมีคำว่า 'สำเร็จ'" and "ห้ามข้อความที่สัญญาว่า 'ทางร้าน
+  // จะติดต่อ'" both apply to every string in this block). ---
+  static const String checkoutOrderCreatedTitle = 'บันทึกคำสั่งซื้อแล้ว';
+  static const String checkoutOrderCreatedOrderNoPrefix = 'เลขที่คำสั่งซื้อ ';
+  static const String checkoutOrderCreatedBadge = 'รอชำระเงิน';
+  static const String checkoutOrderCreatedBodyLine1 =
+      'โปสเตอร์ใบนี้ถูกกันไว้ให้คุณแล้ว · ขั้นตอนชำระเงินจะเปิดในรุ่นถัดไป';
+  static const String checkoutOrderCreatedBodyLine2 =
+      'คำสั่งซื้อนี้ยังไม่มีผลจนกว่าจะชำระเงิน';
+  static const String checkoutOrderCreatedHomeCta = 'กลับหน้าแรก';
+
+  // --- Privacy (SCR-07 `ADR-0020` D11, Amendment 5 A5-D1/A5-D2) ---
+  //
+  // 🔴 This block is `D11` **with exactly two bullet lines removed**
+  // (TikTok · Omise — both false since `ADR-0029`) and nothing else
+  // reworded. It is still a **draft**, not the legal-reviewed final text
+  // (`BL-150` ④) — `A5-D2` requires the draft label to be visible on the
+  // page itself, not only in this comment. Do not edit any wording here
+  // without going through the owner first (root `CLAUDE.md` "เมื่อไหร่หยุด").
+  static const String privacyDraftBadge = 'ฉบับร่าง — รอเจ้าของ';
+  static const String privacyPageTitle = 'ข้อมูลส่วนตัวของคุณ';
+  static const String privacyControllerBody =
+      'ผู้เก็บและดูแลข้อมูลนี้คือ FrameShine โดย ชโนทัย ดวงระหว้า';
+
+  static const String privacyWhatWeCollectHeading = 'เราเก็บอะไร';
+  static const String privacyWhatWeCollectBody1 =
+      'เบอร์โทรหรืออีเมลที่คุณใช้เข้าสู่ระบบ · ชื่อผู้รับ ที่อยู่ '
+      'และเบอร์โทรที่คุณกรอกตอนสั่งซื้อ';
+  static const String privacyWhatWeCollectBody2 =
+      'เราไม่เก็บเลขบัตรประชาชน และไม่เก็บข้อมูลบัตรเครดิต';
+
+  static const String privacyWhyHeading = 'เก็บไปทำอะไร';
+  static const String privacyWhyBody1 =
+      'เพื่อส่งของให้ถึงคุณ ออกใบเสร็จ และติดต่อกลับเมื่อมีปัญหาเรื่องคำสั่งซื้อ';
+  static const String privacyWhyBody2 =
+      'เราเก็บเท่าที่จำเป็นต่อการซื้อขาย จึงไม่ได้ขอความยินยอมแยกอีกชั้น';
+
+  static const String privacyRecipientsHeading = 'ส่งให้ใครบ้าง';
+  static const String privacyRecipientFirebase =
+      '‣ Firebase ของ Google — เบอร์โทรหรืออีเมล เพื่อยืนยันตัวตนตอนเข้าสู่ระบบ';
+  static const String privacyRecipientGoogleDrive =
+      '‣ Google Drive — ไฟล์ใบเสร็จที่มีชื่อคุณ ถูกสำรองไว้ในบัญชีของร้าน '
+      '(ไม่มีที่อยู่ในใบเสร็จ)';
+  static const String privacyNoSellingData = 'เราไม่ขายข้อมูลของคุณให้ใคร';
+
+  static const String privacyRetentionHeading = 'เก็บนานแค่ไหน';
+  static const String privacyRetentionShipping =
+      '‣ ที่อยู่และเบอร์ที่ใช้จัดส่ง — ลบออกจากระบบภายใน 90 วัน'
+      'หลังเรายืนยันว่าส่งถึงแล้ว';
+  static const String privacyRetentionFinancial =
+      '‣ ใบเสร็จและเอกสารการเงินที่มีชื่อคุณ — เก็บ 5 ปี ตามภาระทางบัญชีและภาษี '
+      'ช่วงเวลานี้เราลบให้ไม่ได้แม้คุณจะขอ';
+  static const String privacyRetentionAccount =
+      '‣ เบอร์/อีเมลที่ใช้เข้าสู่ระบบ — เก็บไว้ตราบที่บัญชีของคุณยังอยู่';
+
+  static const String privacyContactHeading =
+      'อยากดูหรืออยากให้ลบ ติดต่อที่ไหน';
+  static const String privacyContactBody1 =
+      'ทักมาที่ LINE @frameshine บอกเบอร์หรืออีเมลที่ใช้สั่งซื้อ';
+  static const String privacyContactBody2 =
+      'เราจะตอบกลับภายใน 30 วัน นับจากวันที่ได้รับคำขอ';
+  static const String privacyContactBody3 =
+      'ส่วนที่ลบไม่ได้ในช่วงนี้คือใบเสร็จและเอกสารการเงินตามที่บอกไว้ข้างบน';
 }

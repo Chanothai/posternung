@@ -145,6 +145,10 @@ presentation/
                   # PosterNotFoundView (AC-6, 404 — no retry, the id
                   # genuinely doesn't exist), PosterErrorView (generic
                   # network/server failure — has retry).
+                  # PosterBuyNowButton (SCR-07 B3 — the "ซื้อเลย" button,
+                  # visible on available/reserved, hidden on sold; a
+                  # ConsumerWidget that reaches into `checkout/`'s
+                  # presentation layer — see "Things worth knowing" below).
 ```
 
 ## Things worth knowing before touching this feature
@@ -212,10 +216,27 @@ presentation/
   states use. They keep their own identities (different copy, different
   tone, retry vs. go-back) but no longer own any layout or styling; adjust
   the shared widget rather than restyling one of them in place.
-- **This round is read-only (ADR-0005 §D1).** No Add to Cart, no quantity
-  selector — `POST /cart/reserve/{poster_id}` is still `x-status: DRAFT` in
-  the contract. Don't add a purchase CTA here without checking whether that
-  DRAFT status has actually been lifted first.
+- **🔴 False as of SCR-07 B3 — this screen has a purchase CTA now.** This
+  bullet used to say the round was read-only and pointed at a DRAFT
+  `/cart/reserve` endpoint that no longer exists at all (`ADR-0030` D1
+  deleted `/cart/*` from the contract outright). `PosterBuyNowButton`
+  (`presentation/widgets/poster_buy_now_button.dart`) is a `ConsumerWidget`
+  that renders the "ซื้อเลย" button on `available`/`reserved` (never on
+  `sold`) and calls `POST /listings/{poster_id}/reserve` — the endpoint's
+  `x-status` is `APPROVED`, and `ADR-0037` D4/SCR-07 AC-15 require the button
+  to stay enabled regardless of `status`, because the backend is the only
+  thing that can lazy-expire a stale reservation (`ADR-0033` D4; see
+  `stock-integrity` skill for why this rule is not up for renegotiation
+  per-feature). There is still no quantity selector (BR-04, stock=1) and no
+  cart of any kind.
+  🔴 **This is the one place `poster/`'s presentation layer imports another
+  feature's presentation layer** (`checkout/`'s `reserveListingViewModelProvider`
+  and `reserveErrorDisplayMessage`) — see `ReserveListingViewModel`'s doc
+  comment (`checkout/presentation/providers/reserve_listing_view_model.dart`)
+  for why that is not a layering violation: it mirrors `onboarding/`'s
+  `OnboardingEntryGate` importing `auth/`'s `sessionProvider`. `checkout/`'s
+  `data/`/`domain/` still never import anything from `poster/`, and this
+  feature's presentation layer still never imports `checkout/`'s `data/`.
 - **US-16 (COA) is deferred**, not implemented partially — see
   `docs/screens.yaml`'s `deferred_stories` entry for SCR-05 and
   ADR-0005 §D2. Never derive "has a COA" from `is_authenticated`; they mean

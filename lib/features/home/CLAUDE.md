@@ -19,11 +19,34 @@ presentation/
   screens/    # HomeScreen — top bar + catalog grid + bottom nav, wrapped in
               # a RefreshIndicator. No lifecycle observer: this screen calls
               # the backend only when the user asks (see below).
-  widgets/    # HomeTopBar, HomeTopBarHeaderDelegate, HomeBottomNavBar,
+  widgets/    # HomeTopBar, HomeTopBarHeaderDelegate,
               # HomeAllPostersSection (owns all four required states),
               # HomePosterCard, HomeLoadMoreFooter, HomePostersEmptyView,
-              # HomePostersErrorView, home_coming_soon.dart
+              # HomePostersErrorView, home_coming_soon.dart — the bottom nav
+              # bar itself moved out, see below
 ```
+
+## Bottom nav — moved to `core/widgets/` (SCR-07 B7)
+
+🔴 **This section used to describe a 5-tab `HomeBottomNavBar` living in
+`presentation/widgets/`, with a Profile tab that called
+`ref.read(authViewModelProvider.notifier).signOut()` directly on tap. Both
+are gone.** `ADR-0037` Amendment 1 cut the bar to 3 tabs (Home / คำสั่งซื้อ
+ของฉัน / โปรไฟล์ — search/wishlist/cart have no schema or endpoint behind
+them, and `ADR-0030` deleted cart from the contract outright), and it is now
+`core/widgets/app_bottom_nav_bar.dart`'s `AppBottomNavBar`: three screens
+across three features (`HomeScreen` here, `OrdersPlaceholderScreen`,
+`ProfileScreen`) render it as their `Scaffold.bottomNavigationBar`, so it
+can't stay owned by any one of them. It routes with `context.go` against
+`AppRoutes.homePath`/`ordersPath`/`profilePath`, reading the active tab from
+`GoRouterState.of(context).uri.path` rather than a parameter — see that
+file's doc comment for the full reasoning, and `core/CLAUDE.md`'s `widgets/`
+entry for where it's indexed.
+
+**Signing out is no longer a nav-bar tap.** It is a confirmed action on
+`features/profile/`'s `ProfileScreen`, reached via the Profile tab — a stray
+tap on the bottom bar used to log the user out with zero confirmation, which
+is exactly what moving it behind a screen and a dialog fixes.
 
 ## Things worth knowing before touching this feature
 
@@ -124,13 +147,12 @@ presentation/
   first `await`, so a `finally` would run before `_inFlight` was assigned
   and wedge the slot permanently. This was a real bug, caught by the
   load-more retry test.
-- The bottom nav's Profile tab calls
-  `ref.read(authViewModelProvider.notifier).signOut()` directly (from
-  `features/auth/`) — the one place `home/` reaches into `auth/`'s
-  presentation providers. That call makes a network round-trip (`POST
-  /auth/logout`); the tap site doesn't await it or show a loading state,
-  which is harmless today (the revoke is best-effort and `AuthGate` swaps the
-  screen away) but is where a spinner would go if one's ever wanted.
+- **False as of SCR-07 B7, kept only as history**: this bullet used to say
+  the bottom nav's Profile tab called `signOut()` directly on tap. It
+  doesn't any more — see "Bottom nav — moved to `core/widgets/`" above.
+  `authViewModelProvider.notifier.signOut()` is now called from
+  `features/profile/`'s `ProfileScreen`, behind a confirm dialog, not from
+  anything in this feature.
 - All SVG icons under `assets/images/` used by this feature came from Figma
   and needed two rounds of fixes: some had NaN cubic-bezier control points
   (`Cnan nan` — flutter_svg's path parser throws a `StateError`), and all had

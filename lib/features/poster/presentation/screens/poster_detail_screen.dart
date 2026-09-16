@@ -21,6 +21,7 @@ import '../../domain/entities/poster_status.dart';
 import '../catalog_error_display.dart';
 import '../providers/poster_providers.dart';
 import '../widgets/poster_availability_status.dart';
+import '../widgets/poster_buy_now_button.dart';
 import '../widgets/poster_detail_image_gallery.dart';
 import '../widgets/poster_details_accordion.dart';
 import '../widgets/poster_error_view.dart';
@@ -28,10 +29,13 @@ import '../widgets/poster_not_found_view.dart';
 import '../widgets/poster_restoration_badge.dart';
 import '../widgets/poster_sold_banner.dart';
 
-/// SCR-05 — Product Detail. Read-only this round (ADR-0005 §D1): no Add to
-/// Cart, no quantity selector — `/cart/reserve` is still `x-status: DRAFT`.
-/// Answers US-01 only; US-16 (COA) is deferred (see `docs/screens.yaml`'s
-/// `deferred_stories` for SCR-05 and ADR-0005 §D2).
+/// SCR-05 — Product Detail. No quantity selector (BR-04, stock=1) and no
+/// cart at all (`ADR-0030` D1 deleted `/cart/*` from the contract outright)
+/// — but as of SCR-07 B3 this screen does have a purchase entry point:
+/// [PosterBuyNowButton] reserves the poster and hands off to `/checkout`,
+/// per `lib/features/poster/CLAUDE.md`. Answers US-01; US-16 (COA) is
+/// deferred (see `docs/screens.yaml`'s `deferred_stories` for SCR-05 and
+/// ADR-0005 §D2).
 ///
 /// Visual layer restyled per ADR-0012 (figma `7:959`) — **only** the eight
 /// items in its §D1 table: `AppGradientBackground` behind everything, a
@@ -494,6 +498,8 @@ class _PosterDetailBodyState extends State<_PosterDetailBody> {
               ],
               const SizedBox(height: AppSpacing.md),
               PosterAvailabilityStatus(status: poster.status),
+              const SizedBox(height: AppSpacing.md),
+              PosterBuyNowButton(poster: poster),
               // 🔴 ADR-0014 D27 — ไม่มีบล็อก "ความถูกต้องแท้จริง" บนหน้านี้โดยตั้งใจ
               // ถอดออกทั้งบล็อก (หัวข้อ · ป้ายผ่าน/ไม่ผ่านการตรวจสอบความแท้ ·
               // ไอคอนโล่ติ๊กถูก) เมื่อ 2026-08-07 ไม่ใช่แค่เปลี่ยนถ้อยคำ เพราะ D1

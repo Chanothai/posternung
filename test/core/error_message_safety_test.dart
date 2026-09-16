@@ -109,6 +109,55 @@ void main() {
     );
   });
 
+  /// Shared by the real case below and its positive/negative control
+  /// (test-quality §3.1) — a plain token check, same shape as the
+  /// `debugDetail` scan above, kept as a named predicate so relaxing the
+  /// real case can't leave the control exercising a hand-copied duplicate
+  /// instead of the actual logic.
+  bool referencesTypedDetails(String content) =>
+      content.contains('typedDetails');
+
+  test('no `typedDetails` reference anywhere under lib/**/presentation/ or '
+      'lib/core/widgets/ (ADR-0017 Amendment 2 A2-D3/A2-D4 — presentation '
+      'may only ever see the typed fields OrderException exposes '
+      '(reservedUntil/expiredAt/limit/retryAfter/validationFields), never '
+      'the parsed detail rows themselves)', () {
+    final offenders = <String>[];
+    for (final file in dartFiles) {
+      final path = relPath(file);
+      if (!underPresentationOrCoreWidgets(path)) continue;
+      if (referencesTypedDetails(file.readAsStringSync())) {
+        offenders.add(path);
+      }
+    }
+
+    expect(
+      offenders,
+      isEmpty,
+      reason:
+          'พบการอ้าง typedDetails ใต้ presentation/ หรือ core/widgets/ — '
+          'ADR-0017 Amendment 2 A2-D3/A2-D4 ห้ามให้ค่านี้ไปถึงชั้น render '
+          'ไม่ว่าทางไหน — ใช้ typed field บน OrderException แทน\n'
+          'จุดที่พบ:\n  ${offenders.join('\n  ')}',
+    );
+  });
+
+  test('positive/negative control for the typedDetails scan above — proves '
+      'the shared predicate actually catches the token and does not '
+      'false-positive on the pre-existing `details` field (a different, '
+      'still-legal-to-hold-as-a-string field on the same class)', () {
+    expect(
+      referencesTypedDetails('final rows = envelope.typedDetails;'),
+      isTrue,
+      reason: 'ต้องจับ token typedDetails ได้จริง',
+    );
+    expect(
+      referencesTypedDetails('final details = envelope.details;'),
+      isFalse,
+      reason: 'ต้องไม่ false-positive กับ token details เดิม ซึ่งเป็นคนละฟิลด์',
+    );
+  });
+
   test('no `runtimeType` reference anywhere under lib/**/presentation/ '
       '(ADR-0017 D6/OD-1 — including debug-only log lines; the ban is on the '
       'token appearing in this subtree at all, not just on it reaching the '
@@ -457,10 +506,11 @@ void main() {
         .toList();
     expect(
       callers,
-      hasLength(2),
+      hasLength(3),
       reason:
-          'ADR-0017 D9 — ต้องมี mapper ต่อฟีเจอร์ 2 ตัว (auth · catalog) '
-          'ที่เรียกอัลกอริทึมกลาง · เจอ: $callers',
+          'ADR-0017 D9 — ต้องมี mapper ต่อฟีเจอร์ 3 ตัว (auth · catalog · '
+          'checkout — SCR-07 เพิ่มผู้เรียกตัวที่ 3 พร้อมทั้งตาราง orders และ '
+          'reserve ในไฟล์เดียวกัน) ที่เรียกอัลกอริทึมกลาง · เจอ: $callers',
     );
   });
 

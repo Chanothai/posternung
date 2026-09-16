@@ -19,14 +19,31 @@ import 'package:posternung/features/auth/presentation/screens/email_verification
 import 'package:posternung/features/auth/presentation/screens/login_screen.dart';
 import 'package:posternung/features/auth/presentation/screens/otp_verification_screen.dart';
 import 'package:posternung/features/auth/presentation/screens/register_screen.dart';
+import 'package:posternung/features/checkout/domain/entities/order.dart';
+import 'package:posternung/features/checkout/domain/entities/order_status.dart';
+import 'package:posternung/features/checkout/domain/entities/reservation.dart';
+import 'package:posternung/features/checkout/presentation/providers/checkout_flow_provider.dart';
+import 'package:posternung/features/checkout/presentation/providers/checkout_view_model.dart';
+import 'package:posternung/features/checkout/presentation/screens/checkout_screen.dart';
+import 'package:posternung/features/checkout/presentation/state/checkout_state.dart';
+import 'package:posternung/features/checkout/presentation/widgets/checkout_address_form.dart';
+import 'package:posternung/features/checkout/presentation/widgets/checkout_order_created_view.dart';
+import 'package:posternung/features/checkout/presentation/widgets/checkout_reservation_lost_view.dart';
 import 'package:posternung/features/home/presentation/screens/home_screen.dart';
 import 'package:posternung/features/onboarding/presentation/screens/onboarding_page_view_screen.dart';
+import 'package:posternung/features/orders/presentation/screens/orders_placeholder_screen.dart';
 import 'package:posternung/features/poster/domain/entities/paginated_posters.dart';
+import 'package:posternung/features/poster/domain/entities/poster_detail.dart';
+import 'package:posternung/features/poster/domain/entities/poster_status.dart';
 import 'package:posternung/features/poster/domain/repositories/poster_repository.dart';
 import 'package:posternung/features/poster/presentation/providers/poster_providers.dart';
 import 'package:posternung/features/poster/presentation/screens/poster_detail_screen.dart';
+import 'package:posternung/features/privacy/presentation/screens/privacy_screen.dart';
+import 'package:posternung/features/profile/presentation/screens/profile_screen.dart';
 
+import '../../support/checkout_flow_harness.dart';
 import '../../support/email_verification_flow_harness.dart';
+import '../../support/manual_stopwatch.dart';
 import '../../support/otp_flow_harness.dart';
 import '../../support/router_harness.dart';
 
@@ -39,6 +56,69 @@ class _NoopAuthViewModel extends AuthViewModel {
   @override
   FutureOr<void> build() {}
 }
+
+PosterDetail _poster() => PosterDetail(
+  id: 'p1',
+  title: 'Blade Runner',
+  price: '450.00',
+  status: PosterStatus.available,
+  conditionGrade: null,
+  eraDecade: 1980,
+  studio: 'Warner Bros',
+  primaryImageUrl: null,
+  tmdbId: null,
+  size: null,
+  description: null,
+  isAuthenticated: true,
+  authenticityNote: null,
+  provenance: null,
+  images: const [],
+  createdAt: DateTime(2024),
+  posterType: null,
+  releaseRegion: null,
+  releaseDateText: null,
+  releaseDate: null,
+  copyrightYear: null,
+  sizeFormat: null,
+  year: null,
+  restorationStatus: null,
+  restorationNote: null,
+);
+
+/// SCR-07 B1 — a checkout flow with a real span, backed by a
+/// [ManualStopwatch] so nothing in this file's `Timer.periodic` (owned by
+/// `reservationCountdownProvider`, mounted with `CheckoutScreen`) ticks
+/// against real wall-clock time during a reachability test.
+CheckoutFlowState _checkoutFlow() {
+  final createdAt = DateTime.utc(2026, 9, 16, 15, 30);
+  return CheckoutFlowState(
+    reservation: Reservation(
+      id: 'r1',
+      posterId: 'p1',
+      createdAt: createdAt,
+      expiresAt: createdAt.add(const Duration(minutes: 30)),
+    ),
+    posterSnapshot: _poster(),
+    stopwatch: ManualStopwatch(),
+  );
+}
+
+/// F1/F2 — a placed order, for tests that drive `checkoutViewModelProvider`
+/// straight to `CheckoutOrderCreated` without going through a real
+/// `POST /orders` call (that path is covered in `checkout_view_model_test.
+/// dart`/`checkout_screen_test.dart`; this file's subject is state lifecycle
+/// across navigation).
+Order _order() => Order(
+  id: 'o1',
+  orderNo: 'PN-260916-0001',
+  posterId: 'p1',
+  status: OrderStatus.awaitingPayment,
+  itemPrice: '450.00',
+  shippingFee: '0.00',
+  totalAmount: '450.00',
+  itemTitle: 'Blade Runner',
+  createdAt: DateTime.utc(2026, 9, 16),
+);
 
 void main() {
   const uuid = '33333333-3333-4333-8333-333333333333';
@@ -72,13 +152,26 @@ void main() {
   /// verification flow is open. It replaces the `extra:` this helper used to
   /// take: after Amendment 2 no route carries arguments, so there is nothing
   /// to hand the router.
+  /// [checkoutFlow] seeds `checkoutFlowProvider`, same idea as [otpFlow] —
+  /// how a test says the checkout flow is open before arriving at
+  /// `/checkout`.
+  ///
+  /// 🔴 [settle] defaults to `true` (`pumpAndSettle`), but **must be passed
+  /// `false` for any test that reaches `/checkout`**: that screen owns a
+  /// `Timer.periodic` (`reservationCountdownProvider`), and
+  /// `pumpAndSettle` waits for the widget tree to go idle — which a
+  /// repeating timer never does, hanging the test (GATE 1 §1 — the exact
+  /// trap `app_router_test.dart:102` documents). Pass `settle: false` and
+  /// drive time explicitly with `tester.pump(Duration(...))` instead.
   Future<GoRouter> pumpAt(
     WidgetTester tester,
     String location, {
     OtpFlowState? otpFlow,
     EmailVerificationFlowState? emailVerificationFlow,
+    CheckoutFlowState? checkoutFlow,
     AsyncValue<AuthUser?>? session,
     List<RouteBase>? routes,
+    bool settle = true,
   }) async {
     late GoRouter router;
     await tester.pumpWidget(
@@ -90,6 +183,9 @@ void main() {
           emailVerificationFlowProvider.overrideWith(
             () => SeededEmailVerificationFlow(emailVerificationFlow),
           ),
+          checkoutFlowProvider.overrideWith(
+            () => SeededCheckoutFlow(checkoutFlow),
+          ),
           if (session != null) sessionProvider.overrideWithValue(session),
         ],
         child: routedApp(
@@ -99,7 +195,11 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    if (settle) {
+      await tester.pumpAndSettle();
+    } else {
+      await tester.pump();
+    }
     return router;
   }
 
@@ -261,6 +361,117 @@ void main() {
       verify(() => repository.getPosterDetail(other)).called(1);
       verifyNever(() => repository.getPosterDetail(uuid));
     });
+
+    testWidgets(
+      '${AppRoutes.ordersPath} is the gate — signed in it is the orders '
+      'placeholder (SCR-07 B7)',
+      (tester) async {
+        await pumpAt(
+          tester,
+          AppRoutes.ordersPath,
+          session: const AsyncData<AuthUser?>(
+            AuthUser(uid: 'u1', email: 'a@b.co'),
+          ),
+        );
+        expect(find.byType(OrdersPlaceholderScreen), findsOneWidget);
+        expect(find.byType(LoginScreen), findsNothing);
+      },
+    );
+
+    testWidgets(
+      '${AppRoutes.ordersPath} signed out is LoginScreen — same AuthGate '
+      'shape as /home',
+      (tester) async {
+        await pumpAt(
+          tester,
+          AppRoutes.ordersPath,
+          session: const AsyncData<AuthUser?>(null),
+        );
+        expect(find.byType(LoginScreen), findsOneWidget);
+        expect(find.byType(OrdersPlaceholderScreen), findsNothing);
+      },
+    );
+
+    testWidgets(
+      '${AppRoutes.profilePath} is the gate — signed in it is the profile '
+      'screen (SCR-07 B7)',
+      (tester) async {
+        await pumpAt(
+          tester,
+          AppRoutes.profilePath,
+          session: const AsyncData<AuthUser?>(
+            AuthUser(uid: 'u1', email: 'a@b.co'),
+          ),
+        );
+        expect(find.byType(ProfileScreen), findsOneWidget);
+        expect(find.byType(LoginScreen), findsNothing);
+      },
+    );
+
+    testWidgets(
+      '${AppRoutes.profilePath} signed out is LoginScreen — same AuthGate '
+      'shape as /home',
+      (tester) async {
+        await pumpAt(
+          tester,
+          AppRoutes.profilePath,
+          session: const AsyncData<AuthUser?>(null),
+        );
+        expect(find.byType(LoginScreen), findsOneWidget);
+        expect(find.byType(ProfileScreen), findsNothing);
+      },
+    );
+
+    testWidgets(
+      '${AppRoutes.checkoutPath} with an open flow is CheckoutScreen, '
+      'signed in (SCR-07 B1)',
+      (tester) async {
+        // `settle: false` — CheckoutScreen owns a Timer.periodic
+        // (`reservationCountdownProvider`); `pumpAndSettle` never returns
+        // against a repeating timer (this file's own `pumpAt` doc comment).
+        await pumpAt(
+          tester,
+          AppRoutes.checkoutPath,
+          session: const AsyncData<AuthUser?>(
+            AuthUser(uid: 'u1', email: 'a@b.co'),
+          ),
+          checkoutFlow: _checkoutFlow(),
+          settle: false,
+        );
+        expect(find.byType(CheckoutScreen), findsOneWidget);
+        expect(find.byType(LoginScreen), findsNothing);
+      },
+    );
+
+    testWidgets(
+      '${AppRoutes.checkoutPath} signed out is LoginScreen — same AuthGate '
+      'shape as /home',
+      (tester) async {
+        await pumpAt(
+          tester,
+          AppRoutes.checkoutPath,
+          session: const AsyncData<AuthUser?>(null),
+          checkoutFlow: _checkoutFlow(),
+          settle: false,
+        );
+        expect(find.byType(LoginScreen), findsOneWidget);
+        expect(find.byType(CheckoutScreen), findsNothing);
+      },
+    );
+
+    testWidgets(
+      '${AppRoutes.privacyPath} is PrivacyScreen — public, reachable with '
+      'no session at all (SCR-07 AC-5)',
+      (tester) async {
+        await pumpAt(
+          tester,
+          AppRoutes.privacyPath,
+          session: const AsyncData<AuthUser?>(null),
+        );
+        expect(find.byType(PrivacyScreen), findsOneWidget);
+        expect(find.byType(LoginScreen), findsNothing);
+      },
+    );
   });
 
   // 🔴 After Amendment 2 (A2-D7) these hold *structurally*: the route carries
@@ -397,6 +608,27 @@ void main() {
         );
 
         expect(find.byType(EmailVerificationScreen), findsNothing);
+        expect(router.state.uri.toString(), AppRoutes.homePath);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'arriving at ${AppRoutes.checkoutPath} with no flow open lands on '
+      'home instead of throwing — same guard as /otp (SCR-07 B1, ADR-0018 '
+      'Amendment 2 A2-D3). Default (settling) pump is safe here: the guard '
+      'redirects before CheckoutScreen — and its Timer.periodic — ever '
+      'mounts.',
+      (tester) async {
+        final GoRouter router = await pumpAt(
+          tester,
+          AppRoutes.checkoutPath,
+          session: const AsyncData<AuthUser?>(
+            AuthUser(uid: 'u1', email: 'a@b.co'),
+          ),
+        );
+
+        expect(find.byType(CheckoutScreen), findsNothing);
         expect(router.state.uri.toString(), AppRoutes.homePath);
         expect(tester.takeException(), isNull);
       },
@@ -827,4 +1059,272 @@ void main() {
       expect(router.state.uri.toString(), AppRoutes.homePath);
     });
   });
+
+  group('F1 — checkoutViewModelProvider must not leak state across flows '
+      '(it must be .autoDispose)', () {
+    late ProviderContainer container;
+
+    // Pumped through `appWithRealRouter`/`routerProvider` — not the
+    // observer-less `pumpAt`/`routedApp` — because (b) below needs
+    // `CheckoutFlowObserver` genuinely installed and clearing
+    // `checkoutFlowProvider` on the real `router.pop()`. A first version of
+    // this harness used `pumpAt` and (b) passed for the wrong reason: with
+    // no observer wired up, `checkoutFlowProvider` never went null on pop
+    // at all, so `_onCountdownExpired`'s guard was never actually exercised
+    // — removing it did not turn the test red. Confirmed by running the
+    // guard-removal mutation against that version first.
+    Future<GoRouter> pumpOnCheckout(WidgetTester tester) async {
+      late GoRouter router;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authViewModelProvider.overrideWith(_NoopAuthViewModel.new),
+            posterRepositoryProvider.overrideWithValue(repository),
+            sessionProvider.overrideWithValue(
+              const AsyncData<AuthUser?>(AuthUser(uid: 'u1', email: 'a@b.co')),
+            ),
+            checkoutFlowProvider.overrideWith(
+              () => SeededCheckoutFlow(_checkoutFlow()),
+            ),
+          ],
+          child: appWithRealRouter(onRouter: (GoRouter r) => router = r),
+        ),
+      );
+      await tester.pump();
+      container = ProviderScope.containerOf(
+        tester.element(find.byType(MaterialApp)),
+      );
+
+      router.go(AppRoutes.homePath);
+      await tester.pumpAndSettle();
+      router.push(AppRoutes.checkoutPath);
+      // Not `pumpAndSettle()` — `/checkout` starts a `Timer.periodic`
+      // (`reservationCountdownProvider`) the moment it mounts, which never
+      // settles. The extra `pump(Duration(...))` lets the push's
+      // page-transition animation run its course instead of leaving
+      // `CheckoutScreen` mid-transition.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byType(CheckoutScreen), findsOneWidget);
+      return router;
+    }
+
+    testWidgets('(a) OrderCreated → back home → reserving a new poster reaches '
+        'CheckoutReady for the new flow, not the previous OrderCreatedView. '
+        '🔴 mutation-locking: reverting checkoutViewModelProvider to a plain '
+        '(non-autoDispose) NotifierProvider turns this red.', (tester) async {
+      final GoRouter router = await pumpOnCheckout(tester);
+
+      // Drives the ViewModel straight to the terminal state a real
+      // `POST /orders` success would reach — this group's subject is
+      // state lifecycle across navigation, not `submit()` itself
+      // (covered in `checkout_view_model_test.dart`).
+      container.read(checkoutViewModelProvider.notifier).state =
+          CheckoutOrderCreated(_order());
+      await tester.pump();
+      expect(find.byType(CheckoutOrderCreatedView), findsOneWidget);
+
+      router.go(AppRoutes.homePath);
+      await tester.pump();
+      // Lets `go()`'s page-transition fully finish. `pump(Duration)` runs on
+      // the test binding's fake clock, not the wall clock — there is no
+      // "sometimes needs longer" here. A duration right after `kThemeAnimation
+      // Duration` (~400ms) is deterministically still mid-transition with the
+      // outgoing `/checkout` page mounted; ~700ms and up is deterministically
+      // past it. 2 seconds is used for margin, not because a shorter duration
+      // is flaky.
+      await tester.pump(const Duration(seconds: 2));
+
+      container.read(checkoutFlowProvider.notifier).start(_checkoutFlow());
+      router.push(AppRoutes.checkoutPath);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+
+      expect(find.byType(CheckoutOrderCreatedView), findsNothing);
+      expect(find.byType(CheckoutAddressForm), findsOneWidget);
+      expect(
+        container.read(checkoutViewModelProvider),
+        isA<CheckoutReady>(),
+        reason:
+            'checkoutViewModelProvider leaked CheckoutOrderCreated from '
+            'the previous flow into a brand-new reservation',
+      );
+    });
+
+    // ✏️ Corrected 2026-09-16 at code-critic round 2 (SCR-07 slice B, N-3).
+    // The doc comment used to claim this router-level test could not
+    // mutation-lock the guard at all, because `tester.pump()` with no
+    // duration doesn't fire the `Future(() {})` `CheckoutFlowObserver.didPop`
+    // defers its `checkoutFlowProvider` clearing into — so the popped screen
+    // and its ViewModel looked torn down "together" only because the
+    // observer's side effect hadn't run yet, not because they actually were.
+    // That was never a real timing race; `pump(Duration.zero)` flushes that
+    // microtask deterministically. Asserting right there — flow cleared,
+    // popped screen's ViewModel still `CheckoutReady`, no
+    // `CheckoutReservationLostView` — now does mutation-lock the guard at
+    // the router level, confirmed below. The guard's unit-level lock in
+    // `checkout_view_model_test.dart`'s "F1 guard" test still stands too;
+    // this is not a replacement for it, just no longer a no-op.
+    testWidgets(
+      '(b) backing out of a Ready checkout, then reserving again fast '
+      'enough that the popped ViewModel has not been autoDispose-collected '
+      'yet, never flashes ReservationLostView and still reaches Ready — '
+      'this is the router-level regression for the scenario the guard '
+      'fixes, mutation-locked at this level too (see the group doc comment '
+      'above).',
+      (tester) async {
+        final GoRouter router = await pumpOnCheckout(tester);
+        expect(container.read(checkoutViewModelProvider), isA<CheckoutReady>());
+
+        // Deliberately no settling duration between the pop and the next
+        // push — this models the "leave, then come straight back" case
+        // `.autoDispose`'s grace period exists for.
+        router.pop();
+        await tester.pump();
+        await tester.pump(Duration.zero); // fires the Future() the observer
+        // deferred `checkoutFlowProvider` clearing into.
+        expect(
+          find.byType(CheckoutReservationLostView),
+          findsNothing,
+          reason:
+              'the old screen is still mid pop-transition here — this is '
+              "the exact instant the guard this test locks protects: "
+              'checkoutFlowProvider is null but the popped ViewModel has '
+              'not been autoDispose-collected yet.',
+        );
+        expect(container.read(checkoutViewModelProvider), isA<CheckoutReady>());
+
+        container.read(checkoutFlowProvider.notifier).start(_checkoutFlow());
+        router.push(AppRoutes.checkoutPath);
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 2));
+
+        expect(find.byType(CheckoutReservationLostView), findsNothing);
+        expect(container.read(checkoutViewModelProvider), isA<CheckoutReady>());
+      },
+    );
+  });
+
+  group(
+    'F2 — CheckoutFlowObserver clears checkoutFlowProvider only on a real '
+    'departure from /checkout (ADR-0018 A2-D4, same shape as OtpFlowObserver)',
+    () {
+      late ProviderContainer container;
+
+      Future<GoRouter> pumpOnCheckout(WidgetTester tester) async {
+        late GoRouter router;
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              authViewModelProvider.overrideWith(_NoopAuthViewModel.new),
+              posterRepositoryProvider.overrideWithValue(repository),
+              sessionProvider.overrideWithValue(
+                const AsyncData<AuthUser?>(
+                  AuthUser(uid: 'u1', email: 'a@b.co'),
+                ),
+              ),
+              checkoutFlowProvider.overrideWith(
+                () => SeededCheckoutFlow(_checkoutFlow()),
+              ),
+            ],
+            child: appWithRealRouter(onRouter: (GoRouter r) => router = r),
+          ),
+        );
+        await tester.pump();
+        container = ProviderScope.containerOf(
+          tester.element(find.byType(MaterialApp)),
+        );
+
+        router.go(AppRoutes.homePath);
+        await tester.pumpAndSettle();
+        router.push(AppRoutes.checkoutPath);
+        // Not `pumpAndSettle()` — `/checkout` starts a `Timer.periodic`
+        // the moment it mounts, which never settles. The extra
+        // `pump(Duration(...))` lets the push's page-transition run its
+        // course instead of leaving `CheckoutScreen` mid-transition.
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.byType(CheckoutScreen), findsOneWidget);
+        expect(container.read(checkoutFlowProvider), isNotNull);
+        return router;
+      }
+
+      testWidgets('a refresh does NOT end the flow', (tester) async {
+        final GoRouter router = await pumpOnCheckout(tester);
+
+        router.refresh();
+        await tester.pump();
+
+        expect(
+          container.read(checkoutFlowProvider),
+          isNotNull,
+          reason: 'refresh cleared the flow the user is still standing in',
+        );
+        expect(find.byType(CheckoutScreen), findsOneWidget);
+      });
+
+      testWidgets(
+        'backing out before finishing ends the flow (the "abandon" case)',
+        (tester) async {
+          final GoRouter router = await pumpOnCheckout(tester);
+
+          router.pop();
+          await tester.pump();
+          await tester.pump(const Duration(seconds: 2));
+
+          expect(find.byType(CheckoutScreen), findsNothing);
+          expect(
+            container.read(checkoutFlowProvider),
+            isNull,
+            reason: 'the flow outlived the screen it belongs to',
+          );
+        },
+      );
+
+      testWidgets(
+        'leaving by "กลับหน้าแรก" after the order is created ends the flow '
+        'too (the "finished" case)',
+        (tester) async {
+          final GoRouter router = await pumpOnCheckout(tester);
+          container.read(checkoutViewModelProvider.notifier).state =
+              CheckoutOrderCreated(_order());
+          await tester.pump();
+          expect(find.byType(CheckoutOrderCreatedView), findsOneWidget);
+
+          router.go(AppRoutes.homePath);
+          await tester.pump();
+          await tester.pump(const Duration(seconds: 2));
+
+          expect(find.byType(CheckoutScreen), findsNothing);
+          expect(container.read(checkoutFlowProvider), isNull);
+        },
+      );
+
+      testWidgets('leaving and coming back with a new reservation reaches '
+          'CheckoutReady with a blank form — nothing from the earlier visit '
+          'survives', (tester) async {
+        final GoRouter router = await pumpOnCheckout(tester);
+
+        router.pop();
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 2));
+        expect(container.read(checkoutFlowProvider), isNull);
+
+        container.read(checkoutFlowProvider.notifier).start(_checkoutFlow());
+        router.push(AppRoutes.checkoutPath);
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 2));
+
+        expect(find.byType(CheckoutScreen), findsOneWidget);
+        expect(container.read(checkoutViewModelProvider), isA<CheckoutReady>());
+        expect(
+          tester
+              .widgetList<TextFormField>(find.byType(TextFormField))
+              .every((w) => (w.controller?.text ?? '').isEmpty),
+          isTrue,
+          reason: 'a field carried text over from the earlier visit',
+        );
+      });
+    },
+  );
 }

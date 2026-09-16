@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../../core/widgets/gradient_background.dart';
 import '../providers/home_posters_provider.dart';
 import '../widgets/home_all_posters_section.dart';
-import '../widgets/home_bottom_nav_bar.dart';
 import '../widgets/home_top_bar_header_delegate.dart';
 
 /// SCR-03 — Home / Discover. The catalog grid off the real `GET /posters`
@@ -87,7 +87,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: const HomeBottomNavBar(),
+      bottomNavigationBar: const AppBottomNavBar(),
     );
   }
 }

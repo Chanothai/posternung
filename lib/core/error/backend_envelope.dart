@@ -15,7 +15,13 @@ import 'package:dio/dio.dart';
 /// the only way to produce a [BackendErrorEnvelope] anywhere else in the
 /// app is to go through [backendErrorEnvelopeOf].
 class BackendErrorEnvelope {
-  const BackendErrorEnvelope._(this.code, this.displayMessage, this.details);
+  const BackendErrorEnvelope._(
+    this.code,
+    this.displayMessage,
+    this.details,
+    this.typedDetails,
+    this.retryAfterSeconds,
+  );
 
   /// The backend's `error_code` — SNAKE_CASE, machine-readable.
   final String code;
@@ -36,7 +42,30 @@ class BackendErrorEnvelope {
   /// legal destination for this is `debugDetail`, and only after the caller
   /// runs it through `debug_log.dart`'s helper themselves; this class does
   /// not do that wrapping on anyone's behalf (Amendment 1 OD-A).
+  ///
+  /// 🔴 **Still true for the raw string, unchanged (ADR-0017 Amendment 2)** —
+  /// what changed is that the *parsed* form of the same data is now also
+  /// available as [typedDetails], for the codes `ADR-0037` A2-D2 guarantees
+  /// carry machine values rather than prose in `details[].message`. Reading
+  /// [typedDetails] is not rendering it; see [OrderException] (`order_
+  /// exception.dart`) for the one place that turns specific rows into typed
+  /// fields a screen may show.
   final String? details;
+
+  /// `details[]` split into `(field, message)` rows, both still `String`
+  /// (ADR-0017 Amendment 2 A2-D2) — `field` is the row's key, `message` is
+  /// the row's raw value (prose on `VALIDATION_ERROR`, a machine value on
+  /// every other code per `ADR-0037` A2-D2). Empty (never `null`) when
+  /// `details` is absent, not a JSON array, or `null`; an entry whose shape
+  /// doesn't match (missing `field`/`message`, or either not a `String`) is
+  /// skipped rather than making parsing throw.
+  final List<({String field, String message})> typedDetails;
+
+  /// Parsed from the `Retry-After` response header, in seconds — a 429
+  /// sends this instead of a `details` row (`ADR-0037` A2-D2: `details` is
+  /// `null` on a rate-limit response). `null` when the header is absent or
+  /// isn't a plain integer.
+  final int? retryAfterSeconds;
 }
 
 /// Parses [e]'s response as a backend `{error_code, message, details}`
@@ -52,7 +81,37 @@ BackendErrorEnvelope? backendErrorEnvelopeOf(DioException e) {
       data['error_code'] as String,
       data['message'] as String?,
       data['details']?.toString(),
+      _typedDetailsOf(data['details']),
+      _retryAfterSecondsOf(e),
     );
   }
   return null;
+}
+
+/// See [BackendErrorEnvelope.typedDetails] — malformed rows are skipped, a
+/// non-list/`null` `details` yields `const []`, never a throw.
+List<({String field, String message})> _typedDetailsOf(Object? details) {
+  if (details is! List) return const [];
+  final rows = <({String field, String message})>[];
+  for (final entry in details) {
+    if (entry is Map &&
+        entry['field'] is String &&
+        entry['message'] is String) {
+      rows.add((
+        field: entry['field'] as String,
+        message: entry['message'] as String,
+      ));
+    }
+  }
+  return rows;
+}
+
+/// See [BackendErrorEnvelope.retryAfterSeconds]. Reads the header's raw
+/// value list rather than `Headers.value()` — the latter throws if a
+/// header ever has more than one value, which would turn a header-shape
+/// surprise into a crash instead of the `null` this function promises.
+int? _retryAfterSecondsOf(DioException e) {
+  final values = e.response?.headers['Retry-After'];
+  if (values == null || values.isEmpty) return null;
+  return int.tryParse(values.first);
 }
