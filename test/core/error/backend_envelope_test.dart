@@ -11,7 +11,11 @@ import 'package:posternung/core/error/backend_envelope.dart';
 // is absent — there would never be a non-null `e.message` for that mutant to
 // leak (code-critic, INF-20 round 2 — same class of bug as M9/M5, this time
 // in this file's own fixture rather than the datasource tests').
-DioException _dioError({required int status, Object? data}) {
+DioException _dioError({
+  required int status,
+  Object? data,
+  Map<String, List<String>>? headers,
+}) {
   final requestOptions = RequestOptions(path: '/test');
   return DioException.badResponse(
     statusCode: status,
@@ -20,6 +24,7 @@ DioException _dioError({required int status, Object? data}) {
       statusCode: status,
       data: data,
       requestOptions: requestOptions,
+      headers: headers == null ? null : Headers.fromMap(headers),
     ),
   );
 }
@@ -122,6 +127,158 @@ void main() {
         ),
         isNull,
       );
+    });
+  });
+
+  // ADR-0017 Amendment 2 A2-D2 / ADR-0037 Amendment 2 A2-D2.
+  group('typedDetails', () {
+    test('splits a well-formed details[] into (field, message) rows, '
+        'preserving message as a raw, unparsed String', () {
+      final envelope = backendErrorEnvelopeOf(
+        _dioError(
+          status: 409,
+          data: {
+            'error_code': 'POSTER_NOT_AVAILABLE',
+            'message': 'มีคนจองใบนี้อยู่แล้ว',
+            'details': [
+              {'field': 'reserved_until', 'message': '2026-09-16T15:30:00Z'},
+            ],
+          },
+        ),
+      );
+
+      expect(envelope, isNotNull);
+      expect(envelope!.typedDetails, hasLength(1));
+      expect(envelope.typedDetails.single.field, 'reserved_until');
+      expect(envelope.typedDetails.single.message, '2026-09-16T15:30:00Z');
+    });
+
+    test('keeps well-formed rows and skips malformed ones in the same '
+        'array, rather than discarding the whole list or throwing', () {
+      final envelope = backendErrorEnvelopeOf(
+        _dioError(
+          status: 409,
+          data: {
+            'error_code': 'RESERVATION_LIMIT_EXCEEDED',
+            'message': 'จองครบจำนวนที่กำหนดแล้ว',
+            'details': [
+              {'field': 'limit', 'message': '3'}, // well-formed
+              {'field': 'no_message'}, // missing message
+              {'message': 'no_field'}, // missing field
+              {'field': 'wrong_type', 'message': 42}, // message not a String
+              {'field': 7, 'message': 'field not a String'},
+              'not a map at all',
+            ],
+          },
+        ),
+      );
+
+      expect(envelope, isNotNull);
+      expect(envelope!.typedDetails, hasLength(1));
+      expect(envelope.typedDetails.single.field, 'limit');
+      expect(envelope.typedDetails.single.message, '3');
+    });
+
+    test('is an empty list — not null — when details is absent', () {
+      final envelope = backendErrorEnvelopeOf(
+        _dioError(
+          status: 404,
+          data: {'error_code': 'POSTER_NOT_FOUND', 'message': 'ไม่พบ'},
+        ),
+      );
+
+      expect(envelope, isNotNull);
+      expect(envelope!.typedDetails, isEmpty);
+    });
+
+    test('is an empty list when details is present but not a JSON array '
+        '(e.g. a bare string or map)', () {
+      final envelope = backendErrorEnvelopeOf(
+        _dioError(
+          status: 500,
+          data: {
+            'error_code': 'SERVER_ERROR',
+            'message': 'เกิดข้อผิดพลาด',
+            'details': 'not a list',
+          },
+        ),
+      );
+
+      expect(envelope, isNotNull);
+      expect(envelope!.typedDetails, isEmpty);
+      // Regression — the pre-existing stringified `details` field must
+      // still be populated exactly as before this field was added.
+      expect(envelope.details, 'not a list');
+    });
+
+    test('regression — the pre-existing `details: String?` field is still '
+        'populated the same way as before typedDetails existed', () {
+      final envelope = backendErrorEnvelopeOf(
+        _dioError(
+          status: 422,
+          data: {
+            'error_code': 'VALIDATION_ERROR',
+            'message': 'ข้อมูลไม่ถูกต้อง',
+            'details': [
+              {
+                'loc': ['body', 'id_token'],
+                'msg': 'field required',
+              },
+            ],
+          },
+        ),
+      );
+
+      expect(envelope, isNotNull);
+      expect(envelope!.details, isNotNull);
+      expect(envelope.details, contains('loc'));
+    });
+  });
+
+  // ADR-0017 Amendment 2 A2-D2 / ADR-0037 Amendment 2 A2-D2 — 429s carry
+  // this in the response header instead of a `details` row.
+  group('retryAfterSeconds', () {
+    test('parses a plain-integer Retry-After header', () {
+      final envelope = backendErrorEnvelopeOf(
+        _dioError(
+          status: 429,
+          data: {'error_code': 'RESERVE_RATE_LIMITED', 'message': 'รัวเกินไป'},
+          headers: {
+            'Retry-After': ['42'],
+          },
+        ),
+      );
+
+      expect(envelope, isNotNull);
+      expect(envelope!.retryAfterSeconds, 42);
+    });
+
+    test('is null when the Retry-After header is absent', () {
+      final envelope = backendErrorEnvelopeOf(
+        _dioError(
+          status: 429,
+          data: {'error_code': 'RESERVE_RATE_LIMITED', 'message': 'รัวเกินไป'},
+        ),
+      );
+
+      expect(envelope, isNotNull);
+      expect(envelope!.retryAfterSeconds, isNull);
+    });
+
+    test('is null when the Retry-After header is not a plain integer '
+        '(e.g. an HTTP-date form) rather than throwing', () {
+      final envelope = backendErrorEnvelopeOf(
+        _dioError(
+          status: 429,
+          data: {'error_code': 'RESERVE_RATE_LIMITED', 'message': 'รัวเกินไป'},
+          headers: {
+            'Retry-After': ['Wed, 16 Sep 2026 15:30:00 GMT'],
+          },
+        ),
+      );
+
+      expect(envelope, isNotNull);
+      expect(envelope!.retryAfterSeconds, isNull);
     });
   });
 }

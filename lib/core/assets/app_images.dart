@@ -31,8 +31,9 @@ abstract final class AppImages {
   static const String searchIcon = 'assets/images/search_icon.svg';
   static const String filterIcon = 'assets/images/filter_icon.svg';
   static const String navHomeIcon = 'assets/images/nav_home_icon.svg';
-  static const String navSearchIcon = 'assets/images/nav_search_icon.svg';
-  static const String navWishlistIcon = 'assets/images/nav_wishlist_icon.svg';
-  static const String navCartIcon = 'assets/images/nav_cart_icon.svg';
+  // `navSearchIcon`/`navWishlistIcon`/`navCartIcon` removed under SCR-07 B7
+  // (`ADR-0037` Amendment 1 — bottom nav cut to 3 tabs: search/wishlist/cart
+  // have no schema or endpoint behind them). The orders tab that replaced
+  // them uses `Icons.receipt_long_outlined` rather than a new asset.
   static const String navProfileIcon = 'assets/images/nav_profile_icon.svg';
 }

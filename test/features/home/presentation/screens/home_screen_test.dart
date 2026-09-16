@@ -11,7 +11,9 @@ import 'package:go_router/go_router.dart';
 import 'package:posternung/core/error/catalog_exception.dart';
 import 'package:posternung/core/router/app_routes.dart';
 import 'package:posternung/core/strings/app_strings.dart';
+import 'package:posternung/features/auth/domain/entities/auth_user.dart';
 import 'package:posternung/features/auth/presentation/providers/auth_providers.dart';
+import 'package:posternung/features/auth/presentation/providers/session_provider.dart';
 import 'package:posternung/features/home/presentation/screens/home_screen.dart';
 import 'package:posternung/features/home/presentation/widgets/home_top_bar.dart';
 import 'package:posternung/features/poster/domain/entities/paginated_posters.dart';
@@ -129,6 +131,13 @@ void main() {
       // The whole real chain above the repository runs — usecase, provider,
       // widgets — with only the network boundary faked. No real Dio anywhere.
       posterRepositoryProvider.overrideWithValue(repository),
+      // Needed since SCR-07 B7: the bottom nav's Profile tab now navigates
+      // to the real `/profile` route (`routesHosting` keeps every route but
+      // `/` real), which sits behind `AuthGate` — without a session here
+      // that gate would show `LoginScreen` instead.
+      sessionProvider.overrideWithValue(
+        const AsyncData<AuthUser?>(AuthUser(uid: 'u1', email: 'a@b.co')),
+      ),
     ],
     // Hosted on the real route table (ADR-0018 D9): a card tap now names
     // `/posters/<uuid>`, so what this proves is that the path resolves to
@@ -731,19 +740,6 @@ void main() {
       expect(find.text('Ending Soon'), findsNothing);
     });
 
-    testWidgets('tapping a not-yet-built nav tab shows the coming-soon '
-        'snackbar', (tester) async {
-      stubList(_page([_summary()]));
-
-      await tester.pumpWidget(wrap());
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('ค้นหา'));
-      await tester.pump();
-
-      expect(find.text('ฟีเจอร์นี้กำลังจะมาเร็ว ๆ นี้'), findsOneWidget);
-    });
-
     testWidgets('the wishlist heart is still coming-soon (US-04 is outside '
         'Phase 1)', (tester) async {
       await useTallSurface(tester);
@@ -758,16 +754,21 @@ void main() {
       expect(find.text('ฟีเจอร์นี้กำลังจะมาเร็ว ๆ นี้'), findsOneWidget);
     });
 
-    testWidgets('tapping Profile signs out', (tester) async {
+    testWidgets('tapping Profile navigates to /profile and does NOT sign out — '
+        '(SCR-07 B7: the old HomeBottomNavBar signed out directly on tap, '
+        'with no confirmation; signing out is now a deliberate, confirmed '
+        'action on ProfileScreen)', (tester) async {
       stubList(_page([_summary()]));
+      late GoRouter router;
 
-      await tester.pumpWidget(wrap());
+      await tester.pumpWidget(wrap(onRouter: (GoRouter r) => router = r));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('โปรไฟล์'));
-      await tester.pump();
+      await tester.tap(find.text(AppStrings.homeNavProfile));
+      await tester.pumpAndSettle();
 
-      expect(authViewModel.signOutCalled, isTrue);
+      expect(router.state.uri.toString(), AppRoutes.profilePath);
+      expect(authViewModel.signOutCalled, isFalse);
     });
 
     testWidgets('top bar collapses continuously on scroll down and recovers '

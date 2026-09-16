@@ -73,6 +73,36 @@ abstract final class AppRoutes {
   /// Call sites use this instead of interpolating a path themselves.
   static String posterDetail(String posterId) => '/posters/$posterId';
 
+  /// The orders tab (SCR-07 B7). Placeholder screen only until SCR-09 wires
+  /// up `GET /orders` — same `AuthGate` shape as [homePath], since a
+  /// signed-out visitor has no orders to place either. Carries nothing:
+  /// there is no argument this screen could render differently on.
+  static const String ordersPath = '/orders';
+  static const String ordersName = 'orders';
+
+  /// The profile tab (SCR-07 B7). Same `AuthGate` shape as [homePath] —
+  /// `AuthUser` only exists once signed in, and this screen reads it.
+  static const String profilePath = '/profile';
+  static const String profileName = 'profile';
+
+  /// SCR-07 B1 — reached by pushing from `PosterDetailScreen`'s "ซื้อเลย"
+  /// flow (B3, out of this slice) once a reservation exists. Carries
+  /// **nothing at all**, same ADR-0018 Amendment 2 A2-D2 shape as [otpPath]:
+  /// the reservation + poster snapshot live in `checkoutFlowProvider`, read
+  /// through `requireRouteState` — there is no `/checkout/:reservationId`
+  /// because there is no `GET /reservations/{id}` to recover the flow from
+  /// a path parameter alone (GATE 1 §6 item 4).
+  static const String checkoutPath = '/checkout';
+  static const String checkoutName = 'checkout';
+
+  /// SCR-07 AC-5 — the privacy notice. **Public**, unlike every other route
+  /// below `homePath`: a PDPA notice has to be readable at the moment data
+  /// is collected, not gated behind having already signed in, and this
+  /// content has to be linkable from outside the app too (a support answer,
+  /// a footer) without requiring a session.
+  static const String privacyPath = '/privacy';
+  static const String privacyName = 'privacy';
+
   /// Every path pattern above. Order is irrelevant; membership is not.
   static const List<String> allPaths = <String>[
     onboardingPath,
@@ -81,6 +111,10 @@ abstract final class AppRoutes {
     otpPath,
     emailVerificationPath,
     posterDetailPath,
+    ordersPath,
+    profilePath,
+    checkoutPath,
+    privacyPath,
   ];
 
   /// Every route name above, paired 1:1 with [allPaths].
@@ -91,5 +125,9 @@ abstract final class AppRoutes {
     otpName,
     emailVerificationName,
     posterDetailName,
+    ordersName,
+    profileName,
+    checkoutName,
+    privacyName,
   ];
 }

@@ -17,17 +17,24 @@ import 'package:posternung/core/error/backend_envelope.dart';
 /// as an explicit JSON `null`) — this is what lets a test exercise "the
 /// envelope has no `message` key at all" (ADR-0017 Amendment 1 AC-9) by
 /// simply not passing it.
+///
+/// [headers], when given, becomes the response's [Headers] — needed to
+/// exercise [BackendErrorEnvelope.retryAfterSeconds] (ADR-0017 Amendment 2
+/// A2-D2), which reads the `Retry-After` response header rather than a
+/// `details` row.
 BackendErrorEnvelope backendEnvelopeFixture({
   required String code,
   String? message,
   Object? details,
   int statusCode = 422,
+  Map<String, List<String>>? headers,
 }) {
   final requestOptions = RequestOptions(path: '/test');
   final response = Response<Map<String, dynamic>>(
     requestOptions: requestOptions,
     statusCode: statusCode,
     data: {'error_code': code, 'message': ?message, 'details': ?details},
+    headers: headers == null ? null : Headers.fromMap(headers),
   );
   final dioException = DioException(
     requestOptions: requestOptions,

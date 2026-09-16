@@ -3,24 +3,35 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:posternung/core/catalog/poster_condition_grade.dart';
 import 'package:posternung/core/catalog/release_region.dart';
 import 'package:posternung/core/catalog/restoration_status.dart';
 import 'package:posternung/core/catalog/size_format.dart';
 import 'package:posternung/core/error/catalog_exception.dart';
+import 'package:posternung/core/error/order_exception.dart';
 import 'package:posternung/core/router/app_router.dart';
 import 'package:posternung/core/router/app_routes.dart';
 import 'package:posternung/core/strings/app_strings.dart';
 import 'package:posternung/core/theme/app_colors.dart';
 import 'package:posternung/core/widgets/gradient_background.dart';
+import 'package:posternung/features/auth/domain/entities/auth_user.dart';
+import 'package:posternung/features/auth/presentation/providers/session_provider.dart';
+import 'package:posternung/features/checkout/domain/entities/reservation.dart';
+import 'package:posternung/features/checkout/domain/repositories/checkout_repository.dart';
+import 'package:posternung/features/checkout/presentation/providers/checkout_providers.dart';
 import 'package:posternung/features/poster/domain/entities/poster_detail.dart';
 import 'package:posternung/features/poster/domain/entities/poster_image.dart';
 import 'package:posternung/features/poster/domain/entities/poster_status.dart';
 import 'package:posternung/features/poster/presentation/providers/poster_providers.dart';
 import '../../../../support/backend_envelope_fixture.dart';
 import '../../../../support/router_harness.dart';
+import 'package:posternung/features/poster/presentation/screens/poster_detail_screen.dart';
 import 'package:posternung/features/poster/presentation/widgets/poster_detail_image_gallery.dart';
 import 'package:posternung/features/poster/presentation/widgets/poster_details_accordion.dart';
+
+class MockCheckoutRepository extends Mock implements CheckoutRepository {}
 
 /// Fake ViewModel that resolves/throws exactly what the test wants —
 /// `build()` throwing is the framework-idiomatic way `AsyncNotifier`
@@ -234,6 +245,11 @@ void main() {
       expect(find.text('เลือกดูโปสเตอร์ชิ้นอื่น'), findsOneWidget);
       // Rest of the listing still renders below the banner.
       expect(listingTitle('Blade Runner'), findsOneWidget);
+      // SCR-07 B3 — the buy button never renders on `sold`; only
+      // `PosterSoldBanner`'s own `OutlinedButton` ("เลือกดูโปสเตอร์ชิ้นอื่น",
+      // asserted above) shows here.
+      expect(find.byType(FilledButton), findsNothing);
+      expect(find.text(AppStrings.posterDetailBuyNowButtonLabel), findsNothing);
     },
   );
 
@@ -978,52 +994,58 @@ void main() {
         // Back + zoom — a wishlist/heart `IconButton` (or any other third
         // one) fails this no matter which icon glyph it uses.
         expect(find.byType(IconButton), findsNWidgets(2));
-        // ADR-0005 §D1 — this screen is read-only. No button-shaped widget
-        // of any kind exists here at all; an "Add to Cart" control built as
-        // any of these fails here regardless of its label's language.
+        // 🔴 SCR-07 B3 — updated allowlist. This screen is no longer
+        // read-only: `_fullPoster()` defaults to `PosterStatus.available`,
+        // so `PosterBuyNowButton` renders its "ซื้อเลย" `FilledButton`
+        // here. It is the *only* button-shaped widget allowed — a second
+        // one (a wishlist toggle, a re-added "Add to Cart") of any of
+        // these types still fails here regardless of its label's language.
         expect(find.byType(ElevatedButton), findsNothing);
-        expect(find.byType(FilledButton), findsNothing);
+        expect(find.byType(FilledButton), findsOneWidget);
         expect(find.byType(OutlinedButton), findsNothing);
         expect(find.byType(TextButton), findsNothing);
-        // Exactly five things may register a tap here. Two of them are the
+        // Six things may register a tap here now — the five audited before
+        // SCR-07 B3 plus the buy-now button. Two of the six are the
         // `IconButton`s already counted above — Material 3's `IconButton`
         // is a `ButtonStyleButton` under the hood, which wraps itself in an
         // `InkWell` too (confirmed against the Flutter 3.44 SDK source; a
         // plain `InkResponse` assumption would have under-counted this).
-        // The other three are the zoom hint, the condition-grade badge
-        // (opens the scale guide, ADR-0003), and the details accordion's
-        // own header (collapse/expand) — `ListTile` always wraps itself in
-        // exactly one `InkWell`, which is what `ExpansionTile` uses under
-        // the hood for its header row. A sixth would mean a new tappable
-        // control slipped in somewhere that isn't an `IconButton`/
-        // `*Button` (already ruled out above).
+        // `FilledButton` is a `ButtonStyleButton` too, so it wraps itself in
+        // exactly one more. The remaining three are the zoom hint, the
+        // condition-grade badge (opens the scale guide, ADR-0003), and the
+        // details accordion's own header (collapse/expand) — `ListTile`
+        // always wraps itself in exactly one `InkWell`, which is what
+        // `ExpansionTile` uses under the hood for its header row. A seventh
+        // would mean a new tappable control slipped in somewhere that
+        // isn't an `IconButton`/`*Button` (already ruled out above).
         final tappableInkWells = tester
             .widgetList<InkWell>(find.byType(InkWell))
             .where((w) => w.onTap != null)
             .length;
-        expect(tappableInkWells, 5);
+        expect(tappableInkWells, 6);
         // Every `InkWell` above is itself implemented with an internal
         // `GestureDetector(onTap: handleTap, ...)` (confirmed against the
         // SDK source — `ink_well.dart`'s `_InkResponseState.build()`), so
         // this count tracks the `InkWell` count 1:1 — *unless* something
         // adds a raw `GestureDetector(onTap: ...)` that isn't backed by an
-        // `InkWell` at all (a plausible way to build a custom "Add to
-        // Cart" control without Material's ripple), which would push this
-        // past 5 without moving the `InkWell` count above. The gallery's
+        // `InkWell` at all (a plausible way to build a custom purchase
+        // control without Material's ripple), which would push this past 6
+        // without moving the `InkWell` count above. The gallery's
         // double-tap-to-zoom `GestureDetector` doesn't count here — it
         // sets `onDoubleTap`, never `onTap`.
         final tappableGestureDetectors = tester
             .widgetList<GestureDetector>(find.byType(GestureDetector))
             .where((w) => w.onTap != null)
             .length;
-        expect(tappableGestureDetectors, 5);
-        // §D8 — no sticky Add to Cart bar. `bottomNavigationBar` alone
+        expect(tappableGestureDetectors, 6);
+        // §D8 — no sticky bar of any kind. `bottomNavigationBar` alone
         // isn't enough (a bar built as a `Positioned` inside the body
         // `Stack` instead would slip past it), but the button/tap-surface
         // counts above already account for every interactive element on
-        // screen, and `14:59` — the one piece of the bar's copy that isn't
-        // free-form Thai prose an allowlist could dodge — still has to
-        // literally not exist.
+        // screen, and `14:59` — the one piece of a sticky bar's copy that
+        // isn't free-form Thai prose an allowlist could dodge — still has
+        // to literally not exist. `PosterBuyNowButton` is an ordinary block
+        // inside the scrolling `ListView`, not a `bottomNavigationBar`.
         expect(
           tester.widget<Scaffold>(find.byType(Scaffold)).bottomNavigationBar,
           isNull,
@@ -1118,6 +1140,10 @@ void main() {
           // ConditionGradeIndicator's own mandated format (ADR-0003).
           '${grade.label} (${grade.scalePosition}/${grade.scaleLength})',
           AppStrings.posterDetailSingleStockNotice,
+          // SCR-07 B3 — the "ซื้อเลย" button's own label. `_fullPoster()`
+          // defaults to `available`, so `PosterBuyNowButton` always renders
+          // here; no failure notice text because nothing has been tapped.
+          AppStrings.posterDetailBuyNowButtonLabel,
           // 🔴 ADR-0014 D27 (2026-08-07) — เดิมเซตนี้มีอีก 3 บรรทัด: หัวข้อ
           // 'ความถูกต้องแท้จริง' · ป้าย 'ผ่านการตรวจสอบความแท้แล้ว' · และ
           // `authenticityNote` ของ fixture ('Verified by in-house expert.')
@@ -1206,5 +1232,356 @@ void main() {
       expect(find.byIcon(Icons.gpp_good_outlined), findsNothing);
       expect(find.byIcon(Icons.gpp_maybe_outlined), findsNothing);
     });
+  });
+
+  group('SCR-07 B3 — the "ซื้อเลย" button', () {
+    late MockCheckoutRepository repository;
+
+    setUp(() {
+      repository = MockCheckoutRepository();
+    });
+
+    Reservation reservation() => Reservation(
+      id: 'r1',
+      posterId: 'p1',
+      createdAt: DateTime.utc(2026, 9, 16, 15, 30),
+      expiresAt: DateTime.utc(2026, 9, 16, 16, 30),
+    );
+
+    Finder buyNowButton() => find.widgetWithText(
+      FilledButton,
+      AppStrings.posterDetailBuyNowButtonLabel,
+    );
+
+    /// Same manual `ProviderScope` shape the AC-5 refresh group above uses
+    /// (not the shared `wrap()` helper) — these tests need to read back
+    /// `posterViewModel.refreshCalls` after the fact, which requires holding
+    /// the exact `FakePosterDetailViewModel` instance the override hands to
+    /// the widget tree.
+    ///
+    /// `sessionProvider` is faked signed-in (same value `app_router_test.dart`
+    /// uses for its `/checkout` reachability tests) because a successful
+    /// reserve navigates to `/checkout`, which sits behind `AuthGate` — with
+    /// no session override that route renders `_SessionProblemScreen`
+    /// instead of `CheckoutScreen`, not a failure of anything this group
+    /// actually tests.
+    Widget wrapWithRepo(
+      FakePosterDetailViewModel posterViewModel, {
+      void Function(GoRouter router)? onRouter,
+    }) => ProviderScope(
+      overrides: [
+        posterDetailViewModelProvider.overrideWith2(
+          (posterId) => posterViewModel,
+        ),
+        checkoutRepositoryProvider.overrideWithValue(repository),
+        sessionProvider.overrideWithValue(
+          const AsyncData<AuthUser?>(AuthUser(uid: 'u1', email: 'a@b.co')),
+        ),
+      ],
+      child: routedApp(
+        location: AppRoutes.posterDetail('p1'),
+        routes: appRoutes,
+        onRouter: onRouter,
+      ),
+    );
+
+    testWidgets(
+      'a `reserved` poster still shows an enabled button, and tapping it '
+      'calls reserveListing — never gated on `status` (AC-15). 🔴 '
+      'mutation-locking: gating `onPressed` on `status == available` turns '
+      'this red',
+      (tester) async {
+        await useTallSurface(tester);
+        when(
+          () => repository.reserveListing('p1'),
+        ).thenAnswer((_) async => reservation());
+        await tester.pumpWidget(
+          wrapWithRepo(
+            FakePosterDetailViewModel(
+              'p1',
+              detail: _fullPoster(status: PosterStatus.reserved),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        final button = buyNowButton();
+        expect(button, findsOneWidget);
+        expect(tester.widget<FilledButton>(button).onPressed, isNotNull);
+
+        await tester.tap(button);
+        await tester.pump();
+        await tester.pump();
+
+        verify(() => repository.reserveListing('p1')).called(1);
+      },
+    );
+
+    testWidgets(
+      'an `available` poster: tapping the button reserves, starts the '
+      'checkout flow with that reservation + this poster snapshot, and '
+      'navigates to /checkout',
+      (tester) async {
+        await useTallSurface(tester);
+        final rsv = reservation();
+        when(
+          () => repository.reserveListing('p1'),
+        ).thenAnswer((_) async => rsv);
+        await tester.pumpWidget(
+          wrapWithRepo(FakePosterDetailViewModel('p1', detail: _fullPoster())),
+        );
+        await tester.pump();
+
+        await tester.tap(buyNowButton());
+        await tester.pump(); // tap → Submitting
+        await tester.pump(); // reserve() resolves → flow started + push
+        // Let the page-route transition finish. Not `pumpAndSettle()` —
+        // `/checkout` starts a `Timer.periodic` countdown the moment it
+        // mounts (`reservationCountdownProvider`), which never settles.
+        await tester.pump(const Duration(milliseconds: 400));
+
+        // Reached /checkout with the right data. `CheckoutScreen` itself
+        // renders the poster's title again inside `CheckoutOrderSummary`
+        // (there are now two on screen — `PosterDetailScreen` underneath
+        // hasn't been popped, only pushed under — so `findsWidgets`, not
+        // `findsOneWidget`), and the submit button is `CheckoutScreen`-only
+        // copy that only `posterSnapshot` making it through could produce.
+        expect(find.text('Blade Runner'), findsWidgets);
+        expect(find.text(AppStrings.checkoutSubmitButtonLabel), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      '409 POSTER_NOT_AVAILABLE with reserved_until shows the absolute '
+      "HH:mm notice under the button and refreshes this screen's poster "
+      '(AC-9). 🔴 mutation-locking: deleting the refresh() call turns this '
+      'red',
+      (tester) async {
+        await useTallSurface(tester);
+        final envelope = backendEnvelopeFixture(
+          code: 'POSTER_NOT_AVAILABLE',
+          details: [
+            {'field': 'reserved_until', 'message': '2026-09-16T08:30:00Z'},
+          ],
+        );
+        when(
+          () => repository.reserveListing('p1'),
+        ).thenThrow(OrderException.fromEnvelope(envelope));
+        final posterViewModel = FakePosterDetailViewModel(
+          'p1',
+          detail: _fullPoster(),
+        );
+        await tester.pumpWidget(wrapWithRepo(posterViewModel));
+        await tester.pump();
+
+        expect(posterViewModel.refreshCalls, 0);
+
+        await tester.tap(buyNowButton());
+        await tester.pump();
+        await tester.pump();
+
+        // Deterministic regardless of the test machine's own timezone —
+        // format the same instant the same way the mapper does, rather
+        // than hardcoding a clock-dependent string (same technique as
+        // `checkout_error_display_test.dart`'s equivalent case).
+        final expectedLocal = DateTime.parse('2026-09-16T08:30:00Z').toLocal();
+        final hh = expectedLocal.hour.toString().padLeft(2, '0');
+        final mm = expectedLocal.minute.toString().padLeft(2, '0');
+        expect(
+          find.text(
+            '${AppStrings.checkoutErrorPosterReservedUntilPrefix}'
+            '$hh:$mm'
+            '${AppStrings.checkoutErrorPosterReservedUntilSuffix}',
+          ),
+          findsOneWidget,
+        );
+        expect(posterViewModel.refreshCalls, 1);
+        // Backend decides, per AC-15 — the button is enabled again, not
+        // stuck disabled after a failure.
+        expect(
+          tester.widget<FilledButton>(buyNowButton()).onPressed,
+          isNotNull,
+        );
+      },
+    );
+
+    testWidgets('429 RESERVE_RATE_LIMITED shows a notice and leaves the button '
+        'enabled — the backend decides, same principle as AC-15, not a '
+        'client-side disable+countdown', (tester) async {
+      await useTallSurface(tester);
+      when(() => repository.reserveListing('p1')).thenThrow(
+        OrderException.fromEnvelope(
+          backendEnvelopeFixture(
+            code: 'RESERVE_RATE_LIMITED',
+            headers: {
+              'Retry-After': ['30'],
+            },
+          ),
+        ),
+      );
+      final posterViewModel = FakePosterDetailViewModel(
+        'p1',
+        detail: _fullPoster(),
+      );
+      await tester.pumpWidget(wrapWithRepo(posterViewModel));
+      await tester.pump();
+
+      // F10 — 429 is a rate-limit code about the buyer's own tapping, not
+      // this poster's stock — it must never trigger the AC-9 refresh
+      // (`_refreshingCodes` in `poster_buy_now_button.dart` deliberately
+      // excludes it).
+      expect(posterViewModel.refreshCalls, 0);
+
+      await tester.tap(buyNowButton());
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        find.text(
+          '${AppStrings.checkoutErrorRateLimitedPrefix}'
+          '30'
+          '${AppStrings.checkoutErrorRateLimitedSuffix}',
+        ),
+        findsOneWidget,
+      );
+      expect(tester.widget<FilledButton>(buyNowButton()).onPressed, isNotNull);
+      expect(posterViewModel.refreshCalls, 0);
+
+      // Tapping again is allowed to go through a second time — proves
+      // "enabled" is not just a visual accident of `onPressed != null`.
+      await tester.tap(buyNowButton());
+      await tester.pump();
+      await tester.pump();
+      verify(() => repository.reserveListing('p1')).called(2);
+      expect(posterViewModel.refreshCalls, 0);
+    });
+
+    testWidgets(
+      '403 BUYER_IS_SELLER shows a notice but does NOT refresh this screen '
+      "— it's about the buyer, not this poster's stock (negative "
+      'assertion, complementing the 409 refresh test above)',
+      (tester) async {
+        await useTallSurface(tester);
+        when(() => repository.reserveListing('p1')).thenThrow(
+          OrderException.fromEnvelope(
+            backendEnvelopeFixture(code: 'BUYER_IS_SELLER'),
+          ),
+        );
+        final posterViewModel = FakePosterDetailViewModel(
+          'p1',
+          detail: _fullPoster(),
+        );
+        await tester.pumpWidget(wrapWithRepo(posterViewModel));
+        await tester.pump();
+
+        await tester.tap(buyNowButton());
+        await tester.pump();
+        await tester.pump();
+
+        expect(
+          find.text(AppStrings.checkoutErrorBuyerIsSeller),
+          findsOneWidget,
+        );
+        expect(posterViewModel.refreshCalls, 0);
+      },
+    );
+
+    testWidgets(
+      'F4 — leaving this screen while reserve() is still in flight does not '
+      'throw once the response finally arrives (context.mounted guard in '
+      'PosterBuyNowButton._onPressed)',
+      (tester) async {
+        await useTallSurface(tester);
+        final completer = Completer<Reservation>();
+        when(
+          () => repository.reserveListing('p1'),
+        ).thenAnswer((_) => completer.future);
+        late GoRouter router;
+        await tester.pumpWidget(
+          wrapWithRepo(
+            FakePosterDetailViewModel('p1', detail: _fullPoster()),
+            onRouter: (r) => router = r,
+          ),
+        );
+        await tester.pump();
+
+        await tester.tap(buyNowButton());
+        await tester.pump(); // tap → Submitting, reserve() in flight
+
+        // Leave — a public route with no data dependency, so the only thing
+        // this exercises is "PosterDetailScreen/PosterBuyNowButton are gone".
+        // The extra `pump(Duration(...))` lets `go()`'s page-transition
+        // finish — otherwise the outgoing route is still mid-transition and
+        // technically still mounted underneath. `pump(Duration)` runs on the
+        // test binding's fake clock, not the wall clock, so this is
+        // deterministic, not "empirically needs real seconds": a duration
+        // right after the nominal ~300ms transition length (~400ms) is
+        // reliably still mid-transition, ~700ms and up is reliably past it
+        // (same finding as `app_router_test.dart`'s F1/F2 groups). 2 seconds
+        // is used for margin.
+        router.go(AppRoutes.privacyPath);
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 2));
+        expect(find.byType(PosterDetailScreen), findsNothing);
+
+        // Now the in-flight call resolves — with a failure, so the pre-fix
+        // code path would go on to call `ref.read(reserveListingViewModel
+        // Provider(...))` and then possibly `posterDetailViewModelProvider
+        // (...).notifier).refresh()` against a disposed widget's `ref`.
+        completer.completeError(
+          const OrderException(code: 'POSTER_NOT_AVAILABLE'),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'F6 — reserveListingViewModelProvider is per-visit: leaving the '
+      'screen after a failed reserve and coming back to the same poster '
+      'shows no leftover notice (the provider must be .autoDispose)',
+      (tester) async {
+        await useTallSurface(tester);
+        when(() => repository.reserveListing('p1')).thenThrow(
+          OrderException.fromEnvelope(
+            backendEnvelopeFixture(code: 'POSTER_NOT_AVAILABLE'),
+          ),
+        );
+        late GoRouter router;
+        await tester.pumpWidget(
+          wrapWithRepo(
+            FakePosterDetailViewModel('p1', detail: _fullPoster()),
+            onRouter: (r) => router = r,
+          ),
+        );
+        await tester.pump();
+
+        await tester.tap(buyNowButton());
+        await tester.pump();
+        await tester.pump();
+        expect(
+          find.text(AppStrings.checkoutErrorPosterSoldOut),
+          findsOneWidget,
+        );
+
+        router.go(AppRoutes.privacyPath);
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 2));
+        router.go(AppRoutes.posterDetail('p1'));
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 2));
+
+        expect(
+          find.text(AppStrings.checkoutErrorPosterSoldOut),
+          findsNothing,
+          reason:
+              'reserveListingViewModelProvider leaked ReserveListingFailed '
+              'from the earlier visit — it must be .autoDispose so a fresh '
+              'visit to the same poster gets a fresh ReserveListingIdle',
+        );
+      },
+    );
   });
 }

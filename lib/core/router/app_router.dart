@@ -10,9 +10,15 @@ import '../../features/auth/presentation/providers/otp_flow_provider.dart';
 import '../../features/auth/presentation/screens/email_verification_screen.dart';
 import '../../features/auth/presentation/screens/otp_verification_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
+import '../../features/checkout/presentation/checkout_flow_observer.dart';
+import '../../features/checkout/presentation/providers/checkout_flow_provider.dart';
+import '../../features/checkout/presentation/screens/checkout_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/onboarding/presentation/onboarding_entry_gate.dart';
+import '../../features/orders/presentation/screens/orders_placeholder_screen.dart';
 import '../../features/poster/presentation/screens/poster_detail_screen.dart';
+import '../../features/privacy/presentation/screens/privacy_screen.dart';
+import '../../features/profile/presentation/screens/profile_screen.dart';
 import 'app_routes.dart';
 import 'route_state_guard.dart';
 
@@ -21,6 +27,15 @@ import 'route_state_guard.dart';
 /// unchanged: this round keeps auth as a widget wrapping the first route and
 /// does **not** move it to a route-level `redirect` (ADR-0018 D4).
 Widget buildHomeScreen(BuildContext context) => const HomeScreen();
+
+/// Same reasoning as [buildHomeScreen] — the orders tab (SCR-07 B7) sits
+/// behind `AuthGate` too, since a signed-out visitor has no orders.
+Widget buildOrdersScreen(BuildContext context) =>
+    const OrdersPlaceholderScreen();
+
+/// Same reasoning as [buildHomeScreen] — the profile tab (SCR-07 B7) reads
+/// `AuthUser`, which only exists once signed in.
+Widget buildProfileScreen(BuildContext context) => const ProfileScreen();
 
 /// The app's route table.
 ///
@@ -98,6 +113,45 @@ final List<RouteBase> appRoutes = <RouteBase>[
       posterId: state.pathParameters[AppRoutes.posterIdParam]!,
     ),
   ),
+  GoRoute(
+    path: AppRoutes.ordersPath,
+    name: AppRoutes.ordersName,
+    builder: (BuildContext context, GoRouterState state) =>
+        const AuthGate(builder: buildOrdersScreen),
+  ),
+  GoRoute(
+    path: AppRoutes.profilePath,
+    name: AppRoutes.profileName,
+    builder: (BuildContext context, GoRouterState state) =>
+        const AuthGate(builder: buildProfileScreen),
+  ),
+  GoRoute(
+    path: AppRoutes.checkoutPath,
+    name: AppRoutes.checkoutName,
+    // Carries no arguments (ADR-0018 Amendment 2 A2-D2): the reservation and
+    // poster snapshot live in `checkoutFlowProvider`, read through
+    // `requireRouteState` exactly like `/otp`/`/verify-email` above. Behind
+    // `AuthGate` too — a checkout with no signed-in buyer can't exist.
+    builder: (BuildContext context, GoRouterState state) => AuthGate(
+      builder: (BuildContext context) => Consumer(
+        builder: (BuildContext context, WidgetRef ref, Widget? _) =>
+            requireRouteState<CheckoutFlowState>(
+              context,
+              ref.read(checkoutFlowProvider),
+              builder: (CheckoutFlowState flow) =>
+                  CheckoutScreen(posterSnapshot: flow.posterSnapshot),
+            ),
+      ),
+    ),
+  ),
+  GoRoute(
+    path: AppRoutes.privacyPath,
+    name: AppRoutes.privacyName,
+    // Public — see AppRoutes.privacyPath's doc comment for why this one
+    // route sits outside AuthGate.
+    builder: (BuildContext context, GoRouterState state) =>
+        const PrivacyScreen(),
+  ),
 ];
 
 /// The single `GoRouter` the app runs on, wired into `MaterialApp.router` in
@@ -114,6 +168,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
     observers: <NavigatorObserver>[
       OtpFlowObserver(ref),
       EmailVerificationFlowObserver(ref),
+      CheckoutFlowObserver(ref),
     ],
   );
   ref.onDispose(router.dispose);
