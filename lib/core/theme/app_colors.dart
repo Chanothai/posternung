@@ -10,6 +10,23 @@ abstract final class AppColors {
   static const Color accent = Color(0xFFA67C52);
   static const Color white = Color(0xFFFFFFFF);
   static const Color borderMuted = Color(0xFFE5E7EB);
+
+  /// The resting border on the white auth inputs (`AuthInputBorders.enabled`)
+  /// and the inactive OTP cell (`_OtpCell` in `otp_verification_screen.dart`)
+  /// — **not** a Figma value, unlike everything else in this file (SCR-02
+  /// gap, opened 2026-09-17 from an owner's on-device SIT read of `SCR-07`
+  /// B9+A5: `borderMuted` on a white fill measures only 1.21:1, "visible in
+  /// a technical sense" but not visible on an actual screen). Computed to
+  /// clear WCAG 1.4.11's 3:1 non-text-contrast floor on white
+  /// (`#948A7C` ≈ 3.39:1 — `test/features/auth/presentation/screens/
+  /// login_screen_test.dart`'s `(ง2)` group asserts this with
+  /// `Color.computeLuminance()`, the same formula), chosen near `accent`'s
+  /// hue (35°) so a *resting* border still reads as part of the same warm
+  /// palette rather than a plain gray. Figma's own source (node `7:130`)
+  /// still shows `#E5E7EB` — `BL-155` tracks getting the design file
+  /// updated to match; this token is the interim source of truth until then.
+  static const Color borderOnLight = Color(0xFF948A7C);
+
   static const Color placeholderGray = Color(0xFF9CA3AF);
   static const Color glassCardFill = Color(0x08FFFCF5);
   static const Color glassCardBorder = Color(0x1ADBD0BA);

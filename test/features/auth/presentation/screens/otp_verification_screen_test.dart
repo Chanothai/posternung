@@ -8,6 +8,7 @@ import 'package:posternung/core/error/auth_exception.dart';
 import 'package:posternung/core/router/app_router.dart';
 import 'package:posternung/core/router/app_routes.dart';
 import 'package:posternung/core/strings/app_strings.dart';
+import 'package:posternung/core/theme/app_colors.dart';
 import 'package:posternung/features/auth/data/datasources/phone_sign_in_data_source.dart';
 import 'package:posternung/features/auth/domain/entities/auth_user.dart';
 import 'package:posternung/features/auth/presentation/providers/auth_providers.dart';
@@ -176,6 +177,47 @@ void main() {
     expect(find.text(AppStrings.authOtpSubtitlePrefix), findsOneWidget);
     expect(find.text(testPhoneNumber), findsOneWidget);
   });
+
+  testWidgets(
+    'SCR-02 gap — the inactive OTP cells paint borderOnLight, not the '
+    'too-faint Figma borderMuted; the one active cell (nothing typed yet, '
+    'so index 0) keeps its own accent border untouched. 🔴 mutation-locking: '
+    'AppColors.borderOnLight reverting to the old #E5E7EB value turns this '
+    'red',
+    (tester) async {
+      await tester.pumpWidget(wrap());
+      await tester.pump();
+
+      final cells = find.byWidgetPredicate(
+        (w) => w.runtimeType.toString() == '_OtpCell',
+      );
+      expect(cells, findsNWidgets(6));
+
+      Color paintedBorder(int index) {
+        final decoratedBox = tester.widget<DecoratedBox>(
+          find.descendant(
+            of: cells.at(index),
+            matching: find.byType(DecoratedBox),
+          ),
+        );
+        final decoration = decoratedBox.decoration as BoxDecoration;
+        return decoration.border!.top.color;
+      }
+
+      // Cell 0: nothing typed yet (code.length == 0 == i), so it is the
+      // active cell — untouched by this fix, still `accent`.
+      expect(paintedBorder(0), AppColors.accent);
+      // Cells 1..5: inactive — this is what SCR-02's gap was about.
+      for (var i = 1; i < 6; i++) {
+        expect(paintedBorder(i), AppColors.borderOnLight, reason: 'cell $i');
+        expect(
+          paintedBorder(i),
+          isNot(AppColors.borderMuted),
+          reason: 'cell $i',
+        );
+      }
+    },
+  );
 
   testWidgets('there is no submit button — verification is automatic', (
     tester,

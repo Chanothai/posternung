@@ -530,11 +530,14 @@ void main() {
     /// WCAG-style relative-luminance contrast ratio of the border as it is
     /// composited onto the fill. The pre-fix state — the theme's white-10%
     /// `inputBorder` blended onto a white fill — is exactly 1.0 (identical
-    /// colour); `borderMuted` (#E5E7EB) on white measures ≈1.21. The
-    /// threshold below sits between those two, so it separates "invisible"
-    /// from "the Figma border" — it is not a WCAG pass mark (3:1 for UI
-    /// components would fail the Figma value too; that is a design call,
-    /// not this test's).
+    /// colour); the Figma resting value `borderMuted` (#E5E7EB) on white
+    /// measures ≈1.21, which is why this group exists at all (SCR-02 gap,
+    /// 2026-09-17: an owner's on-device SIT read called that "visible in a
+    /// technical sense" but not visibly a border). `AppColors.borderOnLight`
+    /// (#948A7C) replaces it for the resting state and clears WCAG 1.4.11's
+    /// 3:1 non-text floor — see that token's own doc comment for the
+    /// computation — so the threshold below **is** the WCAG pass mark now,
+    /// not merely "better than 1.0".
     double contrastOnFill(Color border, Color fill) {
       final Color painted = Color.alphaBlend(border, fill);
       final double l1 = painted.computeLuminance();
@@ -544,7 +547,7 @@ void main() {
       return (hi + 0.05) / (lo + 0.05);
     }
 
-    const double visibleContrast = 1.1;
+    const double wcagNonTextContrast = 3.0;
 
     /// Asserts the painted border/fill of the `TextFormField` at [field].
     void expectVisibleBorder(
@@ -564,7 +567,7 @@ void main() {
         isA<OutlineInputBorder>().having(
           (b) => b.borderSide.color,
           'enabledBorder color',
-          AppColors.borderMuted,
+          AppColors.borderOnLight,
         ),
         reason: '$label must set its own enabledBorder',
       );
@@ -585,9 +588,12 @@ void main() {
       // Negative: the theme's dark-ground resting border (white at 10%)
       // must never be what paints on a white field.
       expect(border, isNot(AppColors.inputBorder), reason: label);
+      // Negative: the old (too-faint) Figma resting value must never be
+      // what paints either — this is the SCR-02 gap this group closes.
+      expect(border, isNot(AppColors.borderMuted), reason: label);
       expect(
         contrastOnFill(border, fill),
-        greaterThan(visibleContrast),
+        greaterThan(wcagNonTextContrast),
         reason:
             '$label border is not visible on its fill '
             '(contrast ${contrastOnFill(border, fill)})',
@@ -619,13 +625,13 @@ void main() {
         expectVisibleBorder(
           tester,
           fields.at(0),
-          expectedBorder: AppColors.borderMuted,
+          expectedBorder: AppColors.borderOnLight,
           label: 'email',
         );
         expectVisibleBorder(
           tester,
           fields.at(1),
-          expectedBorder: AppColors.borderMuted,
+          expectedBorder: AppColors.borderOnLight,
           label: 'password',
         );
         // Height: the theme's 16/12 contentPadding would make these 48.
@@ -648,7 +654,7 @@ void main() {
       expectVisibleBorder(
         tester,
         field,
-        expectedBorder: AppColors.borderMuted,
+        expectedBorder: AppColors.borderOnLight,
         label: 'phone',
       );
       expect(tester.getSize(field).height, 56);
@@ -677,9 +683,10 @@ void main() {
           (container.border as OutlineInputBorder).borderSide.color;
       expect(border, AppColors.accentRed);
       expect(border, isNot(AppColors.inputBorder));
+      expect(border, isNot(AppColors.borderMuted));
       expect(
         contrastOnFill(border, container.fillColor as Color),
-        greaterThan(visibleContrast),
+        greaterThan(wcagNonTextContrast),
       );
     });
   });
