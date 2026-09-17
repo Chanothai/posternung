@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:posternung/core/diagnostics/startup_trace.dart';
 import 'package:posternung/core/error/auth_exception.dart';
 import 'package:posternung/core/network/token_storage.dart';
 import 'package:posternung/features/auth/data/datasources/backend_auth_data_source.dart';
@@ -29,6 +30,8 @@ BackendUser _user() => BackendUser(
 );
 
 void main() {
+  tearDown(StartupTrace.debugReset);
+
   late MockTokenStorage storage;
   late MockGoogleSignInDataSource google;
   late MockEmailPasswordSignInDataSource emailPassword;
@@ -126,6 +129,38 @@ void main() {
         verifyNever(() => storage.clear());
       },
     );
+
+    test('INF-45 AC-5 test #7 — 401 on the first /auth/me, then the retry-path '
+        'refresh() itself hits a transient infra failure: keeps tokens (never '
+        'clears) and traces the same nullInfra outcome _restore() would for a '
+        'first-attempt network_error, not nullCleared', () async {
+      when(() => storage.readAccessToken()).thenAnswer((_) async => 'a');
+      when(
+        () => backend.getMe('a'),
+      ).thenThrow(const AuthException(code: 'unauthorized'));
+      when(
+        () => storage.readRefreshToken(),
+      ).thenAnswer((_) async => 'refresh-token');
+      when(
+        () => backend.refresh('refresh-token'),
+      ).thenThrow(const AuthException(code: 'network_error'));
+
+      final lines = <String>[];
+      StartupTrace.debugSink = lines.add;
+
+      final user = await makeContainer().read(backendSessionProvider.future);
+
+      expect(user, isNull);
+      verifyNever(() => storage.clear());
+      expect(
+        lines.any((l) => l.contains('outcome=null_infra')),
+        isTrue,
+        reason:
+            'expected a restore_end line with outcome=null_infra, got: '
+            '$lines',
+      );
+      expect(lines.any((l) => l.contains('outcome=null_cleared')), isFalse);
+    });
   });
 
   group('signInWithGoogle', () {
