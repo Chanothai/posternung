@@ -451,7 +451,12 @@ class _OtpCell extends StatelessWidget {
     } else if (active) {
       borderColor = AppColors.accent;
     } else {
-      borderColor = AppColors.borderMuted;
+      // SCR-02 gap — see `AppColors.borderOnLight`'s doc comment: `borderMuted`
+      // on this cell's white fill measures 1.21:1, effectively invisible on
+      // an actual screen. `active`/`hasError` still keep their own distinct
+      // colour (and 1.5px width) above, so the inactive/active distinction
+      // this widget draws doesn't depend on this being the muted tone.
+      borderColor = AppColors.borderOnLight;
     }
 
     return SizedBox(

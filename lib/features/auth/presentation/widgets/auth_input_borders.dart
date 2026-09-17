@@ -20,9 +20,15 @@ import '../../../../core/theme/app_colors.dart';
 /// state border is set here explicitly, and `border:` is deliberately not
 /// used at all.
 ///
-/// Colours: resting `borderMuted`, focused `accent`, error `accentRed` —
-/// the Figma auth card values these widgets always named (and, before
-/// B9, never actually rendered).
+/// Colours: resting `borderOnLight`, focused `accent`, error `accentRed`,
+/// disabled `borderMuted`. Only `enabled` (the resting state) departs from
+/// the Figma auth card values these widgets always named — SCR-02 gap,
+/// `AppColors.borderOnLight`'s doc comment has the full story of why
+/// `borderMuted` is not it. `disabled` stays on `borderMuted`/Figma
+/// unchanged: nothing in this app currently renders one of these fields
+/// disabled (grep `enabled:`/`readOnly:` across `features/auth/` is empty),
+/// so there's no on-device contrast complaint to fix here yet — bumping it
+/// too, with nothing to verify it against, would be a guess.
 abstract final class AuthInputBorders {
   AuthInputBorders._();
 
@@ -31,7 +37,7 @@ abstract final class AuthInputBorders {
     borderSide: BorderSide(color: color),
   );
 
-  static final OutlineInputBorder enabled = _outline(AppColors.borderMuted);
+  static final OutlineInputBorder enabled = _outline(AppColors.borderOnLight);
   static final OutlineInputBorder focused = _outline(AppColors.accent);
   static final OutlineInputBorder error = _outline(AppColors.accentRed);
   static final OutlineInputBorder disabled = _outline(AppColors.borderMuted);

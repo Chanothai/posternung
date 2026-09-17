@@ -26,6 +26,7 @@ import 'package:posternung/features/poster/domain/entities/paginated_posters.dar
 import 'package:posternung/features/poster/domain/repositories/poster_repository.dart';
 import 'package:posternung/features/poster/presentation/providers/poster_providers.dart';
 
+import '../../support/in_memory_token_storage.dart';
 import '../../support/router_harness.dart';
 
 /// SCR-01 AC-3 as ADR-0023 D1 rewrote it: *a user with a usable session must
@@ -50,7 +51,7 @@ void main() {
   const AuthUser signedIn = AuthUser(uid: 'u1', email: 'a@b.co');
 
   late _MockPosterRepository repository;
-  late _InMemoryTokenStorage storage;
+  late InMemoryTokenStorage storage;
   late _MockBackendAuthDataSource backendAuth;
 
   setUp(() {
@@ -61,7 +62,7 @@ void main() {
     // than a `signOut()` the fake notifier stubs out: the worst thing a wrong
     // deadline could do is wipe these two values, and a fixture that cannot
     // show that happening cannot fail when it does (`test-quality` §6).
-    storage = _InMemoryTokenStorage(
+    storage = InMemoryTokenStorage(
       accessToken: 'stored-access',
       refreshToken: 'stored-refresh',
     );
@@ -598,47 +599,6 @@ class _FakeBackendSession extends BackendSessionNotifier {
 
 class _MockBackendAuthDataSource extends Mock
     implements BackendAuthDataSource {}
-
-/// `TokenStorage` without the keychain — same API, and it remembers whether
-/// anything cleared it.
-class _InMemoryTokenStorage implements TokenStorage {
-  // Named parameters cannot be private in Dart, so these are plain public
-  // fields — `prefer_initializing_formals` has no other shape to offer here.
-  _InMemoryTokenStorage({
-    required this.accessToken,
-    required this.refreshToken,
-  });
-
-  String? accessToken;
-  String? refreshToken;
-
-  /// Whether [clear] was ever called — the fact a signed-out-by-mistake user
-  /// would feel, and the one a state assertion can miss entirely because a
-  /// still-running restore can write the session back afterwards.
-  bool cleared = false;
-
-  @override
-  Future<String?> readAccessToken() async => accessToken;
-
-  @override
-  Future<String?> readRefreshToken() async => refreshToken;
-
-  @override
-  Future<void> save({
-    required String accessToken,
-    required String refreshToken,
-  }) async {
-    this.accessToken = accessToken;
-    this.refreshToken = refreshToken;
-  }
-
-  @override
-  Future<void> clear() async {
-    cleared = true;
-    accessToken = null;
-    refreshToken = null;
-  }
-}
 
 /// Records every provider that was ever initialised in this scope.
 ///

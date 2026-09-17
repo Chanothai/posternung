@@ -47,10 +47,13 @@ final backendAuthDataSourceProvider = Provider<BackendAuthDataSource>(
 class BackendSessionNotifier extends AsyncNotifier<AuthUser?> {
   @override
   Future<AuthUser?> build() {
-    // AuthInterceptor bumps this when it clears tokens because the refresh
-    // token was missing/rejected on some later authenticated call — react
-    // the same way an explicit sign-out does, so sessionProvider/AuthGate
-    // drop back to the login screen without a manual signOut() call.
+    // AuthInterceptor bumps this on some later authenticated call when the
+    // session can't be recovered client-side — see its class doc comment
+    // (core/network/auth_interceptor.dart) for the closed table of exactly
+    // which three situations that is; not repeated here (one rule, one
+    // place to read it). React the same way an explicit sign-out does, so
+    // sessionProvider/AuthGate drop back to the login screen without a
+    // manual signOut() call.
     ref.listen(sessionExpiryProvider, (previous, next) {
       if (previous != null && next != previous) {
         // INF-40 step 1: trace only — fired on the same branch that flips
@@ -132,7 +135,24 @@ class BackendSessionNotifier extends AsyncNotifier<AuthUser?> {
         elapsed: Duration(milliseconds: StartupTrace.elapsedMs() - startMs),
       );
       return user.toEntity();
-    } on AuthException {
+    } on AuthException catch (e) {
+      // INF-45 AC-5 — same guard as `_restore()` above: a transient infra
+      // failure (`network_error`/`server_error`) on either `refresh()` or
+      // the retried `getMe()` is not proof the refresh token was rejected.
+      // Before this guard, a token expiring right as the network dropped
+      // (refresh itself times out, or the retried `/auth/me` does) cleared
+      // a perfectly good refresh token — the same class of bug `INF-45`
+      // fixed in `AuthInterceptor`, just on this feature's own hand-rolled
+      // startup path (the two are independent: this method predates and
+      // does not go through the interceptor at all — see this class's own
+      // doc comment).
+      if (e.code == 'network_error' || e.code == 'server_error') {
+        StartupTrace.restoreEnd(
+          outcome: RestoreOutcome.nullInfra,
+          elapsed: Duration(milliseconds: StartupTrace.elapsedMs() - startMs),
+        );
+        return null;
+      }
       await storage.clear();
       StartupTrace.restoreEnd(
         outcome: RestoreOutcome.nullCleared,
