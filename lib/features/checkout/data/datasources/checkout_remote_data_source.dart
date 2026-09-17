@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../../../../core/error/backend_envelope.dart';
 import '../../../../core/error/debug_log.dart';
 import '../../../../core/error/order_exception.dart';
+import '../../../../core/utils/http_date.dart';
 import '../models/order_model.dart';
 import '../models/reservation_model.dart';
 import '../models/shipping_address_model.dart';
@@ -31,6 +32,8 @@ class CheckoutRemoteDataSourceImpl implements CheckoutRemoteDataSource {
 
   static const _orders = '/api/v1/orders';
 
+  static const _dateHeader = 'date';
+
   static String _reservePath(String posterId) =>
       '/api/v1/listings/$posterId/reserve';
 
@@ -43,7 +46,20 @@ class CheckoutRemoteDataSourceImpl implements CheckoutRemoteDataSource {
     final response = await _dio.post<Map<String, dynamic>>(
       _reservePath(posterId),
     );
-    return ReservationModel.fromJson(response.data!);
+    // The `Date` header is the server's own clock at the instant it
+    // answered — kept on the DTO so the countdown can anchor a **200**
+    // replay (A5-D1) on "now" rather than on the row's original
+    // `created_at` (code-critic 2026-09-17, F-Med). `null` when missing or
+    // unparseable; the entity falls back to `createdAt` in that case, so a
+    // bad header degrades to the pre-A5 behaviour instead of failing the
+    // reserve. Dio lower-cases header names; `headers[...]` (not
+    // `headers.value(...)`) so a pathological duplicate `Date` can't throw
+    // either.
+    return ReservationModel.fromJson(response.data!).copyWith(
+      serverReceivedAt: tryParseHttpDate(
+        response.headers[_dateHeader]?.firstOrNull,
+      ),
+    );
   });
 
   @override

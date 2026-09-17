@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:posternung/core/router/app_router.dart';
 import 'package:posternung/core/router/app_routes.dart';
+import 'package:posternung/core/theme/app_theme.dart';
 
 /// Builds the `MaterialApp.router` a widget test should pump, over [routes]
 /// and starting at [location].
@@ -18,6 +19,13 @@ import 'package:posternung/core/router/app_routes.dart';
 /// [onRouter] hands back the live `GoRouter` so a test can assert on
 /// `router.state.uri` — that is how the negative assertion about OTP
 /// arguments never reaching a URL is checked.
+///
+/// Installs `AppTheme.dark()` — the theme `main.dart` installs — so a
+/// routed test renders under the same `InputDecorationTheme`/button themes
+/// the app does. Without it (SCR-07 B9 GATE 2 (ง)): the auth inputs'
+/// invisible white-on-white border was reachable only on a device, and
+/// every assertion here about "what is painted" was about `ThemeData()`'s
+/// defaults, not the app's.
 /// There is deliberately no `extra:` parameter. After ADR-0018 Amendment 2
 /// no route takes arguments — state a route needs lives in a provider — and
 /// a harness that still offered a way to hand `extra` to a route would be
@@ -30,7 +38,7 @@ Widget routedApp({
   final GoRouter router = GoRouter(initialLocation: location, routes: routes);
   addTearDown(router.dispose);
   onRouter?.call(router);
-  return MaterialApp.router(routerConfig: router);
+  return MaterialApp.router(theme: AppTheme.dark(), routerConfig: router);
 }
 
 /// The app wired exactly the way `main.dart` wires it — the `GoRouter` that
@@ -51,7 +59,7 @@ Widget appWithRealRouter({void Function(GoRouter router)? onRouter}) {
     builder: (BuildContext context, WidgetRef ref, Widget? _) {
       final GoRouter router = ref.watch(routerProvider);
       onRouter?.call(router);
-      return MaterialApp.router(routerConfig: router);
+      return MaterialApp.router(theme: AppTheme.dark(), routerConfig: router);
     },
   );
 }

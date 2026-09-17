@@ -71,31 +71,60 @@ class ReserveListingViewModel extends Notifier<ReserveListingState> {
   /// navigates away immediately, so [state] resets to [ReserveListingIdle]
   /// on success rather than staying `Submitting` for a screen that is about
   /// to be left.
+  ///
+  /// 🔴 On success the reservation is offered to `checkoutFlowProvider`
+  /// **from here, before any `mounted` check** (`ADR-0037` Amendment 5
+  /// A5-D2) — a response that lands after the buyer has left the screen is
+  /// still kept, so the flow holds a reservation the server has already
+  /// committed. The widget only decides whether to *navigate*.
+  ///
+  /// 🔴 "Offered", not "written": the flow is only taken if no *other*
+  /// poster's flow is open (`CheckoutFlowNotifier.startIfOwnedBy`,
+  /// code-critic 2026-09-17 F-High). When another poster already owns the
+  /// flow — the buyer moved on to B and is on `/checkout` for B — this
+  /// late response is dropped silently and `reserve` returns `null` with
+  /// [state] back at [ReserveListingIdle] (no failure notice, no
+  /// navigation, no refresh): nothing went wrong, and the server still
+  /// holds this reservation for the buyer's next tap (A5-D1 replays it as
+  /// 200).
   Future<Reservation?> reserve(PosterDetail posterSnapshot) async {
     state = const ReserveListingSubmitting();
+    // 🔴 A5-D2 (`ADR-0037` Amendment 5) — grab the flow notifier **before**
+    // the async gap. This notifier is `.autoDispose.family` (F6): if the
+    // buyer leaves the screen while the call below is in flight, Riverpod
+    // disposes this element before the response arrives, and `ref.read`
+    // on a disposed `Ref` throws — so the 201 (or 200) that the backend
+    // has already committed would be thrown away on the client, and the
+    // buyer's next tap would get a 409 for a reservation that is their own
+    // (N-2 in `SCR-07-sliceB-gate3.md`). `checkoutFlowProvider` is a plain
+    // (non-autoDispose) provider, so the `CheckoutFlowNotifier` captured
+    // here stays valid for the life of the container regardless of what
+    // happens to *this* element — writing through it after we are gone is
+    // safe, and is exactly what `test/.../poster_detail_screen_test.dart`'s
+    // "unmount while in flight" test pins.
+    final CheckoutFlowNotifier flow = ref.read(checkoutFlowProvider.notifier);
     try {
       final Reservation reservation = await ref
           .read(reserveListingProvider)
           .call(_posterId);
-      // F4/F6 — this notifier is `.autoDispose.family` (F6), and the caller
-      // (`PosterBuyNowButton`) may have left the screen entirely while the
-      // call above was in flight. If nothing watches `posterId` any more,
-      // Riverpod has already disposed this element by the time we get here,
-      // and `state = ...` on a disposed notifier throws `UnmountedRef
-      // Exception` rather than being a harmless no-op — `ref.mounted` is
-      // the framework's own documented way to check before touching state
-      // after an async gap.
-      if (!ref.mounted) return null;
-      ref
-          .read(checkoutFlowProvider.notifier)
-          .start(
-            CheckoutFlowState(
-              reservation: reservation,
-              posterSnapshot: posterSnapshot,
-            ),
-          );
+      // Offer the reservation to the flow first — mounted or not (A5-D2),
+      // but through the owner-checked gate, never `start()` (F-High: an
+      // unconditional write here is exactly the cross-poster overwrite the
+      // critic's probe reproduced). Only *this* notifier's own `state` is
+      // gated on `ref.mounted` below: `state = ...` on a disposed notifier
+      // throws `UnmountedRefException` rather than being a harmless no-op,
+      // and `ref.mounted` is the framework's own documented check for that.
+      final bool accepted = flow.startIfOwnedBy(
+        _posterId,
+        CheckoutFlowState(
+          reservation: reservation,
+          posterSnapshot: posterSnapshot,
+        ),
+      );
+      final Reservation? result = accepted ? reservation : null;
+      if (!ref.mounted) return result;
       state = const ReserveListingIdle();
-      return reservation;
+      return result;
     } on OrderException catch (e) {
       if (!ref.mounted) return null;
       state = ReserveListingFailed(e);

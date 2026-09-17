@@ -29,12 +29,12 @@ presentation/
     reserve_listing_state.dart       # ReserveListingIdle/Submitting/Failed
   checkout_error_display.dart        # ADR-0017 D4/D9 mapper — orders table (live) + reserve table (live, SCR-07 B3)
   checkout_flow_observer.dart        # clears checkoutFlowProvider on real didPop
-  screens/checkout_screen.dart
+  screens/checkout_screen.dart       # PopScope(canPop: true) + glass back button + sticky CTA bar (B9)
   widgets/
     checkout_countdown_header.dart   # pinned SliverPersistentHeader (AC-8)
-    checkout_order_summary.dart
-    checkout_address_form.dart
-    checkout_order_created_view.dart
+    checkout_order_summary.dart      # AppSectionCard
+    checkout_address_form.dart       # AppSectionCard; fields styled by AppTheme.inputDecorationTheme
+    checkout_order_created_view.dart # AppSectionCard; CTA styled by AppTheme.elevatedButtonTheme
     checkout_reservation_lost_view.dart
 ```
 
@@ -53,8 +53,13 @@ presentation/
   tick would rebuild the whole address form the buyer is typing into.
 - 🔴 **No `DateTime.now()` anywhere in the countdown.** `CheckoutFlowState`
   starts a `Stopwatch` the instant the flow begins (i.e. the moment the
-  reservation response was received), and `remaining = (expiresAt -
-  createdAt) - stopwatch.elapsed` — the *server's* span, anchored once. This
+  reservation response was received), and `remaining =
+  reservation.countdownSpan - stopwatch.elapsed` — the *server's* span,
+  anchored once. `countdownSpan` is `expiresAt - serverReceivedAt` (the
+  response's `Date` header, parsed by `core/utils/http_date.dart` in the
+  data source) so a **200** replay of an older reservation (A5-D1) counts
+  down from what is actually left; it falls back to `expiresAt - createdAt`
+  (exact for a 201) when the header is missing or malformed. This
   is the same reasoning `StartupTrace` uses elsewhere in this app for the
   same reason: a wall-clock read is only ever as good as the device's clock,
   and the backend is the actual authority on when the reservation expires
@@ -104,4 +109,28 @@ presentation/
   starts `checkoutFlowProvider` — it is `poster/`'s `PosterBuyNowButton`
   that calls it, not anything in this feature's own screens. On failure it
   is `reserveErrorDisplayMessage` that renders the notice, same call site.
+  🔴 `ADR-0037` A5-D2: the flow is started **from the notifier, before any
+  `ref.mounted` check**, through a `CheckoutFlowNotifier` captured before
+  the `await` — the VM is `.autoDispose.family` and may be gone when the
+  200/201 lands (buyer left SCR-05), but the flow provider is not, so the
+  server-committed reservation is kept. A5-D1: the data source treats
+  200 (own still-active reservation) and 201 alike — Dio's `validateStatus`,
+  pinned by a real-Dio test. A5-D4: 409 `BUYER_HAS_LIVE_ORDER` →
+  `OrderException.orderNo` → `AppStrings.checkoutErrorBuyerHasLiveOrder`;
+  `PosterBuyNowButton` hides itself on that **code** only (never on
+  `status`, AC-15).
   **B8 (device verification) is still out of this slice.**
+- **No style of its own (SCR-07 B9, B8-UI).** Colours, fonts, input and
+  button looks come from `core/theme/app_theme.dart` + `AppColors`/
+  `AppTextStyles`, sections from `core/widgets/app_section_card.dart`.
+  `test/features/checkout/checkout_no_hardcoded_style_test.dart` bans
+  `TextStyle(` / `Color(0x` / `fontFamily:` / Material `Colors.*` under this
+  feature — add a token to `core/theme/` instead. The one per-field
+  decoration `checkout_address_form.dart` still sets is the 422 highlight,
+  and it points at the theme's own `errorBorder` rather than naming a colour.
+- **Back is always allowed (B8-3).** `CheckoutScreen` wraps its `Scaffold`
+  in `PopScope(canPop: true)` and shows the same `GlassCircleButton` back
+  button SCR-05 has — no confirm dialog, because the reservation is
+  server-side for its 60 minutes and `ADR-0037` A5 hands the same
+  reservation back on a repeat "ซื้อเลย". `CheckoutFlowObserver.didPop`
+  already clears the flow; the screen does not clear it a second time.

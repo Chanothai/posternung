@@ -20,11 +20,15 @@ import 'checkout_flow_provider.dart';
 /// every tick would rebuild the whole form the buyer is typing into.
 ///
 /// 🔴 There is no `60` (minutes or otherwise) anywhere in this file — the
-/// remaining time is `(expiresAt - createdAt) - stopwatch.elapsed`, i.e. the
-/// **server's own span** for this reservation, anchored on the `Stopwatch`
-/// `CheckoutFlowState` started the moment the reservation was received
-/// (AC-8: "ค่าอ่านจาก config ห้าม hardcode" — this goes one step further
-/// and never even materializes the config value client-side).
+/// remaining time is `reservation.countdownSpan - stopwatch.elapsed`, i.e.
+/// the **server's own span** for this reservation, anchored on the
+/// `Stopwatch` `CheckoutFlowState` started the moment the reservation was
+/// received (AC-8: "ค่าอ่านจาก config ห้าม hardcode" — this goes one step
+/// further and never even materializes the config value client-side).
+/// `countdownSpan` is `expiresAt - serverReceivedAt` (the response's `Date`
+/// header) when available, so a **200** replay of an older reservation
+/// (A5-D1) starts from what is actually left, not from the full TTL —
+/// see `Reservation.countdownSpan` (code-critic 2026-09-17, F-Med).
 class ReservationCountdownNotifier extends Notifier<Duration> {
   Timer? _timer;
   Duration _span = Duration.zero;
@@ -45,7 +49,7 @@ class ReservationCountdownNotifier extends Notifier<Duration> {
       return Duration.zero;
     }
 
-    _span = flow.reservation.expiresAt.difference(flow.reservation.createdAt);
+    _span = flow.reservation.countdownSpan;
     _stopwatch = flow.stopwatch;
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
     return _remaining();

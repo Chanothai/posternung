@@ -394,6 +394,7 @@ abstract final class AppStrings {
       'อ่านประกาศเกี่ยวกับความเป็นส่วนตัว';
 
   static const String checkoutSubmitButtonLabel = 'ยืนยันคำสั่งซื้อ';
+  static const String checkoutBackButtonTooltip = 'ย้อนกลับ';
   static const String checkoutRetryButtonLabel = 'ลองใหม่อีกครั้ง';
 
   static const String checkoutReservationLostTitle = 'การจองนี้ใช้ไม่ได้แล้ว';
@@ -426,6 +427,28 @@ abstract final class AppStrings {
   static const String checkoutErrorRateLimitedPrefix =
       'คุณกดจองถี่เกินไป กรุณารออีก ';
   static const String checkoutErrorRateLimitedSuffix = ' วินาที';
+
+  // --- Checkout — reserve 409 `BUYER_HAS_LIVE_ORDER` (SCR-07 `ADR-0037`
+  // Amendment 5 A5-D4, owner's wording from GATE 2) — the poster the buyer
+  // is looking at already has a live order of their own. Composed by
+  // [checkoutErrorBuyerHasLiveOrder] so the sentence never names an order
+  // number it does not have. ---
+  static const String checkoutErrorBuyerHasLiveOrderPrefix =
+      'คุณสั่งซื้อใบนี้แล้ว (';
+  static const String checkoutErrorBuyerHasLiveOrderSuffix = ') · รอชำระเงิน';
+  static const String checkoutErrorBuyerHasLiveOrderNoNumber =
+      'คุณสั่งซื้อใบนี้แล้ว · รอชำระเงิน';
+
+  /// "คุณสั่งซื้อใบนี้แล้ว (PN-…) · รอชำระเงิน" — or the bracket-free
+  /// [checkoutErrorBuyerHasLiveOrderNoNumber] when [orderNo] is `null`
+  /// (`OrderException.orderNo` degrades to `null` on a missing or malformed
+  /// `order_no` row; the sentence must not show empty parentheses then).
+  static String checkoutErrorBuyerHasLiveOrder(String? orderNo) =>
+      orderNo == null
+      ? checkoutErrorBuyerHasLiveOrderNoNumber
+      : '$checkoutErrorBuyerHasLiveOrderPrefix'
+            '$orderNo'
+            '$checkoutErrorBuyerHasLiveOrderSuffix';
 
   // --- Checkout — OrderCreated (SCR-07 `ADR-0037` A4-D1, owner's exact
   // wording — "ห้ามมีคำว่า 'สำเร็จ'" and "ห้ามข้อความที่สัญญาว่า 'ทางร้าน

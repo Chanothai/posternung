@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -6,6 +8,25 @@ import 'package:posternung/features/checkout/data/datasources/checkout_remote_da
 import 'package:posternung/features/checkout/data/models/shipping_address_model.dart';
 
 class MockDio extends Mock implements Dio {}
+
+class MockHttpClientAdapter extends Mock implements HttpClientAdapter {}
+
+/// A wire-level response for the real-`Dio` tests below — the mocked-`Dio`
+/// tests never run Dio's own `validateStatus`, so they cannot say anything
+/// about which HTTP status codes count as success (same shape as
+/// `test/core/network/auth_interceptor_test.dart`).
+ResponseBody _wire(
+  Map<String, dynamic> data,
+  int statusCode, {
+  Map<String, List<String>> extraHeaders = const {},
+}) => ResponseBody.fromString(
+  jsonEncode(data),
+  statusCode,
+  headers: {
+    Headers.contentTypeHeader: [Headers.jsonContentType],
+    ...extraHeaders,
+  },
+);
 
 Response<Map<String, dynamic>> _resp(Map<String, dynamic> data) => Response(
   data: data,
@@ -153,6 +174,154 @@ void main() {
         () => dataSource.reserveListing('p1'),
         throwsA(
           isA<OrderException>().having((e) => e.code, 'code', 'server_error'),
+        ),
+      );
+    });
+  });
+
+  // ADR-0037 Amendment 5 A5-D1 — `POST /listings/{poster_id}/reserve` now
+  // answers **200** (the buyer's own still-active reservation, unchanged)
+  // as well as **201** (a new row). These run through a real `Dio` with a
+  // mocked transport, because the status-code judgement lives in Dio's
+  // `validateStatus` — a `MockDio` that returns a `Response` can neither
+  // prove 200 is accepted nor that 409 is still rejected.
+  group('reserveListing — HTTP status through a real Dio (A5-D1)', () {
+    late MockHttpClientAdapter adapter;
+    late CheckoutRemoteDataSourceImpl realDataSource;
+
+    setUpAll(() {
+      registerFallbackValue(RequestOptions(path: '/'));
+    });
+
+    setUp(() {
+      adapter = MockHttpClientAdapter();
+      realDataSource = CheckoutRemoteDataSourceImpl(
+        Dio(BaseOptions(baseUrl: 'https://api.test'))
+          ..httpClientAdapter = adapter,
+      );
+    });
+
+    for (final status in const [200, 201]) {
+      test('a $status body parses into the reservation — 200 (own existing '
+          'reservation) and 201 (new) are both success', () async {
+        when(
+          () => adapter.fetch(any(), any(), any()),
+        ).thenAnswer((_) async => _wire(_reservationJson(), status));
+
+        final result = await realDataSource.reserveListing('p1');
+
+        expect(result.id, 'r1');
+        expect(result.expiresAt, DateTime.parse('2026-09-16T16:30:00Z'));
+      });
+    }
+
+    // code-critic 2026-09-17 F-Med — the `Date` header is the server's own
+    // clock at the instant it answered; it is what lets a 200 replay count
+    // down from what is actually left. Only a real Dio carries response
+    // headers from the adapter to `response.headers`, so these cannot be
+    // written against `MockDio`.
+    group('Date header → serverReceivedAt', () {
+      test('a well-formed Date header lands on the model as a UTC instant, '
+          'for both 200 (replay) and 201 (new row). 🔴 mutation-locking: '
+          'dropping the `copyWith(serverReceivedAt:)` in the data source '
+          'turns this red', () async {
+        for (final status in const [200, 201]) {
+          when(() => adapter.fetch(any(), any(), any())).thenAnswer(
+            (_) async => _wire(
+              _reservationJson(),
+              status,
+              extraHeaders: const {
+                'date': ['Wed, 16 Sep 2026 16:15:00 GMT'],
+              },
+            ),
+          );
+
+          final result = await realDataSource.reserveListing('p1');
+
+          expect(
+            result.serverReceivedAt,
+            DateTime.utc(2026, 9, 16, 16, 15),
+            reason: 'status $status',
+          );
+          expect(
+            result.toEntity().serverReceivedAt,
+            DateTime.utc(2026, 9, 16, 16, 15),
+          );
+        }
+      });
+
+      test('no Date header → serverReceivedAt is null and the reserve still '
+          'succeeds (fallback to createdAt happens in the entity, not '
+          'here)', () async {
+        when(
+          () => adapter.fetch(any(), any(), any()),
+        ).thenAnswer((_) async => _wire(_reservationJson(), 201));
+
+        final result = await realDataSource.reserveListing('p1');
+
+        expect(result.id, 'r1');
+        expect(result.serverReceivedAt, isNull);
+      });
+
+      test('an unparseable Date header → null, no throw, reserve still '
+          'succeeds (a bad header must never fail the reservation)', () async {
+        when(() => adapter.fetch(any(), any(), any())).thenAnswer(
+          (_) async => _wire(
+            _reservationJson(),
+            201,
+            extraHeaders: const {
+              'date': ['yesterday-ish'],
+            },
+          ),
+        );
+
+        final result = await realDataSource.reserveListing('p1');
+
+        expect(result.id, 'r1');
+        expect(result.serverReceivedAt, isNull);
+      });
+
+      test('a duplicated Date header → first value, no throw (Dio\'s '
+          '`headers.value()` would throw on this; the data source must '
+          'not use it)', () async {
+        when(() => adapter.fetch(any(), any(), any())).thenAnswer(
+          (_) async => _wire(
+            _reservationJson(),
+            201,
+            extraHeaders: const {
+              'date': [
+                'Wed, 16 Sep 2026 16:15:00 GMT',
+                'Wed, 16 Sep 2026 16:16:00 GMT',
+              ],
+            },
+          ),
+        );
+
+        final result = await realDataSource.reserveListing('p1');
+
+        expect(result.serverReceivedAt, DateTime.utc(2026, 9, 16, 16, 15));
+      });
+    });
+
+    test('a 409 through the same real Dio still throws OrderException with '
+        'the envelope code (negative: "2xx is success" is not "anything is '
+        'success")', () async {
+      when(() => adapter.fetch(any(), any(), any())).thenAnswer(
+        (_) async => _wire({
+          'error_code': 'BUYER_HAS_LIVE_ORDER',
+          'message': 'คุณสั่งซื้อโปสเตอร์ใบนี้แล้ว',
+          'details': [
+            {'field': 'order_no', 'message': 'PN-260916-0001'},
+          ],
+        }, 409),
+      );
+
+      await expectLater(
+        () => realDataSource.reserveListing('p1'),
+        throwsA(
+          isA<OrderException>()
+              .having((e) => e.code, 'code', 'BUYER_HAS_LIVE_ORDER')
+              .having((e) => e.orderNo, 'orderNo', 'PN-260916-0001'),
         ),
       );
     });

@@ -5,7 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:posternung/core/error/order_exception.dart';
 import 'package:posternung/core/router/app_routes.dart';
+import 'package:posternung/core/strings/app_strings.dart';
 import 'package:posternung/core/theme/app_colors.dart';
+import 'package:posternung/core/theme/app_theme.dart';
+import 'package:posternung/features/checkout/presentation/checkout_flow_observer.dart';
 import 'package:posternung/features/checkout/domain/entities/order.dart';
 import 'package:posternung/features/checkout/domain/entities/order_status.dart';
 import 'package:posternung/features/checkout/domain/entities/reservation.dart';
@@ -100,7 +103,58 @@ Widget _harness({
         () => SeededCheckoutFlow(flow ?? _flow()),
       ),
     ],
-    child: MaterialApp.router(routerConfig: router),
+    // `AppTheme.dark()` — the theme `main.dart` installs. Not optional here:
+    // since SCR-07 B9 the form's fill/borders/padding and the CTA's shape
+    // come from the theme, so a harness without it would render the
+    // `ThemeData` default and the 422 highlight below (which points at the
+    // theme's own `errorBorder`) would silently never paint.
+    child: MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
+  );
+}
+
+/// The screen **pushed** on top of an origin route, wired with the real
+/// [CheckoutFlowObserver] — for the B9-1 back tests, whose subject is
+/// leaving `/checkout` the way a user does (header button, system back) and
+/// what that does to `checkoutFlowProvider`.
+///
+/// The router is built inside a `Provider` because the observer needs a
+/// `Ref` — the same shape `routerProvider` uses in `app_router.dart`. The
+/// route is registered under [AppRoutes.checkoutName], which is what the
+/// observer's `didPop` keys on; a nameless route would leave the flow
+/// untouched and the assertion on `null` would be testing nothing.
+final Provider<GoRouter> _pushedRouterProvider = Provider<GoRouter>((ref) {
+  final router = GoRouter(
+    initialLocation: '/',
+    routes: [
+      GoRoute(path: '/', builder: (_, _) => const Text('ORIGIN_STUB')),
+      GoRoute(
+        path: AppRoutes.checkoutPath,
+        name: AppRoutes.checkoutName,
+        builder: (_, _) => CheckoutScreen(posterSnapshot: _poster()),
+      ),
+    ],
+    observers: [CheckoutFlowObserver(ref)],
+  );
+  ref.onDispose(router.dispose);
+  return router;
+});
+
+Widget _pushedHarness({
+  required CheckoutRepository repository,
+  required void Function(GoRouter router) onRouter,
+}) {
+  return ProviderScope(
+    overrides: [
+      checkoutRepositoryProvider.overrideWithValue(repository),
+      checkoutFlowProvider.overrideWith(() => SeededCheckoutFlow(_flow())),
+    ],
+    child: Consumer(
+      builder: (context, ref, _) {
+        final router = ref.watch(_pushedRouterProvider);
+        onRouter(router);
+        return MaterialApp.router(theme: AppTheme.dark(), routerConfig: router);
+      },
+    ),
   );
 }
 
@@ -133,15 +187,23 @@ void main() {
     await tester.enterText(fields.at(6), '10110'); // postal code
   }
 
-  // The form is taller than the default 800x600 test surface, so the submit
-  // button starts out below the fold — `ensureVisible` scrolls the
-  // `CustomScrollView` until it's actually hit-testable, the same thing a
-  // real finger would have to do first.
+  // Since SCR-07 B9 the submit button sits in the sticky bottom bar
+  // (`Scaffold.bottomNavigationBar`), not inside the scroll view — it is
+  // always on screen, so no `ensureVisible` is needed (or possible: there is
+  // no `Scrollable` above it).
   Future<void> tapSubmit(WidgetTester tester) async {
-    final submit = find.text('ยืนยันคำสั่งซื้อ');
-    await tester.ensureVisible(submit);
+    await tester.tap(find.text('ยืนยันคำสั่งซื้อ'));
+  }
+
+  /// Scrolls [finder] to the **middle** of the viewport. Since B9 the body
+  /// extends under the blurred sticky bar (`Scaffold.extendBody`), so
+  /// `tester.ensureVisible` — which scrolls the minimum, leaving the target
+  /// hugging the viewport's bottom edge — parks it exactly under the bar,
+  /// where a tap lands on the bar instead. Centering is what a finger
+  /// scrolling past the bar ends up doing anyway.
+  Future<void> scrollToCenter(WidgetTester tester, Finder finder) async {
+    await Scrollable.ensureVisible(tester.element(finder), alignment: 0.5);
     await tester.pump();
-    await tester.tap(submit);
   }
 
   testWidgets('renders the summary, the AC-3 shipping note verbatim, and '
@@ -177,12 +239,11 @@ void main() {
 
       expect(find.byType(Checkbox), findsNothing);
 
-      // The link sits below the fold on the default 800x600 surface — same
-      // `ensureVisible` step `tapSubmit` above needs, or the tap lands on
-      // whatever actually occupies that offset instead.
+      // The link sits below the fold on the default 800x600 surface — it
+      // has to be scrolled into the clear (see `scrollToCenter`), or the tap
+      // lands on whatever actually occupies that offset instead.
       final privacyLink = find.text('อ่านประกาศเกี่ยวกับความเป็นส่วนตัว');
-      await tester.ensureVisible(privacyLink);
-      await tester.pump();
+      await scrollToCenter(tester, privacyLink);
 
       // `pump()`, not `pumpAndSettle()` — the privacy link *pushes*
       // `/privacy` on top of `/`, so `CheckoutScreen` (and its live
@@ -220,8 +281,10 @@ void main() {
 
   group('CheckoutOrderCreated', () {
     testWidgets(
-      'a successful submit shows order_no + "รอชำระเงิน" and exactly one '
-      'tappable control ("กลับหน้าแรก") — closed-world (test-quality §4)',
+      'a successful submit shows order_no + "รอชำระเงิน" and exactly two '
+      'tappable controls — the view\'s "กลับหน้าแรก" and the header back '
+      'button (B9-1: back is always available) — closed-world '
+      '(test-quality §4)',
       (tester) async {
         when(
           () => repository.createOrder(
@@ -257,7 +320,10 @@ void main() {
         expect(find.textContaining('สำเร็จ'), findsNothing);
         expect(find.textContaining('ทางร้านจะติดต่อ'), findsNothing);
 
-        // Exactly one tappable control on the whole screen at this point.
+        // Exactly two tappable controls on the whole screen at this point,
+        // and each is accounted for by name: the view's own CTA and the
+        // header's back button (`GlassCircleButton` is an `IconButton`).
+        // Anything else — a second CTA, a "pay now", a share — fails here.
         final tappable = <Finder>[
           find.byWidgetPredicate(
             (w) => w is ElevatedButton && w.onPressed != null,
@@ -272,7 +338,18 @@ void main() {
           0,
           (sum, f) => sum + tester.widgetList(f).length,
         );
-        expect(total, 1);
+        expect(total, 2);
+        expect(
+          find.ancestor(
+            of: find.text('กลับหน้าแรก'),
+            matching: find.byType(ElevatedButton),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.byTooltip(AppStrings.checkoutBackButtonTooltip),
+          findsOneWidget,
+        );
 
         await tester.tap(find.text('กลับหน้าแรก'));
         await tester.pumpAndSettle();
@@ -385,6 +462,162 @@ void main() {
           borderOf(i).borderSide.color,
           isNot(AppColors.accentRed),
           reason: 'field $i lit up red for a 422 that only named postal_code',
+        );
+      }
+    });
+  });
+
+  group('B9-1 — leaving /checkout (B8-3)', () {
+    /// Lands on `/checkout` *pushed* over the origin route, the way the
+    /// app reaches it from SCR-05 (`context.push`), with the real observer.
+    Future<({GoRouter router, ProviderContainer container})> pumpPushed(
+      WidgetTester tester,
+    ) async {
+      late GoRouter router;
+      await tester.pumpWidget(
+        _pushedHarness(repository: repository, onRouter: (r) => router = r),
+      );
+      await tester.pump();
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(MaterialApp)),
+      );
+
+      router.push(AppRoutes.checkoutPath);
+      // Not `pumpAndSettle()` — the screen's countdown `Timer.periodic`
+      // never settles; let the push transition run out explicitly.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byType(CheckoutScreen), findsOneWidget);
+      expect(router.state.uri.toString(), AppRoutes.checkoutPath);
+      expect(container.read(checkoutFlowProvider), isNotNull);
+      return (router: router, container: container);
+    }
+
+    Future<void> expectLeft(
+      WidgetTester tester,
+      ({GoRouter router, ProviderContainer container}) app,
+    ) async {
+      // The observer clears the flow one event-loop turn after `didPop`.
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+
+      expect(find.byType(CheckoutScreen), findsNothing);
+      expect(find.text('ORIGIN_STUB'), findsOneWidget);
+      expect(app.router.state.uri.toString(), '/');
+      expect(
+        app.container.read(checkoutFlowProvider),
+        isNull,
+        reason: 'CheckoutFlowObserver did not clear the flow on this pop',
+      );
+    }
+
+    testWidgets('(a) the header back button pops the route and the flow is '
+        'cleared by the observer', (tester) async {
+      final app = await pumpPushed(tester);
+
+      final back = find.byTooltip(AppStrings.checkoutBackButtonTooltip);
+      expect(back, findsOneWidget);
+      await tester.tap(back);
+
+      await expectLeft(tester, app);
+    });
+
+    testWidgets('(b) system back — `handlePopRoute()`, the same path '
+        'KEYCODE_BACK / the back gesture take — pops the route too', (
+      tester,
+    ) async {
+      final app = await pumpPushed(tester);
+
+      await tester.binding.handlePopRoute();
+
+      expect(tester.takeException(), isNull);
+      await expectLeft(tester, app);
+    });
+
+    testWidgets('(c) the route is genuinely poppable: `ModalRoute.'
+        'popDisposition` reads `pop` and the one `PopScope` around the '
+        'Scaffold has `canPop: true` — no confirm dialog stands in the way', (
+      tester,
+    ) async {
+      await pumpPushed(tester);
+
+      // Read off the live route, not the widget: this is the value the
+      // navigator actually consults on a back press.
+      final route = ModalRoute.of(tester.element(find.byType(Scaffold)))!;
+      expect(route.popDisposition, RoutePopDisposition.pop);
+
+      // `find.byType(PopScope)` would look for `PopScope<dynamic>` and miss
+      // the `PopScope<Object?>` an untyped constructor call produces.
+      final popScopes = find.ancestor(
+        of: find.byType(Scaffold),
+        matching: find.byWidgetPredicate((w) => w is PopScope),
+      );
+      expect(popScopes, findsOneWidget);
+      expect((tester.widget(popScopes) as PopScope).canPop, isTrue);
+      // Negative: nothing intercepts the pop to show a dialog.
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+  });
+
+  group('AC-B9-3 — the form renders the theme\'s input tokens', () {
+    testWidgets('every field paints `inputFill` and a `inputBorder` outline '
+        '— read off what is rendered, not off `InputDecoration.border`', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_harness(repository: repository));
+      await tester.pump();
+
+      final formFields = find.byType(TextFormField);
+      expect(formFields, findsNWidgets(7));
+
+      for (int i = 0; i < 7; i++) {
+        // 1. The decoration `TextField` hands to `InputDecorator` *after*
+        //    `applyDefaults(theme)` — the theme's values are already merged
+        //    in here, and `enabledBorder` is the one Material 3 resolves for
+        //    an unfocused, error-free field (SCR-02 N-1: `border:` is not).
+        final decorator = tester.widget<InputDecorator>(
+          find.descendant(
+            of: formFields.at(i),
+            matching: find.byType(InputDecorator),
+          ),
+        );
+        final decoration = decorator.decoration;
+        expect(decoration.filled, isTrue, reason: 'field $i is not filled');
+        expect(
+          decoration.fillColor,
+          AppColors.inputFill,
+          reason: 'field $i fill is not the theme token',
+        );
+        final enabled = decoration.enabledBorder;
+        expect(enabled, isA<OutlineInputBorder>(), reason: 'field $i');
+        expect(
+          (enabled! as OutlineInputBorder).borderSide.color,
+          AppColors.inputBorder,
+          reason: 'field $i resting border is not the theme token',
+        );
+        // Negative: the pre-B9 white fill / grey border must be gone.
+        expect(decoration.fillColor, isNot(AppColors.white));
+        expect(enabled.borderSide.color, isNot(AppColors.borderMuted));
+
+        // 2. What `InputDecorator` actually painted: its private
+        //    `_BorderContainer` carries the resolved `border` and
+        //    `fillColor` that `CustomPaint`s the box. Reached by type name
+        //    + dynamic member access because the class is private to
+        //    Flutter — if Flutter renames it this fails loudly (the
+        //    `findsOneWidget` below), never silently.
+        final painted = find.descendant(
+          of: formFields.at(i),
+          matching: find.byWidgetPredicate(
+            (w) => w.runtimeType.toString() == '_BorderContainer',
+          ),
+        );
+        expect(painted, findsOneWidget, reason: 'field $i');
+        final dynamic container = tester.widget(painted);
+        expect(container.fillColor, AppColors.inputFill, reason: 'field $i');
+        expect(
+          (container.border as OutlineInputBorder).borderSide.color,
+          AppColors.inputBorder,
+          reason: 'field $i',
         );
       }
     });

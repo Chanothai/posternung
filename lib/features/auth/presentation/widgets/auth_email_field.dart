@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/assets/app_images.dart';
-import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import 'auth_input_borders.dart';
 
 /// Labeled email input shared by login and register.
 class AuthEmailField extends StatelessWidget {
@@ -56,10 +56,14 @@ class AuthEmailField extends StatelessWidget {
                 height: 16,
               ),
             ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppRadius.xs),
-              borderSide: const BorderSide(color: AppColors.borderMuted),
-            ),
+            // Every state border explicitly, never `border:` alone — see
+            // `AuthInputBorders` for why `border:` never paints under M3.
+            enabledBorder: AuthInputBorders.enabled,
+            focusedBorder: AuthInputBorders.focused,
+            errorBorder: AuthInputBorders.error,
+            focusedErrorBorder: AuthInputBorders.error,
+            disabledBorder: AuthInputBorders.disabled,
+            contentPadding: AuthInputBorders.contentPadding,
           ),
           validator: (value) {
             if (value == null || !value.contains('@')) {

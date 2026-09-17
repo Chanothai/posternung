@@ -33,7 +33,7 @@ class CheckoutFlowState {
   /// Started the instant this flow began — i.e. the moment the reservation
   /// response was received, not whenever `/checkout` happens to build.
   /// `reservationCountdownProvider` computes remaining time as
-  /// `(expiresAt - createdAt) - stopwatch.elapsed`, anchored here rather
+  /// `reservation.countdownSpan - stopwatch.elapsed`, anchored here rather
   /// than on repeated `DateTime.now()` reads (GATE 1 §6 item 5 — the same
   /// reasoning `StartupTrace` uses elsewhere in this app).
   final Stopwatch stopwatch;
@@ -45,11 +45,43 @@ class CheckoutFlowState {
 /// be called from `CheckoutFlowObserver.didPop` and not from
 /// `State.dispose()`/`GoRoute.onExit` (both also fire on a
 /// `GoRouter.refresh()` that never left the route).
+///
+/// 🔴 The reserve path (`ReserveListingViewModel.reserve`) must write
+/// through [startIfOwnedBy], never [start] — see that method for why.
+/// [start] stays as the unconditional write for callers that *know* no
+/// other flow can be open (today: tests seeding a flow directly).
 class CheckoutFlowNotifier extends Notifier<CheckoutFlowState?> {
   @override
   CheckoutFlowState? build() => null;
 
   void start(CheckoutFlowState flow) => state = flow;
+
+  /// Writes [flow] only if no other poster's flow is currently open —
+  /// i.e. the current state is `null`, or its reservation is for the same
+  /// [posterId]. Returns whether the write happened.
+  ///
+  /// This is the single gate for reserve responses, and it **reconciles
+  /// rather than overwrites** (code-critic 2026-09-17, F-High): since
+  /// `ADR-0037` A5-D2 the reserve response is handed to this notifier
+  /// even after the buyer has left the poster's screen, which opened a
+  /// cross-poster race — tap "ซื้อเลย" on A, leave before the response,
+  /// open B, tap again, land on `/checkout` holding B; then A's late 201
+  /// arrives. An unconditional `start(A)` would replace B's flow while the
+  /// screen still shows B's snapshot, and `CheckoutViewModel.submit()`
+  /// (which reads `reservation.id` from here) would `POST /orders` for A.
+  /// Dropping A's response instead loses nothing: the server still holds
+  /// A's reservation, and A5-D1 replays it as 200 on the buyer's next tap.
+  ///
+  /// The decision lives here — not in the view model — so there is exactly
+  /// one place that can answer "may this response become the open flow?".
+  bool startIfOwnedBy(String posterId, CheckoutFlowState flow) {
+    final CheckoutFlowState? current = state;
+    if (current != null && current.reservation.posterId != posterId) {
+      return false;
+    }
+    state = flow;
+    return true;
+  }
 
   void clear() => state = null;
 }

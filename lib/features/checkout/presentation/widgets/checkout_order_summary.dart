@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/app_section_card.dart';
 import '../../../poster/domain/entities/poster_detail.dart';
 
 /// The order summary block (SCR-07 AC-3/AC-1, BUSINESS_RULES.md BR-B3) —
@@ -25,21 +25,11 @@ class CheckoutOrderSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: AppColors.glassCardFill,
-        border: Border.all(color: AppColors.glassCardBorder),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
+    return AppSectionCard(
+      title: AppStrings.checkoutSummaryTitle,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            AppStrings.checkoutSummaryTitle,
-            style: AppTextStyles.authCardHeading,
-          ),
-          const SizedBox(height: AppSpacing.md),
           Text(
             poster.title,
             style: AppTextStyles.bodyDescription.copyWith(

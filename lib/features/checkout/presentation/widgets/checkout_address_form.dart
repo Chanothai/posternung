@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/strings/app_strings.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/app_section_card.dart';
 import '../../domain/entities/shipping_address.dart';
 
 /// The 7-field shipping-address form (SCR-07 AC-1) — one page, no
@@ -13,6 +12,10 @@ import '../../domain/entities/shipping_address.dart';
 /// (120/20/‒/80/80/80/10) so a 422 from exceeding one is not reachable
 /// through this UI at all; `invalidFields` still exists for the case the
 /// backend rejects something this client's own validation missed.
+///
+/// Every field's fill, borders and padding come from
+/// `AppTheme.inputDecorationTheme` (SCR-07 B9); the form declares only what
+/// differs per field — see [_Field].
 class CheckoutAddressForm extends StatelessWidget {
   const CheckoutAddressForm({
     required this.formKey,
@@ -70,101 +73,103 @@ class CheckoutAddressForm extends StatelessWidget {
   Widget build(BuildContext context) {
     return Form(
       key: formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            AppStrings.checkoutFormSectionTitle,
-            style: AppTextStyles.authCardHeading,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _Field(
-            label: AppStrings.checkoutFormRecipientNameLabel,
-            controller: recipientNameController,
-            maxLength: 120,
-            required: true,
-            highlighted: invalidFields.contains('recipient_name'),
-            enabled: enabled,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _Field(
-            label: AppStrings.checkoutFormRecipientPhoneLabel,
-            controller: recipientPhoneController,
-            maxLength: 20,
-            required: true,
-            keyboardType: TextInputType.phone,
-            highlighted: invalidFields.contains('recipient_phone'),
-            enabled: enabled,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _Field(
-            label: AppStrings.checkoutFormAddressLineLabel,
-            controller: addressLineController,
-            required: true,
-            maxLines: 2,
-            highlighted: invalidFields.contains('address_line'),
-            enabled: enabled,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _Field(
-            label:
-                '${AppStrings.checkoutFormSubDistrictLabel}'
-                '${AppStrings.checkoutFormOptionalSuffix}',
-            controller: subDistrictController,
-            maxLength: 80,
-            highlighted: invalidFields.contains('sub_district'),
-            enabled: enabled,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _Field(
-            label:
-                '${AppStrings.checkoutFormDistrictLabel}'
-                '${AppStrings.checkoutFormOptionalSuffix}',
-            controller: districtController,
-            maxLength: 80,
-            highlighted: invalidFields.contains('district'),
-            enabled: enabled,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _Field(
-            label: AppStrings.checkoutFormProvinceLabel,
-            controller: provinceController,
-            maxLength: 80,
-            required: true,
-            highlighted: invalidFields.contains('province'),
-            enabled: enabled,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _Field(
-            label: AppStrings.checkoutFormPostalCodeLabel,
-            controller: postalCodeController,
-            maxLength: 10,
-            required: true,
-            keyboardType: TextInputType.number,
-            highlighted: invalidFields.contains('postal_code'),
-            enabled: enabled,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          GestureDetector(
-            onTap: onPrivacyTap,
-            child: Text(
-              AppStrings.checkoutPrivacyLinkText,
-              style: AppTextStyles.linkBold,
+      child: AppSectionCard(
+        title: AppStrings.checkoutFormSectionTitle,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _Field(
+              label: AppStrings.checkoutFormRecipientNameLabel,
+              controller: recipientNameController,
+              maxLength: 120,
+              required: true,
+              highlighted: invalidFields.contains('recipient_name'),
+              enabled: enabled,
             ),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.md),
+            _Field(
+              label: AppStrings.checkoutFormRecipientPhoneLabel,
+              controller: recipientPhoneController,
+              maxLength: 20,
+              required: true,
+              keyboardType: TextInputType.phone,
+              highlighted: invalidFields.contains('recipient_phone'),
+              enabled: enabled,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _Field(
+              label: AppStrings.checkoutFormAddressLineLabel,
+              controller: addressLineController,
+              required: true,
+              maxLines: 2,
+              highlighted: invalidFields.contains('address_line'),
+              enabled: enabled,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _Field(
+              label:
+                  '${AppStrings.checkoutFormSubDistrictLabel}'
+                  '${AppStrings.checkoutFormOptionalSuffix}',
+              controller: subDistrictController,
+              maxLength: 80,
+              highlighted: invalidFields.contains('sub_district'),
+              enabled: enabled,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _Field(
+              label:
+                  '${AppStrings.checkoutFormDistrictLabel}'
+                  '${AppStrings.checkoutFormOptionalSuffix}',
+              controller: districtController,
+              maxLength: 80,
+              highlighted: invalidFields.contains('district'),
+              enabled: enabled,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _Field(
+              label: AppStrings.checkoutFormProvinceLabel,
+              controller: provinceController,
+              maxLength: 80,
+              required: true,
+              highlighted: invalidFields.contains('province'),
+              enabled: enabled,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _Field(
+              label: AppStrings.checkoutFormPostalCodeLabel,
+              controller: postalCodeController,
+              maxLength: 10,
+              required: true,
+              keyboardType: TextInputType.number,
+              highlighted: invalidFields.contains('postal_code'),
+              enabled: enabled,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            GestureDetector(
+              onTap: onPrivacyTap,
+              child: Text(
+                AppStrings.checkoutPrivacyLinkText,
+                style: AppTextStyles.linkBold,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-OutlineInputBorder _outlineBorder(bool highlighted) => OutlineInputBorder(
-  borderRadius: BorderRadius.circular(AppRadius.xs),
-  borderSide: BorderSide(
-    color: highlighted ? AppColors.accentRed : AppColors.borderMuted,
-  ),
-);
-
+/// One labelled input. Fill, resting/focused/disabled/error borders, content
+/// padding and hint style are all the theme's; the only decoration this
+/// widget sets is what the theme cannot know per field:
+///
+/// - `counterText: ''` — `maxLength` would otherwise render a "0/120"
+///   counter under every field.
+/// - the [highlighted] override — a backend 422 named this field, but there
+///   is no `errorText` to show (ADR-0017 D3: the validator prose is never
+///   rendered), so the theme's error state never engages on its own. The
+///   resting/focused/disabled borders are pointed at the theme's **own**
+///   `errorBorder` for that one field; no colour is restated here.
 class _Field extends StatelessWidget {
   const _Field({
     required this.label,
@@ -188,10 +193,13 @@ class _Field extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final InputBorder? highlightBorder = highlighted
+        ? Theme.of(context).inputDecorationTheme.errorBorder
+        : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: AppTextStyles.inputLabel),
+        Text(label, style: AppTextStyles.formLabel),
         const SizedBox(height: AppSpacing.xs),
         TextFormField(
           controller: controller,
@@ -199,21 +207,16 @@ class _Field extends StatelessWidget {
           maxLength: maxLength,
           maxLines: maxLines,
           keyboardType: keyboardType,
-          style: AppTextStyles.inputText,
+          style: AppTextStyles.inputTextOnDark,
           decoration: InputDecoration(
-            filled: true,
-            fillColor: AppColors.white,
             counterText: '',
-            // Material 3's `InputDecorator` never falls back to `border:`
-            // when it has a Material 3 theme (it replaces the side with the
-            // theme's `activeIndicatorBorder` instead) — every state used by
-            // this field must be set explicitly or the red-highlight case
-            // never renders.
-            enabledBorder: _outlineBorder(highlighted),
-            focusedBorder: _outlineBorder(highlighted),
-            disabledBorder: _outlineBorder(highlighted),
-            errorBorder: _outlineBorder(true),
-            focusedErrorBorder: _outlineBorder(true),
+            // `null` = the theme's value (`InputDecoration.applyDefaults`
+            // fills only what is left unset). Material 3 resolves these
+            // per-state borders, never the plain `border:` (SCR-02 N-1), so
+            // the highlight has to be set on exactly these three.
+            enabledBorder: highlightBorder,
+            focusedBorder: highlightBorder,
+            disabledBorder: highlightBorder,
           ),
           validator: (value) {
             if (required && (value == null || value.trim().isEmpty)) {

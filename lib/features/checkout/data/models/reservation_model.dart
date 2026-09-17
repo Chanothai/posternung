@@ -21,6 +21,11 @@ abstract class ReservationModel with _$ReservationModel {
     required String status,
     @JsonKey(name: 'expires_at') required DateTime expiresAt,
     @JsonKey(name: 'created_at') required DateTime createdAt,
+    // Not on the wire — filled in by `CheckoutRemoteDataSourceImpl` from
+    // the response's `Date` header via `copyWith`, after `fromJson`. See
+    // `Reservation.serverReceivedAt` for why the countdown needs it.
+    @JsonKey(includeFromJson: false, includeToJson: false)
+    DateTime? serverReceivedAt,
   }) = _ReservationModel;
 
   factory ReservationModel.fromJson(Map<String, dynamic> json) =>
@@ -31,5 +36,6 @@ abstract class ReservationModel with _$ReservationModel {
     posterId: posterId,
     expiresAt: expiresAt,
     createdAt: createdAt,
+    serverReceivedAt: serverReceivedAt,
   );
 }

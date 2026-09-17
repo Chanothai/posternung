@@ -83,7 +83,12 @@ presentation/
                   #   ADR-0021 D3 — not on which screen shows it),
                   #   AuthPrimaryButton, AuthNavLinkRow. Screen-specific
                   #   widgets (method tabs, phone field) stay private to
-                  #   their screen.
+                  #   their screen. AuthInputBorders — the white inputs'
+                  #   own per-state OutlineInputBorders + 56px padding,
+                  #   shared by email/password/phone: under `AppTheme`'s
+                  #   dark `inputDecorationTheme` a field that sets only
+                  #   `border:` paints the theme's white-10% side (invisible
+                  #   on white, SCR-02 N-1) — every state must be explicit.
   auth_gate.dart  # gates a destination behind sessionProvider (AuthGate)
   otp_flow_observer.dart / email_verification_flow_observer.dart
                   # end the respective flow on a real NavigatorObserver

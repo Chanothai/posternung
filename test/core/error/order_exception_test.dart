@@ -16,6 +16,7 @@ void main() {
       expect(exception.expiredAt, isNull);
       expect(exception.limit, isNull);
       expect(exception.retryAfter, isNull);
+      expect(exception.orderNo, isNull);
       expect(exception.validationFields, isEmpty);
     });
   });
@@ -83,6 +84,48 @@ void main() {
       expect(exception.retryAfter, const Duration(seconds: 42));
     });
 
+    test('orderNo is the order_no row verbatim on BUYER_HAS_LIVE_ORDER '
+        '(ADR-0037 Amendment 5 A5-D4)', () {
+      final envelope = backendEnvelopeFixture(
+        code: 'BUYER_HAS_LIVE_ORDER',
+        message: 'คุณสั่งซื้อโปสเตอร์ใบนี้แล้ว',
+        details: [
+          {'field': 'order_no', 'message': 'PN-260916-0001'},
+        ],
+      );
+
+      final exception = OrderException.fromEnvelope(envelope);
+
+      expect(exception.orderNo, 'PN-260916-0001');
+    });
+
+    test('orderNo still parses on a different code that happens to carry an '
+        'order_no row — keyed by field name, not by code (same rule as '
+        'reservedUntil)', () {
+      final envelope = backendEnvelopeFixture(
+        code: 'SOME_FUTURE_CODE',
+        message: 'x',
+        details: [
+          {'field': 'order_no', 'message': 'PN-260916-0042'},
+        ],
+      );
+
+      expect(OrderException.fromEnvelope(envelope).orderNo, 'PN-260916-0042');
+    });
+
+    test('orderNo accepts a running number wider than 4 digits — the '
+        'backend\'s `:04d` is a minimum width, not a cap', () {
+      final envelope = backendEnvelopeFixture(
+        code: 'BUYER_HAS_LIVE_ORDER',
+        message: 'x',
+        details: [
+          {'field': 'order_no', 'message': 'PN-260916-12345'},
+        ],
+      );
+
+      expect(OrderException.fromEnvelope(envelope).orderNo, 'PN-260916-12345');
+    });
+
     test('retryAfter is null when there is no Retry-After header', () {
       final envelope = backendEnvelopeFixture(
         code: 'POSTER_NOT_AVAILABLE',
@@ -125,6 +168,37 @@ void main() {
       expect(exception.reservedUntil, isNull);
     });
 
+    // 🔴 Mutation-locking (A5-D4): `orderNo` is embedded verbatim into a Thai
+    // sentence on screen, so an `order_no` row carrying prose must degrade to
+    // `null` — never reach the UI. Verified by mutating `_orderNoField` to
+    // return `row.message` unconditionally: this test goes red while the
+    // happy-path test above stays green.
+    test('orderNo is null when the order_no row is a sentence rather than a '
+        'PN-YYMMDD-NNNN value', () {
+      final envelope = backendEnvelopeFixture(
+        code: 'BUYER_HAS_LIVE_ORDER',
+        message: 'x',
+        details: [
+          {
+            'field': 'order_no',
+            'message': 'คุณสั่งซื้อไปแล้วในเลขที่ PN-260916-0001 กรุณาชำระเงิน',
+          },
+        ],
+      );
+
+      expect(OrderException.fromEnvelope(envelope).orderNo, isNull);
+    });
+
+    test('orderNo is null when the order_no row is absent on '
+        'BUYER_HAS_LIVE_ORDER (no throw)', () {
+      final envelope = backendEnvelopeFixture(
+        code: 'BUYER_HAS_LIVE_ORDER',
+        message: 'x',
+      );
+
+      expect(OrderException.fromEnvelope(envelope).orderNo, isNull);
+    });
+
     test('limit is null when the limit row is not a plain integer', () {
       final envelope = backendEnvelopeFixture(
         code: 'RESERVATION_LIMIT_EXCEEDED',
@@ -151,6 +225,7 @@ void main() {
       expect(exception.reservedUntil, isNull);
       expect(exception.expiredAt, isNull);
       expect(exception.limit, isNull);
+      expect(exception.orderNo, isNull);
     });
 
     test('every typed field is null when details is present but is not a '
@@ -166,6 +241,7 @@ void main() {
       expect(exception.reservedUntil, isNull);
       expect(exception.expiredAt, isNull);
       expect(exception.limit, isNull);
+      expect(exception.orderNo, isNull);
     });
   });
 

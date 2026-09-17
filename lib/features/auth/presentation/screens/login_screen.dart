@@ -22,6 +22,7 @@ import '../providers/otp_flow_provider.dart';
 import '../providers/auth_providers.dart';
 import '../widgets/auth_email_field.dart';
 import '../widgets/auth_error_banner.dart';
+import '../widgets/auth_input_borders.dart';
 import '../widgets/auth_nav_link_row.dart';
 import '../widgets/auth_password_field.dart';
 import '../widgets/auth_primary_button.dart';
@@ -478,14 +479,14 @@ class _PhoneField extends StatelessWidget {
             prefixStyle: AppTextStyles.inputText.copyWith(
               color: AppColors.placeholderGray,
             ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.lg,
-              vertical: AppSpacing.lg,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppRadius.xs),
-              borderSide: const BorderSide(color: AppColors.borderMuted),
-            ),
+            // Every state border explicitly, never `border:` alone — see
+            // `AuthInputBorders` for why `border:` never paints under M3.
+            enabledBorder: AuthInputBorders.enabled,
+            focusedBorder: AuthInputBorders.focused,
+            errorBorder: AuthInputBorders.error,
+            focusedErrorBorder: AuthInputBorders.error,
+            disabledBorder: AuthInputBorders.disabled,
+            contentPadding: AuthInputBorders.contentPadding,
           ),
           validator: (value) {
             if (value == null || thaiMobileToE164(value) == null) {
