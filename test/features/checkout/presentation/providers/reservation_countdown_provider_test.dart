@@ -42,6 +42,7 @@ PosterDetail _poster() => PosterDetail(
 /// why a real `Stopwatch` can't be driven by `flutter_test`'s fake clock.
 ({CheckoutFlowState flow, ManualStopwatch stopwatch}) _flow({
   Duration span = const Duration(seconds: 3),
+  DateTime? serverReceivedAt,
 }) {
   final createdAt = DateTime.utc(2026, 9, 16, 15, 30);
   final stopwatch = ManualStopwatch();
@@ -51,6 +52,7 @@ PosterDetail _poster() => PosterDetail(
       posterId: 'p1',
       createdAt: createdAt,
       expiresAt: createdAt.add(span),
+      serverReceivedAt: serverReceivedAt,
     ),
     posterSnapshot: _poster(),
     stopwatch: stopwatch,
@@ -99,6 +101,97 @@ void main() {
       built.stopwatch.manualElapsed = const Duration(seconds: 4);
       await tester.pump(const Duration(seconds: 1));
       expect(container.read(reservationCountdownProvider), Duration.zero);
+    },
+  );
+
+  // code-critic 2026-09-17 F-Med — a 200 replay (ADR-0037 A5-D1) carries the
+  // row's original `created_at`, so `expiresAt - createdAt` is the full TTL;
+  // the countdown must start from what is actually left, which only the
+  // server's own now (`serverReceivedAt`, the `Date` header) can give.
+  testWidgets(
+    'a 200 replay of a 45-minute-old reservation (created_at = T-45min, '
+    'expires_at = T+15min, Date = T) starts the countdown at 15:00 — not '
+    'the 59:59 the critic probe measured (AC-8). 🔴 mutation-locking: '
+    'anchoring on createdAt regardless of serverReceivedAt turns this red',
+    (tester) async {
+      // Disposed explicitly at the end, not via `addTearDown`: the
+      // countdown's `Timer.periodic` never reaches zero in this test, and
+      // flutter_test checks for pending timers *before* tearDowns run.
+      final container = ProviderContainer();
+      final createdAt = DateTime.utc(2026, 9, 16, 15, 30);
+      final serverNow = createdAt.add(const Duration(minutes: 45));
+      final built = _flow(
+        span: const Duration(minutes: 60),
+        serverReceivedAt: serverNow,
+      );
+      container.read(checkoutFlowProvider.notifier).start(built.flow);
+      final sub = container.listen(reservationCountdownProvider, (_, _) {});
+
+      expect(
+        container.read(reservationCountdownProvider),
+        const Duration(minutes: 15),
+      );
+      expect(
+        container.read(reservationCountdownProvider),
+        isNot(const Duration(minutes: 60)),
+      );
+
+      // And it keeps counting from there, on the same stopwatch anchor.
+      built.stopwatch.manualElapsed = const Duration(minutes: 1);
+      await tester.pump(const Duration(seconds: 1));
+      expect(
+        container.read(reservationCountdownProvider),
+        const Duration(minutes: 14),
+      );
+
+      sub.close();
+      container.dispose();
+    },
+  );
+
+  testWidgets(
+    'a 201 with no Date header (serverReceivedAt null) still counts from '
+    'the full server span expiresAt - createdAt — the pre-F-Med behaviour, '
+    'exact for a freshly created row',
+    (tester) async {
+      // Disposed explicitly at the end, not via `addTearDown`: the
+      // countdown's `Timer.periodic` never reaches zero in this test, and
+      // flutter_test checks for pending timers *before* tearDowns run.
+      final container = ProviderContainer();
+      final built = _flow(span: const Duration(minutes: 60));
+      container.read(checkoutFlowProvider.notifier).start(built.flow);
+      final sub = container.listen(reservationCountdownProvider, (_, _) {});
+
+      expect(
+        container.read(reservationCountdownProvider),
+        const Duration(minutes: 60),
+      );
+
+      sub.close();
+      container.dispose();
+    },
+  );
+
+  testWidgets(
+    'a replay whose server now is already past expires_at reads zero at '
+    'once, never negative',
+    (tester) async {
+      // Disposed explicitly at the end, not via `addTearDown`: the
+      // countdown's `Timer.periodic` never reaches zero in this test, and
+      // flutter_test checks for pending timers *before* tearDowns run.
+      final container = ProviderContainer();
+      final createdAt = DateTime.utc(2026, 9, 16, 15, 30);
+      final built = _flow(
+        span: const Duration(minutes: 60),
+        serverReceivedAt: createdAt.add(const Duration(minutes: 61)),
+      );
+      container.read(checkoutFlowProvider.notifier).start(built.flow);
+      final sub = container.listen(reservationCountdownProvider, (_, _) {});
+
+      expect(container.read(reservationCountdownProvider), Duration.zero);
+
+      sub.close();
+      container.dispose();
     },
   );
 

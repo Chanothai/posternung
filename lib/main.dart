@@ -7,6 +7,7 @@ import 'core/config/environment_provider.dart';
 import 'core/config/firebase_options_selector.dart';
 import 'core/router/app_router.dart';
 import 'core/strings/app_strings.dart';
+import 'core/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,9 +31,9 @@ class MyApp extends ConsumerWidget {
     return MaterialApp.router(
       title: AppStrings.appName,
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
+      // One central theme (SCR-07 B9) — colours, fonts, input and button
+      // defaults live in `AppTheme`, so a feature declares only what differs.
+      theme: AppTheme.dark(),
       routerConfig: ref.watch(routerProvider),
     );
   }

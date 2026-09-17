@@ -8,17 +8,18 @@ import 'backend_envelope.dart';
 /// it, and that constructor only accepts a [BackendErrorEnvelope] that can
 /// only have come from `backendErrorEnvelopeOf`.
 ///
-/// Adds four typed fields on top of that shared shape (ADR-0017 Amendment 2
-/// A2-D2, `ADR-0037` Amendment 2 A2-D2): on this feature's two endpoints,
-/// every error code except `VALIDATION_ERROR` sends `details[].message` as
-/// a bare machine value (ISO-8601, an integer, a UUID) rather than prose —
-/// [reservedUntil]/[expiredAt]/[limit]/[retryAfter] are that value, parsed
-/// and typed, picked out of [BackendErrorEnvelope.typedDetails] by
-/// `field` name.
+/// Adds five typed fields on top of that shared shape (ADR-0017 Amendment 2
+/// A2-D2, `ADR-0037` Amendment 2 A2-D2, Amendment 5 A5-D4): on this
+/// feature's two endpoints, every error code except `VALIDATION_ERROR`
+/// sends `details[].message` as a bare machine value (ISO-8601, an integer,
+/// a UUID, an order number) rather than prose —
+/// [reservedUntil]/[expiredAt]/[limit]/[retryAfter]/[orderNo] are that
+/// value, parsed and typed, picked out of [BackendErrorEnvelope.typedDetails]
+/// by `field` name.
 ///
 /// 🔴 **Nothing on this class's public surface exposes `typedDetails` or
 /// the raw `details` string** — presentation may only ever see
-/// [reservedUntil], [expiredAt], [limit], [retryAfter], and
+/// [reservedUntil], [expiredAt], [limit], [retryAfter], [orderNo], and
 /// [validationFields] (ADR-0017 Amendment 2 A2-D3/A2-D4, enforced by a
 /// source scan in `test/core/error_message_safety_test.dart`). A typed
 /// field that fails to parse is `null`, never a thrown error — presentation
@@ -32,9 +33,10 @@ class OrderException implements Exception {
       expiredAt = null,
       limit = null,
       retryAfter = null,
+      orderNo = null,
       validationFields = const [];
 
-  /// The only legal way to populate [displayMessage] and the four typed
+  /// The only legal way to populate [displayMessage] and the five typed
   /// fields (ADR-0017 D2, Amendment 1 A1-D1, Amendment 2 A2-D2). [env] can
   /// only have come from `backendErrorEnvelopeOf`.
   ///
@@ -52,6 +54,7 @@ class OrderException implements Exception {
       reservedUntil = _dateTimeField(env, 'reserved_until'),
       expiredAt = _dateTimeField(env, 'expired_at'),
       limit = _intField(env, 'limit'),
+      orderNo = _orderNoField(env, 'order_no'),
       retryAfter = env.retryAfterSeconds == null
           ? null
           : Duration(seconds: env.retryAfterSeconds!),
@@ -81,6 +84,21 @@ class OrderException implements Exception {
   /// `details` row (`ADR-0037` Amendment 2 A2-D2: a 429 sends
   /// `details: null`, the value travels in the header instead).
   final Duration? retryAfter;
+
+  /// From the `order_no` row of `details[]` on `BUYER_HAS_LIVE_ORDER`
+  /// (reserve, `ADR-0037` Amendment 5 A5-D4) — the poster being looked at
+  /// already has a live order **of this buyer's own**, and this is its
+  /// human-readable number (`PN-YYMMDD-NNNN`) for the screen to show.
+  ///
+  /// Validated against [_orderNoPattern] rather than taken as any string:
+  /// unlike the other typed fields, this one is embedded verbatim into a
+  /// Thai sentence the buyer reads (`AppStrings.checkoutErrorBuyerHasLive
+  /// Order`), so a row that carried prose instead of the machine value
+  /// would put backend prose on screen — exactly what ADR-0017 D3 forbids.
+  /// A row that fails the pattern therefore degrades to `null` (the
+  /// sentence then omits the number), the same "unparseable → null, never
+  /// throw" rule the `DateTime`/`int` fields follow.
+  final String? orderNo;
 
   /// `details[].field` names, populated only when [code] is
   /// `VALIDATION_ERROR` — for pointing at the offending form field. The
@@ -117,6 +135,23 @@ class OrderException implements Exception {
   static int? _intField(BackendErrorEnvelope env, String field) {
     for (final row in env.typedDetails) {
       if (row.field == field) return int.tryParse(row.message);
+    }
+    return null;
+  }
+
+  /// `PN-YYMMDD-NNNN` — `posternung-backend/app/repositories/order_
+  /// repository.py` formats the running number with `:04d`, which is a
+  /// **minimum** width, not a cap (its own comment: a 5-digit day still
+  /// fits `String(20)`), hence `\d{4,}` rather than `\d{4}`. Anchored on
+  /// both ends so a sentence that merely *contains* an order number is
+  /// still rejected.
+  static final RegExp _orderNoPattern = RegExp(r'^PN-\d{6}-\d{4,}$');
+
+  static String? _orderNoField(BackendErrorEnvelope env, String field) {
+    for (final row in env.typedDetails) {
+      if (row.field == field) {
+        return _orderNoPattern.hasMatch(row.message) ? row.message : null;
+      }
     }
     return null;
   }

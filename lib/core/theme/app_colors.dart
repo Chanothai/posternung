@@ -25,6 +25,43 @@ abstract final class AppColors {
   static const Color accentRedSoft = Color(0x24B54A35);
   static const Color accentSoft = Color(0x24A67C52);
 
+  // --- Surfaces on the dark ground (Figma 7:1201, added SCR-07 B9) ---
+  // Named for what they are (a section, an input, a sticky bar), not for
+  // the screen that first needed them — every one of these is read by
+  // `AppTheme` / `AppSectionCard` in `core/`, so they are app-wide tokens.
+  // Alpha washes rather than flat blends, for the same reason as the status
+  // halos above: they must sit correctly on `surfaceDark` *and* on the
+  // gradient background.
+
+  /// Section card fill — `rgba(0,0,0,.20)`.
+  static const Color sectionFill = Color(0x33000000);
+
+  /// Section card border and the rule under its heading — `rgba(255,255,255,.10)`.
+  static const Color sectionBorder = Color(0x1AFFFFFF);
+
+  /// Text-input fill on the dark ground — `rgba(0,0,0,.30)`. The white
+  /// inputs on the auth cards keep setting `fillColor: white` themselves.
+  static const Color inputFill = Color(0x4D000000);
+
+  /// Text-input resting border — `rgba(255,255,255,.10)`.
+  static const Color inputBorder = Color(0x1AFFFFFF);
+
+  /// Sticky CTA bar fill — `surfaceDark` at 85%, blurred behind.
+  static const Color stickyBarFill = Color(0xD94A3F35);
+
+  /// Sticky CTA bar top rule — `#DBD0BA` at 10%.
+  static const Color stickyBarBorder = Color(0x1ADBD0BA);
+
+  /// Secondary (outlined) button fill — `rgba(255,255,255,.10)`.
+  ///
+  /// Not yet read by anything: `AppTheme` deliberately carries no
+  /// `outlinedButtonTheme` (SCR-07 B9 GATE 2 (จ1)) — this token waits for
+  /// BL-154 to re-introduce it screen by screen.
+  static const Color secondaryButtonFill = Color(0x1AFFFFFF);
+
+  /// Primary CTA drop shadow — `#3A332C` at 12%.
+  static const Color ctaShadow = Color(0x1F3A332C);
+
   // --- Condition grade scale (ADR-0016 D6) ---
   //
   // 🔴 round-1 code-critic history (2026-08-06): the first version of this

@@ -143,6 +143,42 @@ void main() {
       );
     });
 
+    test('BUYER_HAS_LIVE_ORDER with a parsed order_no composes the sentence '
+        'around the number (ADR-0037 Amendment 5 A5-D4) — the backend\'s '
+        'own `message` is never what is shown', () {
+      final e = _fromEnvelope(
+        code: 'BUYER_HAS_LIVE_ORDER',
+        message: 'คุณสั่งซื้อโปสเตอร์ใบนี้แล้ว',
+        details: [
+          {'field': 'order_no', 'message': 'PN-260916-0001'},
+        ],
+      );
+      final shown = reserveErrorDisplayMessage(e, fallback: 'fallback');
+      expect(
+        shown,
+        '${AppStrings.checkoutErrorBuyerHasLiveOrderPrefix}'
+        'PN-260916-0001'
+        '${AppStrings.checkoutErrorBuyerHasLiveOrderSuffix}',
+      );
+      expect(shown, isNot('คุณสั่งซื้อโปสเตอร์ใบนี้แล้ว'));
+      expect(shown, isNot('fallback'));
+    });
+
+    test('BUYER_HAS_LIVE_ORDER with NO usable order_no uses the bracket-free '
+        'sentence — never "()" and never the backend prose', () {
+      final e = _fromEnvelope(
+        code: 'BUYER_HAS_LIVE_ORDER',
+        message: 'คุณสั่งซื้อโปสเตอร์ใบนี้แล้ว',
+        details: [
+          {'field': 'order_no', 'message': 'เลขที่ PN-260916-0001 รอชำระเงิน'},
+        ],
+      );
+      final shown = reserveErrorDisplayMessage(e, fallback: 'fallback');
+      expect(shown, AppStrings.checkoutErrorBuyerHasLiveOrderNoNumber);
+      expect(shown, isNot(contains('(')));
+      expect(shown, isNot(contains('PN-')));
+    });
+
     test('POSTER_NOT_AVAILABLE with reserved_until composes the absolute '
         'HH:mm local time into the message', () {
       final e = _fromEnvelope(

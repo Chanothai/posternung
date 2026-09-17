@@ -8,6 +8,7 @@ import 'package:posternung/core/error/auth_exception.dart';
 import 'package:posternung/core/router/app_router.dart';
 import 'package:posternung/core/router/app_routes.dart';
 import 'package:posternung/core/strings/app_strings.dart';
+import 'package:posternung/core/theme/app_colors.dart';
 import 'package:posternung/features/auth/data/datasources/phone_sign_in_data_source.dart';
 import 'package:posternung/features/auth/domain/entities/auth_user.dart';
 import 'package:posternung/features/auth/presentation/providers/auth_providers.dart';
@@ -516,5 +517,170 @@ void main() {
         );
       },
     );
+  });
+
+  // SCR-07 B9 GATE 2 (ง2) · SCR-02 gap N-1 — under the app's real theme
+  // (`routedApp` installs `AppTheme.dark()`), the white auth inputs must
+  // paint a border that is actually visible on their white fill. Read off
+  // what `InputDecorator` renders (its private `_BorderContainer`), the
+  // same way `checkout_screen_test.dart`'s AC-B9-3 does — not off
+  // `InputDecoration.border`, which is precisely the value M3 never paints.
+  group('(ง2) / SCR-02 N-1 — auth inputs paint a visible border under '
+      'AppTheme', () {
+    /// WCAG-style relative-luminance contrast ratio of the border as it is
+    /// composited onto the fill. The pre-fix state — the theme's white-10%
+    /// `inputBorder` blended onto a white fill — is exactly 1.0 (identical
+    /// colour); `borderMuted` (#E5E7EB) on white measures ≈1.21. The
+    /// threshold below sits between those two, so it separates "invisible"
+    /// from "the Figma border" — it is not a WCAG pass mark (3:1 for UI
+    /// components would fail the Figma value too; that is a design call,
+    /// not this test's).
+    double contrastOnFill(Color border, Color fill) {
+      final Color painted = Color.alphaBlend(border, fill);
+      final double l1 = painted.computeLuminance();
+      final double l2 = fill.computeLuminance();
+      final double hi = l1 > l2 ? l1 : l2;
+      final double lo = l1 > l2 ? l2 : l1;
+      return (hi + 0.05) / (lo + 0.05);
+    }
+
+    const double visibleContrast = 1.1;
+
+    /// Asserts the painted border/fill of the `TextFormField` at [field].
+    void expectVisibleBorder(
+      WidgetTester tester,
+      Finder field, {
+      required Color expectedBorder,
+      required String label,
+    }) {
+      final decorator = tester.widget<InputDecorator>(
+        find.descendant(of: field, matching: find.byType(InputDecorator)),
+      );
+      final decoration = decorator.decoration;
+      expect(decoration.filled, isTrue, reason: '$label is not filled');
+      expect(decoration.fillColor, AppColors.white, reason: label);
+      expect(
+        decoration.enabledBorder,
+        isA<OutlineInputBorder>().having(
+          (b) => b.borderSide.color,
+          'enabledBorder color',
+          AppColors.borderMuted,
+        ),
+        reason: '$label must set its own enabledBorder',
+      );
+
+      final painted = find.descendant(
+        of: field,
+        matching: find.byWidgetPredicate(
+          (w) => w.runtimeType.toString() == '_BorderContainer',
+        ),
+      );
+      expect(painted, findsOneWidget, reason: label);
+      final dynamic container = tester.widget(painted);
+      final Color fill = container.fillColor as Color;
+      final Color border =
+          (container.border as OutlineInputBorder).borderSide.color;
+      expect(fill, AppColors.white, reason: '$label painted fill');
+      expect(border, expectedBorder, reason: '$label painted border');
+      // Negative: the theme's dark-ground resting border (white at 10%)
+      // must never be what paints on a white field.
+      expect(border, isNot(AppColors.inputBorder), reason: label);
+      expect(
+        contrastOnFill(border, fill),
+        greaterThan(visibleContrast),
+        reason:
+            '$label border is not visible on its fill '
+            '(contrast ${contrastOnFill(border, fill)})',
+      );
+    }
+
+    testWidgets(
+      'email + password: resting border is borderMuted on a white fill — '
+      'visible — and the field is 56px tall, as before the theme existed. '
+      '🔴 mutation-locking: removing `enabledBorder:` from either field '
+      'turns this red (the theme\'s white-10% border then paints)',
+      (tester) async {
+        await tester.pumpWidget(wrap());
+        await tester.pump();
+
+        final fields = find.byType(TextFormField);
+        expect(fields, findsNWidgets(2));
+        // Email is `autofocus: true` on login — so first it paints its own
+        // `focusedBorder` (accent), also visible on white …
+        expectVisibleBorder(
+          tester,
+          fields.at(0),
+          expectedBorder: AppColors.accent,
+          label: 'email (focused)',
+        );
+        // … and once focus leaves, the resting `enabledBorder`.
+        tester.binding.focusManager.primaryFocus?.unfocus();
+        await tester.pump();
+        expectVisibleBorder(
+          tester,
+          fields.at(0),
+          expectedBorder: AppColors.borderMuted,
+          label: 'email',
+        );
+        expectVisibleBorder(
+          tester,
+          fields.at(1),
+          expectedBorder: AppColors.borderMuted,
+          label: 'password',
+        );
+        // Height: the theme's 16/12 contentPadding would make these 48.
+        expect(tester.getSize(fields.at(0)).height, 56, reason: 'email');
+        expect(tester.getSize(fields.at(1)).height, 56, reason: 'password');
+      },
+    );
+
+    testWidgets('phone: resting border is borderMuted on a white fill and the '
+        'field is 56px tall', (tester) async {
+      await tester.pumpWidget(wrap());
+      await tester.tap(find.text(AppStrings.authMethodPhoneTab));
+      await tester.pump();
+      // `_PhoneField` is `autofocus: true` as well — rest it first.
+      tester.binding.focusManager.primaryFocus?.unfocus();
+      await tester.pump();
+
+      final field = find.byType(TextFormField);
+      expect(field, findsOneWidget);
+      expectVisibleBorder(
+        tester,
+        field,
+        expectedBorder: AppColors.borderMuted,
+        label: 'phone',
+      );
+      expect(tester.getSize(field).height, 56);
+    });
+
+    testWidgets('a validation failure paints accentRed on the email field — '
+        'the error state has its own explicit border too, not `border:`\'s '
+        'never-painted side', (tester) async {
+      await tester.pumpWidget(wrap());
+      await tester.pump();
+
+      await tester.tap(find.text(AppStrings.authSubmitLogin));
+      await tester.pump();
+      expect(find.text(AppStrings.authEmailValidationError), findsOneWidget);
+
+      final email = find.byType(TextFormField).first;
+      final painted = find.descendant(
+        of: email,
+        matching: find.byWidgetPredicate(
+          (w) => w.runtimeType.toString() == '_BorderContainer',
+        ),
+      );
+      expect(painted, findsOneWidget);
+      final dynamic container = tester.widget(painted);
+      final Color border =
+          (container.border as OutlineInputBorder).borderSide.color;
+      expect(border, AppColors.accentRed);
+      expect(border, isNot(AppColors.inputBorder));
+      expect(
+        contrastOnFill(border, container.fillColor as Color),
+        greaterThan(visibleContrast),
+      );
+    });
   });
 }

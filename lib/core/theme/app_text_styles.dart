@@ -249,4 +249,70 @@ abstract final class AppTextStyles {
     letterSpacing: 0.35,
     color: AppColors.textPrimary,
   );
+
+  // --- Sections / forms / CTAs on the dark ground (Figma 7:1201, SCR-07 B9) ---
+  // Consumed by `core/theme/app_theme.dart` (input, button and app-bar
+  // themes) and `core/widgets/app_section_card.dart`, so a screen that
+  // leaves a `Text` unstyled inside a themed button still renders in Kanit
+  // rather than the `ThemeData` default. Size/weight/line-height are the
+  // Figma values; the family is Kanit throughout — Lora/Libre Baskerville
+  // have no Thai glyphs (see the note at the top of this file).
+
+  /// H2 — a page-level section title (20/28 bold).
+  static final TextStyle sectionTitle = GoogleFonts.kanit(
+    fontSize: 20,
+    height: 28 / 20,
+    fontWeight: FontWeight.bold,
+    color: AppColors.textPrimary,
+  );
+
+  /// H3 — the heading inside an `AppSectionCard` (14/20 bold).
+  static final TextStyle sectionHeading = GoogleFonts.kanit(
+    fontSize: 14,
+    height: 20 / 14,
+    fontWeight: FontWeight.bold,
+    color: AppColors.textPrimary,
+  );
+
+  /// Form-field label (12/16 w500, tracking .6). Figma sets these in
+  /// UPPERCASE — do that on the *string* (`toUpperCase()`, Latin labels
+  /// only; Thai has no case), never here: a `TextStyle` cannot transform
+  /// text, and a Thai label passed through it would be unchanged anyway.
+  static final TextStyle formLabel = GoogleFonts.kanit(
+    fontSize: 12,
+    height: 16 / 12,
+    fontWeight: FontWeight.w500,
+    letterSpacing: 0.6,
+    color: AppColors.textSecondary,
+  );
+
+  /// Text typed into an input on the dark ground (14 regular, `textPrimary`).
+  /// Distinct from [inputText], whose `surfaceDark` colour is for the white
+  /// inputs on the auth cards — that value is unchanged on purpose.
+  static final TextStyle inputTextOnDark = GoogleFonts.kanit(
+    fontSize: 14,
+    height: 20 / 14,
+    fontWeight: FontWeight.normal,
+    color: AppColors.textPrimary,
+  );
+
+  /// Primary CTA label (16/24 bold, white on `accent`).
+  static final TextStyle ctaLabel = GoogleFonts.kanit(
+    fontSize: 16,
+    height: 24 / 16,
+    fontWeight: FontWeight.bold,
+    color: AppColors.white,
+  );
+
+  /// Secondary (outlined) button label (14 bold).
+  ///
+  /// Not yet read by anything: `AppTheme` deliberately carries no
+  /// `outlinedButtonTheme` (SCR-07 B9 GATE 2 (จ1)) — this token waits for
+  /// BL-154 to re-introduce it screen by screen.
+  static final TextStyle secondaryButtonLabel = GoogleFonts.kanit(
+    fontSize: 14,
+    height: 20 / 14,
+    fontWeight: FontWeight.bold,
+    color: AppColors.textPrimary,
+  );
 }

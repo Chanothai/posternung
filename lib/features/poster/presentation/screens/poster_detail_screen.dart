@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +14,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/condition_grade_indicator.dart';
+import '../../../../core/widgets/glass_circle_button.dart';
 import '../../../../core/widgets/gradient_background.dart';
 import '../../domain/entities/poster_detail.dart';
 import '../../domain/entities/poster_status.dart';
@@ -123,14 +123,14 @@ class _PosterDetailScreenState extends ConsumerState<PosterDetailScreen>
         elevation: 0,
         flexibleSpace: _AppBarBackdrop(controller: _scrollController),
         // `AppSpacing.lg` (16) left inset + the button's own 48px tap area
-        // (code-critic round 1, Medium — see `_GlassCircleButton`) —
+        // (code-critic round 1, Medium — see `GlassCircleButton`) —
         // measured close to figma's `pl-16` rather than the default
         // `leadingWidth` (56) centering a smaller button with an
         // uncontrolled, narrower inset.
-        leadingWidth: AppSpacing.lg + _GlassCircleButton.hitArea,
+        leadingWidth: AppSpacing.lg + GlassCircleButton.hitArea,
         leading: Padding(
           padding: const EdgeInsets.only(left: AppSpacing.lg),
-          child: _GlassCircleButton(
+          child: GlassCircleButton(
             icon: Icons.arrow_back,
             tooltip: AppStrings.posterDetailBackButtonTooltip,
             onPressed: () => context.popOrGoHome(),
@@ -307,74 +307,6 @@ class _AppBarBackdrop extends StatelessWidget {
   }
 }
 
-/// The 40px translucent glass button (ADR-0012 §D1 7:981) both the back
-/// button and [_ZoomAction] render as — `rgba(0,0,0,0.4)` fill, blurred
-/// backdrop, and a faint `rgba(255,255,255,0.1)` ring, floating directly on
-/// the image rather than sitting in an opaque bar. Wraps a real `IconButton`
-/// rather than a bare `GestureDetector` so the tooltip/semantics/ripple
-/// behaviour every call site already relied on keeps working unchanged.
-///
-/// 🔴 code-critic round 1 (Medium) measured the first version of this
-/// widget's actual tap target at 38×38 — the *whole* button (glass circle
-/// **and** its `IconButton`) was sized to the 40px visual diameter, short of
-/// both Material's 48dp and Apple's 44pt minimums, on a control that AC-1
-/// gates inspecting condition before a non-refundable purchase (ADR-0002).
-/// The visual stays exactly 40px (ADR-0012 §D1 is about the glass circle's
-/// look, not the tap target); only `IconButton.constraints` grows to
-/// [hitArea] now, via the `icon:` slot rather than the outer size — the
-/// glass circle becomes the *content* `IconButton` centers inside its own
-/// larger, invisible hit box, instead of being the box.
-class _GlassCircleButton extends StatelessWidget {
-  const _GlassCircleButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onPressed;
-
-  static const _diameter = 40.0;
-
-  /// Material's 48dp / Apple HIG's 44pt minimum touch target — see the
-  /// class doc.
-  static const hitArea = 48.0;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints.tightFor(
-        width: hitArea,
-        height: hitArea,
-      ),
-      onPressed: onPressed,
-      tooltip: tooltip,
-      icon: ClipOval(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Container(
-            width: _diameter,
-            height: _diameter,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.black.withValues(alpha: 0.4),
-              border: Border.all(color: AppColors.white.withValues(alpha: 0.1)),
-            ),
-            child: Icon(
-              icon,
-              size: AppDimens.iconMd,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// The bar's zoom button. Mirrors the gallery's state rather than owning it,
 /// so pinching, double-tapping, tapping the hint and pressing this all report
 /// the same thing.
@@ -389,7 +321,7 @@ class _ZoomAction extends StatelessWidget {
       listenable: controller,
       builder: (context, _) {
         final zoomedIn = controller.isZoomed;
-        return _GlassCircleButton(
+        return GlassCircleButton(
           icon: zoomedIn ? Icons.zoom_out : Icons.zoom_in,
           // An icon-only control has no other source for an accessible name;
           // `IconButton` reuses the tooltip as one.

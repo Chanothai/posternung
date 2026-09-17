@@ -20,6 +20,7 @@ import 'package:posternung/features/auth/domain/entities/auth_user.dart';
 import 'package:posternung/features/auth/presentation/providers/session_provider.dart';
 import 'package:posternung/features/checkout/domain/entities/reservation.dart';
 import 'package:posternung/features/checkout/domain/repositories/checkout_repository.dart';
+import 'package:posternung/features/checkout/presentation/providers/checkout_flow_provider.dart';
 import 'package:posternung/features/checkout/presentation/providers/checkout_providers.dart';
 import 'package:posternung/features/poster/domain/entities/poster_detail.dart';
 import 'package:posternung/features/poster/domain/entities/poster_image.dart';
@@ -78,9 +79,12 @@ PosterDetail _fullPoster({
   SizeFormat? sizeFormat,
   RestorationStatus? restorationStatus,
   DateTime? releaseDate,
+  // F-High cross-poster probe only — every other test keeps `p1`.
+  String id = 'p1',
+  String title = 'Blade Runner',
 }) => PosterDetail(
-  id: 'p1',
-  title: 'Blade Runner',
+  id: id,
+  title: title,
   price: '450.00',
   status: status,
   conditionGrade: conditionGrade,
@@ -1535,6 +1539,300 @@ void main() {
         await tester.pump();
 
         expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'A5-D2 (ADR-0037 Amendment 5) — leaving this screen while reserve() '
+      'is in flight, then the 201 arriving: checkoutFlowProvider holds that '
+      'reservation anyway (the server has committed it — the client must '
+      'not throw it away, N-2). 🔴 mutation-locking: moving '
+      '`flow.start()` in ReserveListingViewModel back behind '
+      '`if (!ref.mounted) return` turns this red',
+      (tester) async {
+        await useTallSurface(tester);
+        final completer = Completer<Reservation>();
+        when(
+          () => repository.reserveListing('p1'),
+        ).thenAnswer((_) => completer.future);
+        late GoRouter router;
+        await tester.pumpWidget(
+          wrapWithRepo(
+            FakePosterDetailViewModel('p1', detail: _fullPoster()),
+            onRouter: (r) => router = r,
+          ),
+        );
+        await tester.pump();
+        // The scope's container, read off the tree — it outlives every
+        // screen, which is the whole point of the assertion below.
+        final ProviderContainer container = ProviderScope.containerOf(
+          tester.element(find.byType(MaterialApp)),
+          listen: false,
+        );
+        expect(container.read(checkoutFlowProvider), isNull);
+
+        await tester.tap(buyNowButton());
+        await tester.pump(); // tap → Submitting, reserve() in flight
+
+        // Leave — same route + timing as the F4 test above. Once the page
+        // transition is over `PosterBuyNowButton` is unmounted and the
+        // `.autoDispose` element behind it is gone.
+        router.go(AppRoutes.privacyPath);
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 2));
+        expect(find.byType(PosterDetailScreen), findsNothing);
+
+        final rsv = reservation();
+        completer.complete(rsv);
+        await tester.pump();
+        await tester.pump();
+
+        expect(tester.takeException(), isNull);
+        final CheckoutFlowState? flow = container.read(checkoutFlowProvider);
+        expect(
+          flow,
+          isNotNull,
+          reason:
+              'the 201 landed after unmount and was dropped — the flow must '
+              'be started from the notifier before any mounted check',
+        );
+        expect(flow!.reservation.id, rsv.id);
+        expect(flow.posterSnapshot.id, 'p1');
+        // Negative: nobody navigated to /checkout on an unmounted screen.
+        expect(find.text(AppStrings.checkoutSubmitButtonLabel), findsNothing);
+      },
+    );
+
+    testWidgets(
+      "F-High (code-critic 2026-09-17) — the critic's probe, reversed: tap "
+      '"ซื้อเลย" on A, leave before the response, open B, tap, reach '
+      "/checkout holding B; then A's late 201 lands. The open flow must "
+      "STILL be B's (reservation AND snapshot), /checkout must still show B, "
+      'and there must be exactly one /checkout. 🔴 mutation-locking: '
+      '`start()` (overwrite always) in ReserveListingViewModel turns this '
+      'red',
+      (tester) async {
+        await useTallSurface(tester);
+        final completerA = Completer<Reservation>();
+        when(
+          () => repository.reserveListing('p1'),
+        ).thenAnswer((_) => completerA.future);
+        final rsvB = Reservation(
+          id: 'r-b',
+          posterId: 'p2',
+          createdAt: DateTime.utc(2026, 9, 16, 15, 30),
+          expiresAt: DateTime.utc(2026, 9, 16, 16, 30),
+        );
+        when(
+          () => repository.reserveListing('p2'),
+        ).thenAnswer((_) async => rsvB);
+        final posterA = _fullPoster();
+        final posterB = _fullPoster(id: 'p2', title: 'Alien');
+
+        late GoRouter router;
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              // One fake per poster id — this probe needs two real detail
+              // screens, not `wrapWithRepo`'s single instance.
+              posterDetailViewModelProvider.overrideWith2(
+                (posterId) => FakePosterDetailViewModel(
+                  posterId,
+                  detail: posterId == 'p1' ? posterA : posterB,
+                ),
+              ),
+              checkoutRepositoryProvider.overrideWithValue(repository),
+              sessionProvider.overrideWithValue(
+                const AsyncData<AuthUser?>(
+                  AuthUser(uid: 'u1', email: 'a@b.co'),
+                ),
+              ),
+            ],
+            child: routedApp(
+              location: AppRoutes.posterDetail('p1'),
+              routes: appRoutes,
+              onRouter: (r) => router = r,
+            ),
+          ),
+        );
+        await tester.pump();
+        final ProviderContainer container = ProviderScope.containerOf(
+          tester.element(find.byType(MaterialApp)),
+          listen: false,
+        );
+
+        // A: tap, in flight.
+        expect(find.text('Blade Runner'), findsWidgets);
+        await tester.tap(buyNowButton());
+        await tester.pump();
+        verify(() => repository.reserveListing('p1')).called(1);
+
+        // Leave A for B (same transition timing as the A5-D2 test above).
+        router.go(AppRoutes.posterDetail('p2'));
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 2));
+        expect(find.text('Alien'), findsWidgets);
+        expect(find.text('Blade Runner'), findsNothing);
+
+        // B: tap, 201 at once → /checkout holding B.
+        await tester.tap(buyNowButton());
+        await tester.pump();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.text(AppStrings.checkoutSubmitButtonLabel), findsOneWidget);
+        final CheckoutFlowState? flowB = container.read(checkoutFlowProvider);
+        expect(flowB, isNotNull);
+        expect(flowB!.reservation.id, 'r-b');
+        expect(flowB.posterSnapshot.id, 'p2');
+
+        // A's 201 finally lands.
+        completerA.complete(reservation());
+        await tester.pump();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+
+        expect(tester.takeException(), isNull);
+        final CheckoutFlowState? after = container.read(checkoutFlowProvider);
+        expect(
+          after,
+          same(flowB),
+          reason:
+              "A's late 201 replaced B's open flow — submit() would now "
+              'POST /orders for A while the screen shows B',
+        );
+        expect(after!.reservation.id, 'r-b');
+        expect(after.reservation.id, isNot('r1'));
+        expect(after.posterSnapshot.id, 'p2');
+        // The screen still shows B, and nobody pushed a second /checkout.
+        expect(find.text('Alien'), findsWidgets);
+        expect(find.text('Blade Runner'), findsNothing);
+        expect(find.text(AppStrings.checkoutSubmitButtonLabel), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'A5-D4 — 409 BUYER_HAS_LIVE_ORDER: the notice names the order number '
+      'and the "ซื้อเลย" button is gone (this buyer already has a live '
+      'order on this poster — nothing to reserve again)',
+      (tester) async {
+        await useTallSurface(tester);
+        when(() => repository.reserveListing('p1')).thenThrow(
+          OrderException.fromEnvelope(
+            backendEnvelopeFixture(
+              code: 'BUYER_HAS_LIVE_ORDER',
+              details: [
+                {'field': 'order_no', 'message': 'PN-260916-0001'},
+              ],
+            ),
+          ),
+        );
+        final posterViewModel = FakePosterDetailViewModel(
+          'p1',
+          detail: _fullPoster(),
+        );
+        await tester.pumpWidget(wrapWithRepo(posterViewModel));
+        await tester.pump();
+        expect(buyNowButton(), findsOneWidget);
+
+        await tester.tap(buyNowButton());
+        await tester.pump();
+        await tester.pump();
+
+        expect(
+          find.text(
+            AppStrings.checkoutErrorBuyerHasLiveOrder('PN-260916-0001'),
+          ),
+          findsOneWidget,
+        );
+        expect(find.textContaining('PN-260916-0001'), findsOneWidget);
+        expect(buyNowButton(), findsNothing);
+        // Not a stock change on this listing — no AC-9 refresh either.
+        expect(posterViewModel.refreshCalls, 0);
+      },
+    );
+
+    testWidgets(
+      'A5-D4 negative — 409 POSTER_NOT_AVAILABLE (no reserved_until) keeps '
+      'the "ซื้อเลย" button on screen and never shows the live-order '
+      'sentence: only BUYER_HAS_LIVE_ORDER hides the button, not the '
+      'status, not any other 409',
+      (tester) async {
+        await useTallSurface(tester);
+        when(() => repository.reserveListing('p1')).thenThrow(
+          OrderException.fromEnvelope(
+            backendEnvelopeFixture(code: 'POSTER_NOT_AVAILABLE'),
+          ),
+        );
+        await tester.pumpWidget(
+          wrapWithRepo(
+            FakePosterDetailViewModel(
+              'p1',
+              detail: _fullPoster(status: PosterStatus.reserved),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        await tester.tap(buyNowButton());
+        await tester.pump();
+        await tester.pump();
+
+        expect(buyNowButton(), findsOneWidget);
+        expect(
+          tester.widget<FilledButton>(buyNowButton()).onPressed,
+          isNotNull,
+        );
+        expect(
+          find.text(AppStrings.checkoutErrorPosterSoldOut),
+          findsOneWidget,
+        );
+        expect(
+          find.text(AppStrings.checkoutErrorBuyerHasLiveOrderNoNumber),
+          findsNothing,
+        );
+        expect(
+          find.textContaining(AppStrings.checkoutErrorBuyerHasLiveOrderPrefix),
+          findsNothing,
+        );
+      },
+    );
+
+    testWidgets(
+      'A5-D4 — BUYER_HAS_LIVE_ORDER with a malformed order_no row still '
+      'hides the button and shows the bracket-free sentence (no "()")',
+      (tester) async {
+        await useTallSurface(tester);
+        when(() => repository.reserveListing('p1')).thenThrow(
+          OrderException.fromEnvelope(
+            backendEnvelopeFixture(
+              code: 'BUYER_HAS_LIVE_ORDER',
+              details: [
+                {'field': 'order_no', 'message': 'เลขที่ PN-260916-0001'},
+              ],
+            ),
+          ),
+        );
+        await tester.pumpWidget(
+          wrapWithRepo(FakePosterDetailViewModel('p1', detail: _fullPoster())),
+        );
+        await tester.pump();
+
+        await tester.tap(buyNowButton());
+        await tester.pump();
+        await tester.pump();
+
+        expect(
+          find.text(AppStrings.checkoutErrorBuyerHasLiveOrderNoNumber),
+          findsOneWidget,
+        );
+        // The parenthesised form must not appear with an empty number.
+        expect(
+          find.textContaining(AppStrings.checkoutErrorBuyerHasLiveOrderPrefix),
+          findsNothing,
+        );
+        expect(find.textContaining('()'), findsNothing);
+        expect(find.textContaining('PN-'), findsNothing);
+        expect(buyNowButton(), findsNothing);
       },
     );
 

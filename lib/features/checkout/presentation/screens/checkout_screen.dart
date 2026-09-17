@@ -1,8 +1,9 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/design_system/app_dimens.dart';
 import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/error/order_exception.dart';
@@ -10,6 +11,8 @@ import '../../../../core/router/app_navigation.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/glass_circle_button.dart';
 import '../../../poster/domain/entities/poster_detail.dart';
 import '../checkout_error_display.dart';
 import '../providers/checkout_view_model.dart';
@@ -31,6 +34,19 @@ import '../widgets/checkout_reservation_lost_view.dart';
 /// phoneNumber`) — the reservation itself is read live from
 /// `checkoutFlowProvider`/`reservationCountdownProvider` by the ViewModel
 /// and the countdown provider respectively.
+///
+/// Leaving (SCR-07 B9, B8-3): the header carries the same glass back button
+/// SCR-05 has, and the whole screen sits in a `PopScope(canPop: true)` —
+/// back is **always** allowed, with no confirm dialog. The reservation lives
+/// server-side for its 60 minutes regardless of this screen, and
+/// `ADR-0037` A5 makes tapping "ซื้อเลย" again return the same reservation,
+/// so there is nothing to warn the buyer about. `CheckoutFlowObserver`
+/// clears the flow on the resulting `didPop`; nothing here duplicates that.
+///
+/// Styling comes from `AppTheme` (`core/theme/app_theme.dart`) and
+/// `AppSectionCard`; this file names no colour, radius or font of its own
+/// beyond the sticky bar's tokens — `test/features/checkout/
+/// checkout_no_hardcoded_style_test.dart` scans for regressions.
 class CheckoutScreen extends ConsumerStatefulWidget {
   const CheckoutScreen({required this.posterSnapshot, super.key});
 
@@ -79,10 +95,41 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final CheckoutState state = ref.watch(checkoutViewModelProvider);
+    final bool showsForm = switch (state) {
+      CheckoutReady() || CheckoutSubmitting() || CheckoutFailed() => true,
+      CheckoutOrderCreated() || CheckoutReservationLost() => false,
+    };
 
-    return Scaffold(
-      backgroundColor: AppColors.surfaceDark,
-      body: SafeArea(child: _body(state)),
+    return PopScope(
+      canPop: true,
+      child: Scaffold(
+        // Same header treatment as SCR-05: the bar floats over the body
+        // (transparent via `AppTheme.appBarTheme`), so the body paints
+        // underneath it and offsets itself through `SafeArea` below.
+        extendBodyBehindAppBar: true,
+        // The sticky CTA bar blurs what scrolls under it, which needs the
+        // body to actually extend beneath it — the form's scroll view adds
+        // the bar's height as trailing padding so nothing is hidden.
+        extendBody: showsForm,
+        appBar: AppBar(
+          leadingWidth: AppSpacing.lg + GlassCircleButton.hitArea,
+          leading: Padding(
+            padding: const EdgeInsets.only(left: AppSpacing.lg),
+            child: GlassCircleButton(
+              icon: Icons.arrow_back,
+              tooltip: AppStrings.checkoutBackButtonTooltip,
+              onPressed: () => context.popOrGoHome(),
+            ),
+          ),
+        ),
+        body: SafeArea(bottom: !showsForm, child: _body(state)),
+        bottomNavigationBar: showsForm
+            ? _StickyCtaBar(
+                isSubmitting: state is CheckoutSubmitting,
+                onSubmit: _onSubmit,
+              )
+            : null,
+      ),
     );
   }
 
@@ -115,72 +162,112 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         ? failure!.validationFields.toSet()
         : const {};
 
-    return CustomScrollView(
-      slivers: [
-        CheckoutCountdownHeader(remaining: remaining),
-        SliverPadding(
-          padding: const EdgeInsets.all(AppSpacing.xl),
-          sliver: SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                CheckoutOrderSummary(poster: widget.posterSnapshot),
-                const SizedBox(height: AppSpacing.xl),
-                CheckoutAddressForm(
-                  formKey: _formKey,
-                  recipientNameController: _recipientName,
-                  recipientPhoneController: _recipientPhone,
-                  addressLineController: _addressLine,
-                  subDistrictController: _subDistrict,
-                  districtController: _district,
-                  provinceController: _province,
-                  postalCodeController: _postalCode,
-                  invalidFields: invalidFields,
-                  enabled: !isSubmitting,
-                  onPrivacyTap: () => context.push(AppRoutes.privacyPath),
-                ),
-                if (failure != null) ...[
-                  const SizedBox(height: AppSpacing.lg),
-                  _FailureBanner(
-                    message: checkoutOrderErrorDisplayMessage(
-                      failure,
-                      fallback: AppStrings.authErrorServer,
-                    ),
+    // A `Builder` so the trailing padding below reads the `MediaQuery` the
+    // *Scaffold* provides to its body (`extendBody` puts the sticky bar's
+    // height there) — this State's own `context` sits above the Scaffold
+    // and would read the window's inset instead.
+    return Builder(
+      builder: (BuildContext context) => CustomScrollView(
+        slivers: [
+          CheckoutCountdownHeader(remaining: remaining),
+          SliverPadding(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  CheckoutOrderSummary(poster: widget.posterSnapshot),
+                  const SizedBox(height: AppSpacing.xl),
+                  CheckoutAddressForm(
+                    formKey: _formKey,
+                    recipientNameController: _recipientName,
+                    recipientPhoneController: _recipientPhone,
+                    addressLineController: _addressLine,
+                    subDistrictController: _subDistrict,
+                    districtController: _district,
+                    provinceController: _province,
+                    postalCodeController: _postalCode,
+                    invalidFields: invalidFields,
+                    enabled: !isSubmitting,
+                    onPrivacyTap: () => context.push(AppRoutes.privacyPath),
                   ),
+                  if (failure != null) ...[
+                    const SizedBox(height: AppSpacing.lg),
+                    _FailureBanner(
+                      message: checkoutOrderErrorDisplayMessage(
+                        failure,
+                        fallback: AppStrings.authErrorServer,
+                      ),
+                    ),
+                  ],
                 ],
-                const SizedBox(height: AppSpacing.xl),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: isSubmitting ? null : _onSubmit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      foregroundColor: AppColors.white,
-                      minimumSize: const Size.fromHeight(
-                        AppDimens.buttonHeight,
+              ),
+            ),
+          ),
+          // `extendBody` hands the sticky bar's height to the body as bottom
+          // padding; reserving it here is what lets the last field scroll out
+          // from under the bar instead of being covered by it.
+          SliverPadding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.paddingOf(context).bottom,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The blurred bar pinned to the bottom of the form (Figma 7:1201 —
+/// `stickyBarFill` at 85% over a 6px backdrop blur, `stickyBarBorder` top
+/// rule). Holds the one primary CTA; the button itself carries no style of
+/// its own — `AppTheme.elevatedButtonTheme` is what makes it the accent
+/// pill with the `ctaLabel` face.
+///
+/// Padding is Figma's 17 / 24 / 32 mapped to `AppSpacing.lg` / `xl` / `xxl`
+/// (the 17 → 16 delta is recorded in the B9 gate report). The bottom value
+/// is a `SafeArea.minimum`, so on a device with a home indicator the larger
+/// of the two wins rather than both stacking.
+class _StickyCtaBar extends StatelessWidget {
+  const _StickyCtaBar({required this.isSubmitting, required this.onSubmit});
+
+  final bool isSubmitting;
+  final VoidCallback onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.stickyBarFill,
+            border: Border(top: BorderSide(color: AppColors.stickyBarBorder)),
+          ),
+          child: SafeArea(
+            top: false,
+            minimum: const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              AppSpacing.lg,
+              AppSpacing.xl,
+              AppSpacing.xxl,
+            ),
+            child: ElevatedButton(
+              onPressed: isSubmitting ? null : onSubmit,
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.white,
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.xs),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: isSubmitting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.white,
-                            ),
-                          )
-                        : const Text(AppStrings.checkoutSubmitButtonLabel),
-                  ),
-                ),
-              ],
+                    )
+                  : const Text(AppStrings.checkoutSubmitButtonLabel),
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -200,7 +287,12 @@ class _FailureBanner extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(color: AppColors.accentRed),
       ),
-      child: Text(message, style: TextStyle(color: AppColors.textPrimary)),
+      child: Text(
+        message,
+        style: AppTextStyles.cardSubtitle.copyWith(
+          color: AppColors.textPrimary,
+        ),
+      ),
     );
   }
 }

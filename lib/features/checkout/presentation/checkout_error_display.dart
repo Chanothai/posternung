@@ -65,6 +65,12 @@ Map<String, String> _reserveMessages(OrderException e) {
   final Map<String, String> messages = {
     'BUYER_IS_SELLER': AppStrings.checkoutErrorBuyerIsSeller,
     'POSTER_ALREADY_RESERVED': AppStrings.checkoutErrorAlreadyReserved,
+    // A5-D4 — the buyer's own live order on this poster. `orderNo` is
+    // `null` when the row is missing/malformed; the string helper then
+    // drops the parenthesised number rather than rendering "()".
+    'BUYER_HAS_LIVE_ORDER': AppStrings.checkoutErrorBuyerHasLiveOrder(
+      e.orderNo,
+    ),
     'network_error': AppStrings.authErrorNetwork,
     'server_error': AppStrings.authErrorServer,
   };

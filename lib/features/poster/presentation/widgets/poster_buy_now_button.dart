@@ -9,6 +9,7 @@ import '../../../../core/error/order_exception.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_text_styles.dart';
 import '../../../checkout/presentation/checkout_error_display.dart';
 import '../../../checkout/presentation/providers/reserve_listing_view_model.dart';
 import '../../../checkout/presentation/state/reserve_listing_state.dart';
@@ -33,6 +34,16 @@ import '../providers/poster_providers.dart';
 /// at all on `sold` — `PosterSoldBanner` already gives that state its own
 /// way forward, and AC-15's "don't block lazy-expire" reasoning doesn't
 /// apply to a poster that isn't merely reserved.
+///
+/// The one other time the button is gone: after the backend has answered
+/// 409 `BUYER_HAS_LIVE_ORDER` (`ADR-0037` Amendment 5 A5-D4) — this buyer
+/// already holds a live order on this very poster, so there is nothing to
+/// reserve again; [_LiveOrderNotice] takes the button's place with the
+/// order number. Keyed on the **response code**, never on `poster.status`
+/// (AC-15 still stands: tap first, learn from the backend). The
+/// `PosterAvailabilityStatus` banner above is untouched — `GET /posters/
+/// {id}` does not know who the buyer is, so before the tap it can only say
+/// "someone" is holding it (accepted limitation, GATE 1 §3).
 class PosterBuyNowButton extends ConsumerWidget {
   const PosterBuyNowButton({super.key, required this.poster});
 
@@ -50,6 +61,10 @@ class PosterBuyNowButton extends ConsumerWidget {
     'POSTER_ALREADY_RESERVED',
   };
 
+  /// See the class doc comment — the only failure code that replaces the
+  /// button instead of leaving it enabled under a notice.
+  static const String _buyerHasLiveOrderCode = 'BUYER_HAS_LIVE_ORDER';
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (poster.status == PosterStatus.sold) return const SizedBox.shrink();
@@ -58,6 +73,11 @@ class PosterBuyNowButton extends ConsumerWidget {
       reserveListingViewModelProvider(poster.id),
     );
     final bool isSubmitting = state is ReserveListingSubmitting;
+
+    if (state is ReserveListingFailed &&
+        state.exception.code == _buyerHasLiveOrderCode) {
+      return _LiveOrderNotice(exception: state.exception);
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -127,6 +147,40 @@ class PosterBuyNowButton extends ConsumerWidget {
   }
 }
 
+/// A5-D4 — takes the place of the button once the backend has said this
+/// buyer already has a live order on this poster. Informational, not a
+/// failure: accent halo rather than the red of [_ReserveFailureNotice],
+/// because the buyer did nothing wrong and the way forward is "go pay",
+/// not "try again". Same mapper as every other reserve code, so the
+/// sentence composition (with/without the order number) has one owner.
+class _LiveOrderNotice extends StatelessWidget {
+  const _LiveOrderNotice({required this.exception});
+
+  final OrderException exception;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.accentSoft,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: AppColors.accent),
+      ),
+      child: Text(
+        reserveErrorDisplayMessage(
+          exception,
+          fallback: AppStrings.checkoutErrorBuyerHasLiveOrderNoNumber,
+        ),
+        style: AppTextStyles.cardSubtitle.copyWith(
+          color: AppColors.textPrimary,
+        ),
+      ),
+    );
+  }
+}
+
 /// The inline notice under the button (GATE 1 §3 item 3 — never a
 /// `SnackBar`: a message like "ถึง 15:30 น." has to stay readable, not
 /// disappear on its own timer). Same container shape as `checkout_screen.
@@ -153,7 +207,9 @@ class _ReserveFailureNotice extends StatelessWidget {
           exception,
           fallback: AppStrings.authErrorServer,
         ),
-        style: const TextStyle(color: AppColors.textPrimary),
+        style: AppTextStyles.cardSubtitle.copyWith(
+          color: AppColors.textPrimary,
+        ),
       ),
     );
   }

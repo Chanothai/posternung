@@ -98,6 +98,13 @@ closed-world และสิ่งที่ widget test พิสูจน์ไ
 - **Widget tests** override providers with `ProviderScope`, never hit real network/Firebase. See `test/features/auth/presentation/screens/login_screen_test.dart` for the reference pattern (fake ViewModel via `overrideWith`).
 - Mirror `lib/` structure under `test/`: `lib/features/poster/domain/usecases/get_featured_posters.dart` → `test/features/poster/domain/usecases/get_featured_posters_test.dart`.
 - `flutter test` must pass before every commit; CI enforces this (see `.github/workflows/ci.yml`).
+- 🔴 **Widget tests run under the app's real theme.** `test/support/router_harness.dart` installs
+  `AppTheme.dark()` (`lib/core/theme/app_theme.dart`); any new harness that pumps a `MaterialApp`
+  must do the same. **A change to the central theme is a change to every screen that renders under
+  it** — each such screen needs a test that installs the theme and reads what is actually painted
+  (`InputDecorator.decoration` after `applyDefaults`, `Material.shape`), not the widget's own
+  `decoration.border`. Owner's rule 2026-09-17 after the first `InputDecorationTheme` silently made
+  the login fields borderless while the whole auth suite stayed green (`project-gotchas` §5).
 
 ### Verify exactly what CI runs
 

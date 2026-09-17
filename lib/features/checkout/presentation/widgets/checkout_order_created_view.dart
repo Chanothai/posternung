@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/design_system/app_dimens.dart';
 import '../../../../core/design_system/app_radius.dart';
 import '../../../../core/design_system/app_spacing.dart';
 import '../../../../core/strings/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/app_section_card.dart';
 import '../../domain/entities/order.dart';
 
 /// `POST /orders` succeeded — rendered **in place** on `/checkout`
@@ -13,9 +13,11 @@ import '../../domain/entities/order.dart';
 ///
 /// 🔴 Closed-world by design (`test-quality` §4 — see
 /// `checkout_screen_test.dart`): exactly **one** tappable control
-/// ("กลับหน้าแรก"), and the word "สำเร็จ" must never appear anywhere on this
-/// view (Consequence 5 — an order that cannot be paid for yet must not be
-/// told to the buyer as already bought).
+/// ("กลับหน้าแรก") *in this view* — the screen's header back button (B9-1)
+/// is the only other one on screen and the test names both — and the word
+/// "สำเร็จ" must never appear anywhere on this view (Consequence 5 — an
+/// order that cannot be paid for yet must not be told to the buyer as
+/// already bought).
 class CheckoutOrderCreatedView extends StatelessWidget {
   const CheckoutOrderCreatedView({
     required this.order,
@@ -31,20 +33,14 @@ class CheckoutOrderCreatedView extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Container(
-          padding: const EdgeInsets.all(AppSpacing.xxl),
-          decoration: BoxDecoration(
-            color: AppColors.glassCardFill,
-            border: Border.all(color: AppColors.glassCardBorder),
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-          ),
+        child: AppSectionCard(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
                 AppStrings.checkoutOrderCreatedTitle,
-                style: AppTextStyles.authCardHeading,
+                style: AppTextStyles.sectionTitle,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -87,21 +83,12 @@ class CheckoutOrderCreatedView extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppSpacing.xl),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: onBackHome,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: AppColors.white,
-                    minimumSize: const Size.fromHeight(AppDimens.buttonHeight),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.xs),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: const Text(AppStrings.checkoutOrderCreatedHomeCta),
-                ),
+              // No style of its own — `AppTheme.elevatedButtonTheme` is the
+              // accent pill with the `ctaLabel` face (B8-UI: an unstyled
+              // label here used to fall back to Roboto).
+              ElevatedButton(
+                onPressed: onBackHome,
+                child: const Text(AppStrings.checkoutOrderCreatedHomeCta),
               ),
             ],
           ),
